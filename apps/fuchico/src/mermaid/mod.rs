@@ -17,6 +17,9 @@ pub mod sources;
 pub mod theme;
 pub mod window;
 
+#[cfg(test)]
+mod ui_tests;
+
 #[allow(unused_imports)] // The editor's API (wired by the editor engineer).
 pub use sources::{close_block, is_tracked, new_block_key, open_block, tracked_keys, update_block};
 

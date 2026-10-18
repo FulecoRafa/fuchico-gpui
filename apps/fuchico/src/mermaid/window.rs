@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use fuchico_mermaid::{Chrome, MermaidEvent, MermaidView};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyWindowHandle, App, Bounds, Context, Entity, Global, Subscription, TitlebarOptions, Window, WindowBounds,
+    AnyWindowHandle, App, Bounds, Context, Entity, Global, Subscription, TitlebarOptions, WeakEntity, Window, WindowBounds,
     WindowOptions, div, px, size,
 };
 
@@ -25,15 +25,22 @@ pub fn window_label(block_key: &str) -> String {
 
 /// Open diagram windows by label.
 #[derive(Default)]
-struct MermaidWindows(HashMap<String, AnyWindowHandle>);
+struct MermaidWindows(HashMap<String, (AnyWindowHandle, WeakEntity<MermaidWindow>)>);
 impl Global for MermaidWindows {}
 
-fn registry(cx: &mut App) -> &mut HashMap<String, AnyWindowHandle> {
+fn registry(cx: &mut App) -> &mut HashMap<String, (AnyWindowHandle, WeakEntity<MermaidWindow>)> {
     &mut cx.default_global::<MermaidWindows>().0
 }
 
 pub fn is_open(block_key: &str, cx: &mut App) -> bool {
-    registry(cx).contains_key(&window_label(block_key))
+    let Some((h, _)) = registry(cx).get(&window_label(block_key)).cloned() else { return false };
+    h.update(cx, |_, _, _| ()).is_ok()
+}
+
+/// The open diagram window for `block_key`, if any.
+pub fn window_for(block_key: &str, cx: &mut App) -> Option<(AnyWindowHandle, Entity<MermaidWindow>)> {
+    let (h, w) = registry(cx).get(&window_label(block_key))?.clone();
+    Some((h, w.upgrade()?))
 }
 
 /// `openMermaidWindow(blockKey, label)`. An already open window for the
@@ -41,7 +48,7 @@ pub fn is_open(block_key: &str, cx: &mut App) -> bool {
 /// shown until the editor answers the request.
 pub fn open_mermaid_window(block_key: String, label: String, text: Option<String>, cx: &mut App) {
     let wl = window_label(&block_key);
-    if let Some(h) = registry(cx).get(&wl).copied() {
+    if let Some((h, _)) = registry(cx).get(&wl).cloned() {
         let background = crate::background_mode();
         if h.update(cx, |_, w, _| if !background { w.activate_window() }).is_ok() {
             return;
@@ -63,8 +70,8 @@ pub fn open_mermaid_window(block_key: String, label: String, text: Option<String
     match gpui_kit::open_window(opts, cx, |window, cx| {
         cx.new(|cx| MermaidWindow::new(block_key, label, text, window, cx))
     }) {
-        Ok((handle, _)) => {
-            registry(cx).insert(wl, handle);
+        Ok((handle, view)) => {
+            registry(cx).insert(wl, (handle, view.downgrade()));
         }
         Err(e) => log::error!("open diagram window: {e}"),
     }
