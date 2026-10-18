@@ -236,8 +236,16 @@ impl CalDavClient {
         let mut req = self
             .http
             .request(method, url)
-            .basic_auth(&self.username, Some(&self.password))
-            .header("Content-Type", "application/xml; charset=utf-8");
+            .basic_auth(&self.username, Some(&self.password));
+        // Default to the XML body type unless the caller supplies its own
+        // (PUT sends `text/calendar`). `RequestBuilder::header` appends, so
+        // setting both would send two Content-Type headers.
+        let caller_sets_content_type = extra_headers
+            .iter()
+            .any(|(k, _)| k.eq_ignore_ascii_case("content-type"));
+        if !caller_sets_content_type {
+            req = req.header("Content-Type", "application/xml; charset=utf-8");
+        }
         if let Some(d) = depth {
             req = req.header("Depth", d);
         }
@@ -661,6 +669,32 @@ mod tests {
             .put_ics(&url, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", Some("\"abc123\""))
             .await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn put_ics_sends_a_single_text_calendar_content_type() {
+        let server = MockServer::start().await;
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(201))
+            .mount(&server)
+            .await;
+        Mock::given(method("PROPFIND"))
+            .respond_with(ResponseTemplate::new(207).set_body_string(PRINCIPAL_RESPONSE))
+            .mount(&server)
+            .await;
+
+        let client = CalDavClient::new(server.uri(), "user", "pass");
+        let url = format!("{}/t.ics", server.uri());
+        client.put_ics(&url, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", None).await.unwrap();
+        let _ = client.discover_calendar_home().await;
+
+        let reqs = server.received_requests().await.unwrap();
+        let put = reqs.iter().find(|r| r.method.as_str() == "PUT").unwrap();
+        let cts: Vec<_> = put.headers.get_all("content-type").iter().map(|v| v.to_str().unwrap().to_string()).collect();
+        assert_eq!(cts, vec!["text/calendar; charset=utf-8".to_string()]);
+        let propfind = reqs.iter().find(|r| r.method.as_str() == "PROPFIND").unwrap();
+        let cts: Vec<_> = propfind.headers.get_all("content-type").iter().map(|v| v.to_str().unwrap().to_string()).collect();
+        assert_eq!(cts, vec!["application/xml; charset=utf-8".to_string()]);
     }
 
     #[tokio::test]
