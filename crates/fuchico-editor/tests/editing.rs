@@ -38,7 +38,7 @@ async fn typing_modes_and_pending(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-async fn block_cursor_in_normal_bar_in_insert(cx: &mut TestAppContext) {
+async fn block_cursor_in_normal_and_insert(cx: &mut TestAppContext) {
     let mut ui = open(cx, "hello\n", EditorOptions::default());
     let c = ui.read(|v, _| v.debug_cursors());
     assert_eq!(c.len(), 1);
@@ -49,17 +49,17 @@ async fn block_cursor_in_normal_bar_in_insert(cx: &mut TestAppContext) {
     ui.press("i");
     let c = ui.read(|v, _| v.debug_cursors());
     assert!(
-        c[0].0.size.width <= px(2.),
-        "bar cursor in insert mode: {c:?}"
+        c[0].0.size.width > px(4.),
+        "block cursor in insert mode (cm-helix default): {c:?}"
     );
-    // Option: block in insert mode too.
+    // Option: bar in insert mode.
     ui.update(|v, _, cx| {
         let mut o = v.options().clone();
-        o.insert_cursor = InsertCursor::Block;
+        o.insert_cursor = InsertCursor::Bar;
         v.set_options(o, cx);
     });
     let c = ui.read(|v, _| v.debug_cursors());
-    assert!(c[0].0.size.width > px(4.));
+    assert!(c[0].0.size.width <= px(2.));
 }
 
 #[gpui_kit::test]
@@ -193,15 +193,27 @@ async fn cursor_shapes_and_colours_match_helix(cx: &mut TestAppContext) {
     for c in &c {
         assert!(c.0.size.width > px(4.), "block: {c:?}");
     }
-    // Insert mode: thin `.cm-cursor` bars in the foreground colour, both.
+    // Insert mode: cm-helix keeps `.cm-hx-block-cursor` (cursor-shape
+    // `block` by default, which the original does not override).
     ui.press("i");
     let c = ui.read(|v, _| v.debug_cursors());
     assert_eq!(c.len(), 2);
     for c in &c {
+        assert!(c.0.size.width > px(4.), "block: {c:?}");
+        assert_eq!(c.2, block);
+    }
+    assert_eq!(c.iter().filter(|c| c.1).count(), 1);
+    // The `bar` option: thin `.cm-cursor` bars in the foreground colour.
+    ui.update(|v, _, cx| {
+        let mut o = v.options().clone();
+        o.insert_cursor = InsertCursor::Bar;
+        v.set_options(o, cx);
+    });
+    let c = ui.read(|v, _| v.debug_cursors());
+    for c in &c {
         assert!(c.0.size.width <= px(1.5), "bar: {c:?}");
         assert_eq!(c.2, fg);
     }
-    assert_eq!(c.iter().filter(|c| c.1).count(), 1);
 }
 
 #[gpui_kit::test]

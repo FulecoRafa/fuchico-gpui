@@ -46,10 +46,12 @@ pub enum LineNumbers {
 }
 
 /// Cursor shape in insert mode (normal/select always draw a block).
+/// cm-helix draws a block in insert mode too unless configured otherwise
+/// (the original does not override it).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InsertCursor {
-    #[default]
     Bar,
+    #[default]
     Block,
 }
 
@@ -109,7 +111,7 @@ impl Default for EditorOptions {
             line_numbers: LineNumbers::Absolute,
             soft_wrap: false,
             rulers: Vec::new(),
-            insert_cursor: InsertCursor::Bar,
+            insert_cursor: InsertCursor::Block,
             vault_files: Vec::new(),
             all_tags: Vec::new(),
             path: None,
@@ -2241,11 +2243,63 @@ pub(crate) fn to_helix(ks: &Keystroke) -> Option<KeyEvent> {
                 if cs.next().is_some() {
                     return Some(KeyEvent::new(Key::Other(k.to_string()), mods));
                 }
-                Key::Char(if m.shift { c.to_ascii_uppercase() } else { c })
+                Key::Char(if m.shift { shifted(c) } else { c })
             }
         }
     };
     Some(KeyEvent::new(key, mods))
+}
+
+/// The character Shift produces for `c` on a US layout (`;` -> `:`, `1` ->
+/// `!`, `a` -> `A`), for modified keys whose `key_char` is not reported.
+fn shifted(c: char) -> char {
+    const PAIRS: &[(char, char)] = &[
+        ('`', '~'),
+        ('1', '!'),
+        ('2', '@'),
+        ('3', '#'),
+        ('4', '$'),
+        ('5', '%'),
+        ('6', '^'),
+        ('7', '&'),
+        ('8', '*'),
+        ('9', '('),
+        ('0', ')'),
+        ('-', '_'),
+        ('=', '+'),
+        ('[', '{'),
+        (']', '}'),
+        ('\\', '|'),
+        (';', ':'),
+        ('\'', '"'),
+        (',', '<'),
+        ('.', '>'),
+        ('/', '?'),
+    ];
+    PAIRS
+        .iter()
+        .find(|(k, _)| *k == c)
+        .map(|(_, s)| *s)
+        .unwrap_or_else(|| c.to_ascii_uppercase())
+}
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+
+    fn ev(s: &str) -> KeyEvent {
+        to_helix(&Keystroke::parse(s).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn alt_shift_punctuation_maps_to_the_shifted_char() {
+        assert_eq!(ev("alt-shift-;").key, Key::Char(':'));
+        assert!(ev("alt-shift-;").modifiers.alt);
+        assert_eq!(ev("alt-;").key, Key::Char(';'));
+        assert_eq!(ev("alt-shift-1").key, Key::Char('!'));
+        assert_eq!(ev("ctrl-shift-a").key, Key::Char('A'));
+        assert_eq!(ev("alt-shift-,").key, Key::Char('<'));
+    }
 }
 
 impl Render for EditorView {

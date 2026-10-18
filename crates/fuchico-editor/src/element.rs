@@ -26,7 +26,7 @@ use crate::images::{IMAGE_PAD, ImageContext, fit};
 
 use crate::display::{DisplayLine, SpanStyle, WidgetKind};
 use crate::style::{EditorStyle, mix};
-use crate::view::{EditorView, InsertCursor, LineNumbers, Overlay};
+use crate::view::{EditorView, EngineKind, InsertCursor, LineNumbers, Overlay};
 
 /// Something clickable in the last frame.
 #[derive(Debug, Clone)]
@@ -1310,7 +1310,9 @@ impl EditorView {
 
         // ---- cursors -------------------------------------------------------------
         let heads = self.engine.block_cursors();
-        let block = mode != ModeType::Insert || self.options.insert_cursor == InsertCursor::Block;
+        // Plain (non-modal) editing keeps CodeMirror's native bar.
+        let block = self.options.engine != EngineKind::Normal
+            && (mode != ModeType::Insert || self.options.insert_cursor == InsertCursor::Block);
         let mut cursor_anchor = None;
         if self.table.is_none() {
             for (i, &h) in heads.iter().enumerate() {
