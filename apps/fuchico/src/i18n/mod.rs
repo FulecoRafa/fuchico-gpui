@@ -170,7 +170,9 @@ mod tests {
     fn key_sets_are_equal_and_unique() {
         let keys: HashSet<_> = Msg::ALL.iter().map(|m| m.key()).collect();
         assert_eq!(keys.len(), Msg::ALL.len());
-        assert_eq!(Msg::ALL.len(), 300);
+        // 300 keys ported from the original catalog plus the native-only ones
+        // (CalDAV UI, shortcut reset, …) appended after them.
+        assert!(Msg::ALL.len() >= 300);
     }
 
     #[test]

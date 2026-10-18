@@ -16,6 +16,7 @@ chrono.workspace = true
 futures = "0.3"
 sys-locale = "0.3"
 rand = "0.9"
+lsp-types = "0.97"
 
 [dev-dependencies]
 # Headless UI tests (`#[gpui_kit::test]`): enables gpui's TestAppContext.

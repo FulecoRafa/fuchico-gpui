@@ -2126,6 +2126,7 @@ dependencies = [
  "gpui-pre-platform",
  "image",
  "log",
+ "lsp-types",
  "rand 0.9.5",
  "regex",
  "serde",
