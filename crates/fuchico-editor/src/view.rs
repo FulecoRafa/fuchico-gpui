@@ -101,6 +101,8 @@ pub struct EditorOptions {
     /// Indent width in spaces (`Settings → Tab size`).
     pub tab_size: u32,
     pub engine: EngineKind,
+    /// Labels of the editor's own UI (search panel, go-to-line, outline).
+    pub strings: crate::find::EditorStrings,
 }
 
 impl Default for EditorOptions {
@@ -122,6 +124,7 @@ impl Default for EditorOptions {
             externals: Default::default(),
             tab_size: 2,
             engine: EngineKind::Helix,
+            strings: Default::default(),
         }
     }
 }
@@ -202,14 +205,6 @@ pub(crate) struct PromptState {
     pub typed: String,
 }
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct FindState {
-    pub query: String,
-    /// Byte ranges of the matches.
-    pub matches: Vec<Range<usize>>,
-    pub current: usize,
-}
-
 #[derive(Debug, Clone)]
 pub(crate) struct OutlineState {
     pub query: String,
@@ -235,7 +230,6 @@ pub(crate) struct LangMenu {
 pub(crate) enum Overlay {
     None,
     Prompt(PromptState),
-    Find(FindState),
     Outline(OutlineState),
 }
 
@@ -285,6 +279,8 @@ pub struct EditorView {
     // IME / mouse
     pub(crate) marked: Option<Range<usize>>,
     pub(crate) drag_anchor: Option<usize>,
+    /// Search panel, go-to-line dialog, selection history (`find.rs`).
+    pub(crate) find: crate::find::FindModel,
 
     // host bookkeeping
     saved_text: String,
@@ -367,6 +363,7 @@ impl EditorView {
             message: None,
             marked: None,
             drag_anchor: None,
+            find: Default::default(),
             saved_text: normalized,
             dirty: false,
             mermaid: Vec::new(),
@@ -374,6 +371,7 @@ impl EditorView {
             suppress_completion: false,
         };
         view.ensure_engine_mode(cx);
+        view.find.reset_history(view.engine.selection().clone());
         view
     }
 
@@ -455,12 +453,6 @@ impl EditorView {
         match &self.overlay {
             Overlay::Prompt(p) => p.completions.options.clone(),
             _ => Vec::new(),
-        }
-    }
-    pub fn find_query(&self) -> Option<(String, usize, usize)> {
-        match &self.overlay {
-            Overlay::Find(f) => Some((f.query.clone(), f.current, f.matches.len())),
-            _ => None,
         }
     }
     pub fn outline_items(&self) -> Option<Vec<String>> {
@@ -816,6 +808,7 @@ impl EditorView {
             {
                 self.table = None;
             }
+            self.record_selection(doc_changed);
         }
         if doc_changed && self.mode() == ModeType::Insert && !self.suppress_completion {
             self.refresh_completion(true);
@@ -840,10 +833,6 @@ impl EditorView {
             .filter(|m| m.end <= self.engine.doc().len());
         if let Some(t) = &mut self.table {
             t.state.anchor = map_pos(t.state.anchor, &md, Assoc::Before);
-        }
-        if let Overlay::Find(f) = &mut self.overlay {
-            f.matches = find_matches(self.model.text(), &f.query);
-            f.current = f.current.min(f.matches.len().saturating_sub(1));
         }
         // Mermaid previews follow their fence.
         let mut events = Vec::new();
@@ -885,7 +874,7 @@ impl EditorView {
 
     // ---- keys -------------------------------------------------------------------
 
-    fn feed_key(&mut self, ev: KeyEvent, cx: &mut Context<Self>) {
+    pub(crate) fn feed_key(&mut self, ev: KeyEvent, cx: &mut Context<Self>) {
         // Bridge the system clipboard for paste/replace keys.
         if let Key::Char(c) = ev.key
             && (matches!(c, 'p' | 'P' | 'R') || !self.engine.pending_status().is_empty())
@@ -905,7 +894,7 @@ impl EditorView {
     pub(crate) fn on_key_down(
         &mut self,
         ev: &KeyDownEvent,
-        window: &mut Window,
+        _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let ks = &ev.keystroke;
@@ -917,12 +906,15 @@ impl EditorView {
             cx.stop_propagation();
             return;
         }
+        if matches!(self.overlay, Overlay::None) && self.panel_key(ks, cx) {
+            cx.stop_propagation();
+            return;
+        }
         let handled = match self.overlay {
             Overlay::Prompt(_) => {
                 self.prompt_key(ks, cx);
                 true
             }
-            Overlay::Find(_) => self.find_key(ks, window, cx),
             Overlay::Outline(_) => {
                 self.outline_key(ks, cx);
                 true
@@ -944,6 +936,10 @@ impl EditorView {
         let insert = self.mode() == ModeType::Insert;
         if insert && typed_char(ks).is_some() {
             return; // goes to the input handler (IME)
+        }
+        if self.editor_escape_closes_panel(ks, cx) {
+            cx.stop_propagation();
+            return;
         }
         if self.options.engine == EngineKind::Normal && self.normal_key(ks, cx) {
             cx.stop_propagation();
@@ -1143,108 +1139,9 @@ impl EditorView {
         cx.notify();
     }
 
-    // ---- find bar (Mod-f) ------------------------------------------------------
-
-    pub(crate) fn open_find(&mut self, cx: &mut Context<Self>) {
-        let r = self.engine.selection().main();
-        let sel = self.engine.doc().slice(r.from(), r.to());
-        let query = if sel.chars().count() > 1 && !sel.contains('\n') {
-            sel
-        } else {
-            String::new()
-        };
-        let matches = find_matches(self.model.text(), &query);
-        self.overlay = Overlay::Find(FindState {
-            query,
-            matches,
-            current: 0,
-        });
-        cx.notify();
-    }
-
-    fn find_set(&mut self, query: String, cx: &mut Context<Self>) {
-        let head = self.byte_of(self.engine.selection().main().from());
-        let matches = find_matches(self.model.text(), &query);
-        let current = matches.iter().position(|m| m.start >= head).unwrap_or(0);
-        self.overlay = Overlay::Find(FindState {
-            query,
-            matches,
-            current,
-        });
-        self.find_select(cx);
-    }
-
-    fn find_select(&mut self, cx: &mut Context<Self>) {
-        let Overlay::Find(f) = &self.overlay else {
-            return;
-        };
-        let Some(m) = f.matches.get(f.current).cloned() else {
-            return;
-        };
-        let (a, h) = (self.char_of(m.start), self.char_of(m.end));
-        let fx = self.engine.set_selection(Selection::single(a, h));
-        self.apply_effects(fx, cx);
-        self.pending_scroll = Some(Scroll::To {
-            pos: h,
-            align: ScrollAlign::Center,
-        });
-    }
-
-    fn find_key(&mut self, ks: &Keystroke, _window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let Overlay::Find(f) = &self.overlay else {
-            return false;
-        };
-        let f = f.clone();
-        match ks.key.as_str() {
-            "escape" => self.overlay = Overlay::None,
-            "enter" | "f3" => {
-                let n = f.matches.len();
-                if n > 0 {
-                    let cur = if ks.modifiers.shift {
-                        (f.current + n - 1) % n
-                    } else {
-                        (f.current + 1) % n
-                    };
-                    // The first Enter after typing selects the current match.
-                    let cur = if self.find_selected(&f) {
-                        cur
-                    } else {
-                        f.current
-                    };
-                    if let Overlay::Find(ff) = &mut self.overlay {
-                        ff.current = cur;
-                    }
-                    self.find_select(cx);
-                }
-            }
-            "backspace" => {
-                let mut q = f.query.clone();
-                q.pop();
-                self.find_set(q, cx);
-            }
-            _ => match typed_char(ks) {
-                Some(s) => {
-                    let mut q = f.query.clone();
-                    q.push_str(&s);
-                    self.find_set(q, cx);
-                }
-                None => return true,
-            },
-        }
-        cx.notify();
-        true
-    }
-
-    fn find_selected(&self, f: &FindState) -> bool {
-        f.matches.get(f.current).is_some_and(|m| {
-            let r = self.engine.selection().main();
-            self.byte_of(r.from()) == m.start && self.byte_of(r.to()) == m.end
-        })
-    }
-
     // ---- outline (Mod-o) ---------------------------------------------------------
 
-    pub(crate) fn open_outline(&mut self, cx: &mut Context<Self>) {
+    pub fn open_outline(&mut self, cx: &mut Context<Self>) {
         let items = self.model.outline();
         let filtered = (0..items.len()).collect();
         self.overlay = Overlay::Outline(OutlineState {
@@ -1257,7 +1154,7 @@ impl EditorView {
     }
 
     fn outline_filter(o: &mut OutlineState) {
-        if o.query.is_empty() {
+        if o.query.trim().is_empty() {
             o.filtered = (0..o.items.len()).collect();
         } else {
             let mut scored: Vec<(i64, usize)> = o
@@ -1282,7 +1179,18 @@ impl EditorView {
         let Some(&i) = o.filtered.get(ix) else { return };
         let line = o.items[i].line;
         self.overlay = Overlay::None;
-        self.reveal_line(line, cx);
+        // `EditorSelection.range(line.from, line.to)`, scrolled to the centre.
+        let doc = self.engine.doc();
+        let l = doc.line(line.clamp(1, doc.lines()));
+        let fx = self
+            .engine
+            .set_selection_from_pointer(Selection::single(l.from, l.to));
+        self.apply_effects(fx, cx);
+        self.pending_scroll = Some(Scroll::To {
+            pos: l.from,
+            align: ScrollAlign::Center,
+        });
+        cx.notify();
     }
 
     fn outline_key(&mut self, ks: &Keystroke, cx: &mut Context<Self>) {
@@ -1296,14 +1204,9 @@ impl EditorView {
                 let s = o.selected;
                 self.outline_pick(s, cx);
             }
-            "down" => o.selected = if n == 0 { 0 } else { (o.selected + 1) % n },
-            "up" => o.selected = if n == 0 { 0 } else { (o.selected + n - 1) % n },
-            "n" if ks.modifiers.control => {
-                o.selected = if n == 0 { 0 } else { (o.selected + 1) % n }
-            }
-            "p" if ks.modifiers.control => {
-                o.selected = if n == 0 { 0 } else { (o.selected + n - 1) % n }
-            }
+            // Clamped, like `Math.min(i + 1, filtered.length - 1)`.
+            "down" => o.selected = (o.selected + 1).min(n.saturating_sub(1)),
+            "up" => o.selected = o.selected.saturating_sub(1),
             "backspace" => {
                 o.query.pop();
                 Self::outline_filter(o);
@@ -1788,9 +1691,15 @@ impl EditorView {
             .join("\n")
     }
     fn act_copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
+        if self.field_clipboard('c', cx) {
+            return;
+        }
         cx.write_to_clipboard(ClipboardItem::new_string(self.selected_text()));
     }
     fn act_cut(&mut self, _: &Cut, _: &mut Window, cx: &mut Context<Self>) {
+        if self.field_clipboard('x', cx) {
+            return;
+        }
         cx.write_to_clipboard(ClipboardItem::new_string(self.selected_text()));
         let changes: Vec<Change> = self
             .engine
@@ -1803,6 +1712,9 @@ impl EditorView {
         self.apply_effects(fx, cx);
     }
     fn act_paste(&mut self, _: &Paste, _: &mut Window, cx: &mut Context<Self>) {
+        if self.field_clipboard('v', cx) {
+            return;
+        }
         let Some(item) = cx.read_from_clipboard() else {
             return;
         };
@@ -1837,7 +1749,7 @@ impl EditorView {
     fn on_mouse_down(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         window.focus(&self.focus, cx);
         self.lang_menu = None;
-        if !matches!(self.overlay, Overlay::None | Overlay::Find(_)) {
+        if !matches!(self.overlay, Overlay::None) {
             if let Overlay::Prompt(_) = self.overlay {
                 self.prompt_finish(false, cx);
             } else {
@@ -1845,11 +1757,16 @@ impl EditorView {
             }
         }
         self.completion = None;
+        // A click in the text gives the keyboard back to the editor.
+        self.find.focus = None;
         let Some(frame) = self.frame.clone() else {
             return;
         };
         if let Some(hit) = frame.hit_at(ev.position) {
             self.on_hit(hit, ev.position, cx);
+            return;
+        }
+        if self.rect_mouse_down(ev, cx) {
             return;
         }
         let Some(pos) = self.pos_at(&frame, ev.position) else {
@@ -1885,6 +1802,9 @@ impl EditorView {
     }
 
     fn on_mouse_move(&mut self, ev: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.rect_mouse_move(ev, cx) {
+            return;
+        }
         let (Some(anchor), Some(MouseButton::Left)) = (self.drag_anchor, ev.pressed_button) else {
             return;
         };
@@ -1902,6 +1822,8 @@ impl EditorView {
 
     fn on_mouse_up(&mut self, _: &MouseUpEvent, _: &mut Window, _: &mut Context<Self>) {
         self.drag_anchor = None;
+        self.find.rect = None;
+        self.find.end_drag();
     }
 
     fn on_scroll(&mut self, ev: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
@@ -2034,12 +1956,6 @@ impl EditorView {
                 self.prompt_set(v, cx);
                 return;
             }
-            Overlay::Find(f) => {
-                let q = format!("{}{text}", f.query);
-                self.find_set(q, cx);
-                cx.notify();
-                return;
-            }
             Overlay::Outline(o) => {
                 o.query.push_str(text);
                 Self::outline_filter(o);
@@ -2047,6 +1963,9 @@ impl EditorView {
                 return;
             }
             Overlay::None => {}
+        }
+        if self.field_input(text, cx) {
+            return;
         }
         if self.table_input(text, cx) {
             return;
@@ -2079,7 +1998,10 @@ impl EditorView {
     }
 
     pub(crate) fn ime_mark(&mut self, text: &str, cx: &mut Context<Self>) {
-        if self.mode() != ModeType::Insert || !matches!(self.overlay, Overlay::None) {
+        if self.mode() != ModeType::Insert
+            || !matches!(self.overlay, Overlay::None)
+            || self.find.focus.is_some()
+        {
             return;
         }
         let (from, to) = match self.marked.take() {
@@ -2115,20 +2037,6 @@ pub(crate) fn prompt_label(kind: PromptKind) -> &'static str {
     match kind {
         PromptKind::Command => ":",
         PromptKind::Search(k) => k.label(),
-    }
-}
-
-/// Case-insensitive literal matches (capped).
-pub(crate) fn find_matches(text: &str, query: &str) -> Vec<Range<usize>> {
-    if query.is_empty() {
-        return Vec::new();
-    }
-    let re = regex::RegexBuilder::new(&regex::escape(query))
-        .case_insensitive(true)
-        .build();
-    match re {
-        Ok(re) => re.find_iter(text).take(10_000).map(|m| m.range()).collect(),
-        Err(_) => Vec::new(),
     }
 }
 
@@ -2238,12 +2146,14 @@ impl Render for EditorView {
         let sans: SharedString = st.sans_family.clone();
         let fs = st.font_size;
         let lh = st.line_height_px();
-        let mut root = div()
+        let root = div()
             .id("fuchico-editor")
             .key_context(crate::KEY_CONTEXT)
             .track_focus(&self.focus)
             .size_full()
             .relative()
+            .flex()
+            .flex_col()
             .overflow_hidden()
             .bg(st.background)
             .text_color(st.foreground)
@@ -2273,23 +2183,67 @@ impl Render for EditorView {
             .on_action(cx.listener(Self::act_paste))
             .on_action(cx.listener(Self::act_tab))
             .on_action(cx.listener(Self::act_backtab))
-            .on_action(cx.listener(|this, _: &Undo, _, cx| this.undo(false, cx)))
-            .on_action(cx.listener(|this, _: &Redo, _, cx| this.undo(true, cx)))
-            .on_action(cx.listener(|this, _: &SelectAll, _, cx| this.select_all(cx)))
+            .on_action(cx.listener(|this, _: &Undo, _, cx| {
+                if !this.field_clipboard('z', cx) {
+                    this.undo(false, cx)
+                }
+            }))
+            .on_action(cx.listener(|this, _: &Redo, _, cx| {
+                if !this.field_clipboard('z', cx) {
+                    this.undo(true, cx)
+                }
+            }))
+            .on_action(cx.listener(|this, _: &SelectAll, _, cx| {
+                if !this.field_clipboard('a', cx) {
+                    this.select_all(cx)
+                }
+            }))
+            .on_action(cx.listener(|this, _: &FindNext, _, cx| this.find_next(false, cx)))
+            .on_action(cx.listener(|this, _: &FindPrevious, _, cx| this.find_next(true, cx)))
+            .on_action(
+                cx.listener(|this, _: &SelectSelectionMatches, _, cx| {
+                    this.select_selection_matches(cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &SelectNextOccurrence, _, cx| {
+                    this.select_next_occurrence(cx)
+                }),
+            )
+            .on_action(cx.listener(|this, _: &OpenGotoLine, _, cx| this.open_goto(cx)))
+            .on_action(cx.listener(|this, _: &UndoSelection, _, cx| this.undo_selection(false, cx)))
+            .on_action(cx.listener(|this, _: &RedoSelection, _, cx| this.undo_selection(true, cx)))
             .on_key_down(cx.listener(Self::on_key_down))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
-            .on_scroll_wheel(cx.listener(Self::on_scroll))
-            .child(EditorElement { view: cx.entity() });
+            .on_scroll_wheel(cx.listener(Self::on_scroll));
+        // The text area between the docked panels (search on top, go-to-line
+        // at the bottom, like `.cm-panels-top` / `.cm-panels-bottom`).
+        let mut body = div()
+            .id("fuchico-editor-body")
+            .relative()
+            .flex_1()
+            .min_h_0()
+            .w_full()
+            .overflow_hidden()
+            .child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .child(EditorElement { view: cx.entity() }),
+            );
+        let mut overlays: Vec<gpui_kit::AnyElement> = Vec::new();
 
         let stop = |_: &MouseDownEvent, _: &mut Window, cx: &mut App| cx.stop_propagation();
-        let bottom_bar = matches!(self.overlay, Overlay::Prompt(_));
+        let bottom_bar = matches!(self.overlay, Overlay::Prompt(_)) || self.find.goto.is_some();
 
         // Mode chip (bottom-left, over the gutter).
         if self.options.mode_chip && self.options.engine == EngineKind::Helix && !bottom_bar {
-            root = root.child(
+            body = body.child(
                 div()
                     .id("fuchico-editor-mode-chip")
                     .absolute()
@@ -2327,7 +2281,7 @@ impl Render for EditorView {
         if let Some((msg, err)) = &self.message
             && !bottom_bar
         {
-            root = root.child(
+            body = body.child(
                 div()
                     .id("fuchico-editor-message")
                     .absolute()
@@ -2413,131 +2367,9 @@ impl Render for EditorView {
                                 .child(div().w(px(1.5)).h(lh).bg(st.foreground)),
                         ),
                 );
-                root = root.child(bar);
+                body = body.child(bar);
             }
-            Overlay::Find(f) => {
-                let count = if f.matches.is_empty() {
-                    if f.query.is_empty() {
-                        String::new()
-                    } else {
-                        "No results".into()
-                    }
-                } else {
-                    format!("{} of {}", f.current + 1, f.matches.len())
-                };
-                root = root.child(
-                    div()
-                        .id("fuchico-editor-find")
-                        .absolute()
-                        .top(px(6.))
-                        .right(px(16.))
-                        .w(px(320.))
-                        .flex()
-                        .items_center()
-                        .gap(px(8.))
-                        .px(px(8.))
-                        .py(px(4.))
-                        .bg(st.card)
-                        .border_1()
-                        .border_color(st.border)
-                        .rounded(st.radius_sm)
-                        .font_family(sans.clone())
-                        .text_size(px(12.))
-                        .on_mouse_down(MouseButton::Left, stop)
-                        .child(
-                            div()
-                                .flex_1()
-                                .flex()
-                                .px(px(6.))
-                                .border_1()
-                                .border_color(st.input)
-                                .rounded(px(4.))
-                                .bg(st.background)
-                                .child(div().font_family(mono.clone()).child(f.query.clone()))
-                                .child(div().w(px(1.5)).h(px(16.)).bg(st.foreground)),
-                        )
-                        .child(div().text_color(st.muted_foreground).child(count)),
-                );
-            }
-            Overlay::Outline(o) => {
-                let mut list = div().flex().flex_col().py(px(4.));
-                for (row, &i) in o.filtered.iter().enumerate().take(14) {
-                    let h = &o.items[i];
-                    let sel = row == o.selected;
-                    list = list.child(
-                        div()
-                            .id(("fuchico-editor-outline-item", row))
-                            .flex()
-                            .gap(px(8.))
-                            .px(px(10.))
-                            .py(px(3.))
-                            .pl(px(10. + 12. * (h.level.saturating_sub(1)) as f32))
-                            .when_sel(sel, st.accent, st.accent_foreground)
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(move |v, _: &MouseDownEvent, _, cx| {
-                                    cx.stop_propagation();
-                                    v.outline_pick(row, cx);
-                                }),
-                            )
-                            .child(
-                                div()
-                                    .text_color(st.muted_foreground)
-                                    .child(format!("H{}", h.level)),
-                            )
-                            .child(h.text.clone()),
-                    );
-                }
-                if o.filtered.is_empty() {
-                    list = list.child(
-                        div()
-                            .px(px(10.))
-                            .text_color(st.muted_foreground)
-                            .child("No headings"),
-                    );
-                }
-                root = root.child(
-                    div()
-                        .absolute()
-                        .top(px(40.))
-                        .left_0()
-                        .right_0()
-                        .flex()
-                        .justify_center()
-                        .child(
-                            div()
-                                .id("fuchico-editor-outline")
-                                .w(px(480.))
-                                .flex()
-                                .flex_col()
-                                .bg(st.card)
-                                .border_1()
-                                .border_color(st.border)
-                                .rounded(st.radius_md)
-                                .shadow_lg()
-                                .font_family(sans.clone())
-                                .text_size(px(13.))
-                                .on_mouse_down(MouseButton::Left, stop)
-                                .child(
-                                    div()
-                                        .flex()
-                                        .px(px(10.))
-                                        .py(px(8.))
-                                        .border_b_1()
-                                        .border_color(st.border)
-                                        .child(if o.query.is_empty() {
-                                            div()
-                                                .text_color(st.muted_foreground)
-                                                .child("Go to header…")
-                                        } else {
-                                            div().child(o.query.clone())
-                                        })
-                                        .child(div().w(px(1.5)).h(px(16.)).bg(st.foreground)),
-                                )
-                                .child(list),
-                        ),
-                );
-            }
+            Overlay::Outline(o) => overlays.push(self.render_outline(o, cx)),
             Overlay::None => {}
         }
 
@@ -2579,7 +2411,7 @@ impl Render for EditorView {
                 }
                 list = list.child(row);
             }
-            root = root.child(
+            body = body.child(
                 div()
                     .id("fuchico-editor-completions")
                     .absolute()
@@ -2624,7 +2456,7 @@ impl Render for EditorView {
                         }),
                 );
             }
-            root = root.child(
+            body = body.child(
                 div()
                     .id("fuchico-editor-lang-menu")
                     .absolute()
@@ -2641,8 +2473,13 @@ impl Render for EditorView {
                     .child(list),
             );
         }
-        let _ = (window, mix);
-        root
+        let _ = (window, mix, sans);
+        let panel = self.render_find_panel(cx);
+        let goto = self.render_goto(cx);
+        root.children(panel)
+            .child(body)
+            .children(goto)
+            .children(overlays)
     }
 }
 

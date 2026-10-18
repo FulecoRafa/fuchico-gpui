@@ -181,7 +181,30 @@ pub fn options_for(s: &Settings, path: &str, pcx: &PaneContext, vault: (Vec<Stri
         },
         tab_size: s.tab_size.max(1),
         engine: engine_for(s.keybinding_mode),
+        strings: editor_strings(),
         ..EditorOptions::default()
+    }
+}
+
+/// The editor's own UI labels in the current locale.
+pub fn editor_strings() -> fuchico_editor::EditorStrings {
+    use crate::i18n::Msg;
+    let t = |m: Msg| crate::i18n::tr(m, &[]);
+    fuchico_editor::EditorStrings {
+        find: t(Msg::EditorFind),
+        replace: t(Msg::EditorReplace),
+        next: t(Msg::EditorFindNext),
+        previous: t(Msg::EditorFindPrevious),
+        all: t(Msg::EditorFindAll),
+        match_case: t(Msg::EditorMatchCase),
+        regexp: t(Msg::EditorRegexp),
+        by_word: t(Msg::EditorByWord),
+        replace_one: t(Msg::EditorReplaceOne),
+        replace_all: t(Msg::EditorReplaceAll),
+        go_to_line: t(Msg::EditorGoToLine),
+        go: t(Msg::EditorGo),
+        go_to_header: t(Msg::EditorGoToHeader),
+        no_headers: t(Msg::EditorNoHeaders),
     }
 }
 

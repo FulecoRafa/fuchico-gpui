@@ -56,5 +56,19 @@ gpui_kit::actions!(
         Undo,
         Redo,
         SelectAll,
+        /// F3 / Mod-g (`findNext`) and Shift-F3 / Mod-Shift-g
+        /// (`findPrevious`); they also work with the panel closed.
+        FindNext,
+        FindPrevious,
+        /// Mod-Shift-l (`selectSelectionMatches`).
+        SelectSelectionMatches,
+        /// Mod-d (`selectNextOccurrence`).
+        SelectNextOccurrence,
+        /// Mod-Alt-g (`gotoLine`): the "Go to line" dialog.
+        OpenGotoLine,
+        /// Mod-u / Mod-Shift-u (Alt-u off macOS): `undoSelection` /
+        /// `redoSelection`.
+        UndoSelection,
+        RedoSelection,
     ]
 );

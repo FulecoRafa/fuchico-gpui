@@ -732,6 +732,34 @@ pub enum Msg {
     EditorTooLarge,
     /// `editor.saveFailed` (native port; the original hardcoded it)
     EditorSaveFailed,
+    /// `editor.find` (native port; the original hardcoded it)
+    EditorFind,
+    /// `editor.replace` (native port; the original hardcoded it)
+    EditorReplace,
+    /// `editor.findNext` (native port; the original hardcoded it)
+    EditorFindNext,
+    /// `editor.findPrevious` (native port; the original hardcoded it)
+    EditorFindPrevious,
+    /// `editor.findAll` (native port; the original hardcoded it)
+    EditorFindAll,
+    /// `editor.matchCase` (native port; the original hardcoded it)
+    EditorMatchCase,
+    /// `editor.regexp` (native port; the original hardcoded it)
+    EditorRegexp,
+    /// `editor.byWord` (native port; the original hardcoded it)
+    EditorByWord,
+    /// `editor.replaceOne` (native port; the original hardcoded it)
+    EditorReplaceOne,
+    /// `editor.replaceAll` (native port; the original hardcoded it)
+    EditorReplaceAll,
+    /// `editor.goToLine` (native port; the original hardcoded it)
+    EditorGoToLine,
+    /// `editor.go` (native port; the original hardcoded it)
+    EditorGo,
+    /// `editor.goToHeader` (native port; the original hardcoded it)
+    EditorGoToHeader,
+    /// `editor.noHeaders` (native port; the original hardcoded it)
+    EditorNoHeaders,
 }
 
 impl Msg {
@@ -1099,6 +1127,20 @@ impl Msg {
         Msg::EditorBinaryFile,
         Msg::EditorTooLarge,
         Msg::EditorSaveFailed,
+        Msg::EditorFind,
+        Msg::EditorReplace,
+        Msg::EditorFindNext,
+        Msg::EditorFindPrevious,
+        Msg::EditorFindAll,
+        Msg::EditorMatchCase,
+        Msg::EditorRegexp,
+        Msg::EditorByWord,
+        Msg::EditorReplaceOne,
+        Msg::EditorReplaceAll,
+        Msg::EditorGoToLine,
+        Msg::EditorGo,
+        Msg::EditorGoToHeader,
+        Msg::EditorNoHeaders,
     ];
 
     /// The original dotted key, e.g. `"common.loading"`.
@@ -1466,6 +1508,20 @@ impl Msg {
             Msg::EditorBinaryFile => "editor.binaryFile",
             Msg::EditorTooLarge => "editor.tooLarge",
             Msg::EditorSaveFailed => "editor.saveFailed",
+            Msg::EditorFind => "editor.find",
+            Msg::EditorReplace => "editor.replace",
+            Msg::EditorFindNext => "editor.findNext",
+            Msg::EditorFindPrevious => "editor.findPrevious",
+            Msg::EditorFindAll => "editor.findAll",
+            Msg::EditorMatchCase => "editor.matchCase",
+            Msg::EditorRegexp => "editor.regexp",
+            Msg::EditorByWord => "editor.byWord",
+            Msg::EditorReplaceOne => "editor.replaceOne",
+            Msg::EditorReplaceAll => "editor.replaceAll",
+            Msg::EditorGoToLine => "editor.goToLine",
+            Msg::EditorGo => "editor.go",
+            Msg::EditorGoToHeader => "editor.goToHeader",
+            Msg::EditorNoHeaders => "editor.noHeaders",
         }
     }
 }
@@ -1835,6 +1891,20 @@ pub fn en(m: Msg) -> &'static str {
         Msg::EditorBinaryFile => "Binary file · {size}",
         Msg::EditorTooLarge => "File too large · {size}",
         Msg::EditorSaveFailed => "Couldn't save {name}: {error}",
+        Msg::EditorFind => "Find",
+        Msg::EditorReplace => "Replace",
+        Msg::EditorFindNext => "next",
+        Msg::EditorFindPrevious => "previous",
+        Msg::EditorFindAll => "all",
+        Msg::EditorMatchCase => "match case",
+        Msg::EditorRegexp => "regexp",
+        Msg::EditorByWord => "by word",
+        Msg::EditorReplaceOne => "replace",
+        Msg::EditorReplaceAll => "replace all",
+        Msg::EditorGoToLine => "Go to line",
+        Msg::EditorGo => "go",
+        Msg::EditorGoToHeader => "Go to header…",
+        Msg::EditorNoHeaders => "No headers found",
     }
 }
 
@@ -2203,5 +2273,19 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::EditorBinaryFile => "Arquivo binário · {size}",
         Msg::EditorTooLarge => "Arquivo grande demais · {size}",
         Msg::EditorSaveFailed => "Não foi possível salvar {name}: {error}",
+        Msg::EditorFind => "Localizar",
+        Msg::EditorReplace => "Substituir",
+        Msg::EditorFindNext => "próximo",
+        Msg::EditorFindPrevious => "anterior",
+        Msg::EditorFindAll => "todos",
+        Msg::EditorMatchCase => "diferenciar maiúsculas",
+        Msg::EditorRegexp => "regexp",
+        Msg::EditorByWord => "por palavra",
+        Msg::EditorReplaceOne => "substituir",
+        Msg::EditorReplaceAll => "substituir tudo",
+        Msg::EditorGoToLine => "Ir para a linha",
+        Msg::EditorGo => "ir",
+        Msg::EditorGoToHeader => "Ir para o cabeçalho…",
+        Msg::EditorNoHeaders => "Nenhum cabeçalho encontrado",
     }
 }
