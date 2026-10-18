@@ -82,6 +82,7 @@ pub fn init_app(theme: SnapTheme, cx: &mut App) {
     crate::bus::init(cx);
     crate::theme::init(cx);
     crate::keymap::bind_global_keys(cx);
+    crate::editor::init(cx);
 }
 
 /// Renders `build`'s view (wrapped in gpui-kit's `Root`, like a real

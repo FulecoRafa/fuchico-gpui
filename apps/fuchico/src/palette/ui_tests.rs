@@ -205,7 +205,13 @@ async fn palette_and_switcher_end_to_end(cx: &mut TestAppContext) {
     let at = ui.center("palette-row-0");
     ui.click_at(at);
     assert!(ui.read(|ws, _| !ws.palette.is_open()));
-    assert_eq!(*dispatched.borrow(), ["goto 12", "insert-date"]);
+    // The editor pane handles it now (inserts today's date).
+    assert_eq!(*dispatched.borrow(), ["goto 12"]);
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    ui.wait(move |ws, cx| {
+        ws.active_editor().and_then(|p| p.read(cx).view().cloned()).is_some_and(|v| v.read(cx).text().contains(&today))
+    })
+    .await;
 
     // `:` aliases: `:q` closes the active tab.
     ui.press("cmd-shift-p");

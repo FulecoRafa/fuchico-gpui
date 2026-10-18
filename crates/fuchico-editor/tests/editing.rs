@@ -260,3 +260,43 @@ async fn drag_across_lines_selects_range(cx: &mut TestAppContext) {
     assert!(h < a, "{a}..{h}");
     assert!((2..=3).contains(&h));
 }
+
+#[gpui_kit::test]
+async fn normal_engine_is_non_modal(cx: &mut TestAppContext) {
+    let opts = EditorOptions {
+        engine: fuchico_editor::EngineKind::Normal,
+        ..Default::default()
+    };
+    let mut ui = open(cx, "hello\nworld\n", opts);
+    assert_eq!(ui.read(|v, _| v.mode_label()), "INS");
+    ui.type_text("ab");
+    ui.press("escape");
+    assert_eq!(ui.read(|v, _| v.mode_label()), "INS");
+    ui.type_text("c");
+    assert_eq!(ui.text(), "abchello\nworld\n");
+    // Shift-arrows extend; typing replaces the selection.
+    ui.press("shift-right shift-right");
+    assert_eq!(ui.sel(), (3, 5));
+    ui.type_text("X");
+    assert_eq!(ui.text(), "abcXllo\nworld\n");
+    ui.press("shift-left");
+    ui.press("backspace");
+    assert_eq!(ui.text(), "abcllo\nworld\n");
+    // Mod-z undoes and stays in insert.
+    ui.press("cmd-z");
+    assert_eq!(ui.read(|v, _| v.mode_label()), "INS");
+    assert_ne!(ui.text(), "abcllo\nworld\n");
+    ui.press("cmd-a");
+    assert_eq!(ui.sel().1 - ui.sel().0, ui.text().chars().count());
+}
+
+#[gpui_kit::test]
+async fn tab_size_option_sets_indent(cx: &mut TestAppContext) {
+    let opts = EditorOptions {
+        tab_size: 4,
+        ..Default::default()
+    };
+    let mut ui = open(cx, "x\n", opts);
+    ui.press("i tab");
+    assert_eq!(ui.text(), "    x\n");
+}

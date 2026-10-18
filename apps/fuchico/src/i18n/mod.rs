@@ -187,7 +187,7 @@ mod tests {
         assert_eq!(keys.len(), Msg::ALL.len());
         // 300 keys ported from the original catalog plus the native-only ones
         // (CalDAV UI, shortcut reset, explorer, media, …) appended after them.
-        assert_eq!(Msg::ALL.len(), 356);
+        assert_eq!(Msg::ALL.len(), 362);
     }
 
     #[test]

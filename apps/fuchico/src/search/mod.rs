@@ -111,8 +111,8 @@ impl SearchView {
         &self.state
     }
 
-    /// Types `q` into the query box as the user would (snapshots).
-    #[cfg(test)]
+    /// Types `q` into the query box as the user would (Helix `Space /`,
+    /// snapshots).
     pub fn set_query(&mut self, q: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.query_input.update(cx, |s, cx| s.set_value(q.to_string(), window, cx));
         self.query = q.to_string();

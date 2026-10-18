@@ -41,7 +41,7 @@ async fn draw_autosave_dirty_and_external_reload(cx: &mut TestAppContext) {
     let dirty: Rc<RefCell<Vec<bool>>> = Rc::default();
     let p = path.clone();
     let (mut ui, pane) =
-        test_ui::open(cx, (1000., 700.), move |window, cx| ExcalidrawPane::new(p, PaneContext { root: None }, window, cx));
+        test_ui::open(cx, (1000., 700.), move |window, cx| ExcalidrawPane::new(p, PaneContext { root: None, ..Default::default() }, window, cx));
     let sink = dirty.clone();
     let _sub = ui.cx.update(|_, cx| {
         cx.subscribe(&pane, move |_, ev: &PaneEvent, _| {
@@ -105,7 +105,7 @@ async fn draw_autosave_dirty_and_external_reload(cx: &mut TestAppContext) {
     let bad = dir.join("bad.excalidraw").to_string_lossy().to_string();
     std::fs::write(&bad, "{ not json").unwrap();
     let (mut ui2, bad_pane) =
-        test_ui::open(cx, (600., 400.), move |window, cx| ExcalidrawPane::new(bad, PaneContext { root: None }, window, cx));
+        test_ui::open(cx, (600., 400.), move |window, cx| ExcalidrawPane::new(bad, PaneContext { root: None, ..Default::default() }, window, cx));
     ui2.wait("loaded", |cx| bad_pane.read(cx).view().is_some()).await;
     assert!(ui2.cx.read(|cx| bad_pane.read(cx).view().unwrap().read(cx).error().is_some()));
 }
@@ -120,7 +120,7 @@ fn snapshots() {
         let name = if dark { "excalidraw-dark" } else { "excalidraw-light" };
         let p = p.clone();
         crate::snapshot::snapshot(name, gpui_kit::size(px(900.), px(600.)), SnapTheme::default_mode(dark), move |window, cx| {
-            cx.new(|cx| ExcalidrawPane::new(p, PaneContext { root: None }, window, cx))
+            cx.new(|cx| ExcalidrawPane::new(p, PaneContext { root: None, ..Default::default() }, window, cx))
         });
     }
 }

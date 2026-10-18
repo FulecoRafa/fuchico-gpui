@@ -48,7 +48,7 @@ impl EditorWindow {
     }
 
     fn mount(path: &str, root: &Option<String>, window: &mut Window, cx: &mut Context<Self>) -> PaneHandle {
-        open_pane(path, PaneContext { root: root.clone() }, window, cx, |this: &mut EditorWindow, ev, window, cx| {
+        open_pane(path, PaneContext { root: root.clone(), in_window: true }, window, cx, |this: &mut EditorWindow, ev, window, cx| {
             this.on_pane_event(ev, window, cx)
         })
     }
@@ -76,7 +76,12 @@ impl EditorWindow {
             }
             PaneEvent::Close => window.remove_window(),
             // Main-window-only features.
-            PaneEvent::OpenTag(_) | PaneEvent::OpenMermaid { .. } | PaneEvent::OpenCommandPalette(_) => {
+            PaneEvent::OpenTag(_)
+            | PaneEvent::OpenMermaid { .. }
+            | PaneEvent::OpenCommandPalette(_)
+            | PaneEvent::QuickOpen
+            | PaneEvent::CycleTab(_)
+            | PaneEvent::GlobalSearch(_) => {
                 log::debug!("editor window ignores {ev:?}");
             }
         }
