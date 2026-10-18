@@ -98,6 +98,7 @@ fn options(label: &str, title: &str, default: (f32, f32), cx: &App) -> WindowOpt
         }),
         window_min_size: Some(size(px(480.), px(320.))),
         app_id: Some("fuchico".into()),
+        focus: !crate::background_mode(),
         ..Default::default()
     }
 }
