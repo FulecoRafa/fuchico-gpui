@@ -16,3 +16,8 @@ chrono.workspace = true
 futures = "0.3"
 sys-locale = "0.3"
 rand = "0.9"
+
+[dev-dependencies]
+gpui-base = { version = "0.7", features = ["test-support"] }
+gpui-component = { version = "0.7", features = ["test-support"] }
+tempfile = "3"

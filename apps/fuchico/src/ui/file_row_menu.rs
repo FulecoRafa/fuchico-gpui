@@ -3,7 +3,9 @@
 //! results, tag file lists, backlinks, agenda items).
 
 use gpui_kit::component::IconName;
-use gpui_kit::{App, ClipboardItem, Window};
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenu};
+use gpui_kit::prelude::*;
+use gpui_kit::{AnyElement, App, ClipboardItem, Context, ElementId, Window, div};
 
 use crate::ui::MenuEntry;
 
@@ -24,6 +26,17 @@ pub fn file_row_menu(
             .icon(IconName::Copy),
     );
     items
+}
+
+/// A full-width box owning `row`'s right-click menu. The row itself (the
+/// click target) stays a plain stateful element so UI tests can observe it
+/// with `.test_support()`, which cannot wrap a context-menu element.
+pub fn with_context_menu(
+    id: impl Into<ElementId>,
+    row: impl IntoElement,
+    menu: impl Fn(PopupMenu, &mut Window, &mut Context<PopupMenu>) -> PopupMenu + 'static,
+) -> AnyElement {
+    div().id(id).w_full().child(row).context_menu(menu).into_any_element()
 }
 
 /// `revealInFileManager(path)` — selects the file in Finder / Explorer, or

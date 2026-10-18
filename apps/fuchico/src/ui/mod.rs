@@ -6,12 +6,14 @@ pub mod context_menu;
 pub mod dialog;
 pub mod file_row_menu;
 pub mod style;
+#[cfg(test)]
+pub mod test_harness;
 pub mod toast;
 pub mod widgets;
 
 pub use context_menu::{MenuEntry, build_menu};
 pub use dialog::{ConfirmOptions, confirm};
-pub use file_row_menu::file_row_menu;
+pub use file_row_menu::{file_row_menu, with_context_menu};
 pub use style::u;
 pub use toast::toast_info;
 pub use widgets::{Segment, empty_state, icon_button, placeholder_view, segmented};
