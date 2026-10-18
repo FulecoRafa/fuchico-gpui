@@ -2452,7 +2452,7 @@ dependencies = [
 name = "fuchico-helix"
 version = "0.1.0"
 dependencies = [
- "regex",
+ "fancy-regex",
  "ropey 1.6.1",
  "unicode-segmentation",
 ]
