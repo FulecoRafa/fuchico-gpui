@@ -16,3 +16,9 @@ chrono.workspace = true
 futures = "0.3"
 sys-locale = "0.3"
 rand = "0.9"
+
+[dev-dependencies]
+# Headless UI tests (`#[gpui_kit::test]`): enables gpui's TestAppContext.
+# Not gpui-kit/test-support: its weak `gpui-fast?/…` features drag the
+# conflicting gpui-fast tree into the lockfile.
+gpui-pre = { version = "=0.3.9", features = ["test-support"] }
