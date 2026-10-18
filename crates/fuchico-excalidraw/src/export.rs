@@ -402,8 +402,11 @@ fn write_element(out: &mut String, el: &Element, scene: &Scene, pal: Palette, fo
                 let (hex, a) = css(c);
                 let d = path_d(&layer.ops);
                 match &layer.paint {
-                    Paint::Fill => {
+                    Paint::Fill | Paint::FillNonZero => {
                         let _ = write!(out, "<path d=\"{d}\" fill=\"{hex}\"");
+                        if layer.paint == Paint::Fill {
+                            out.push_str(" fill-rule=\"evenodd\"");
+                        }
                         if let Some(a) = a {
                             let _ = write!(out, " fill-opacity=\"{}\"", fmt(a as f64));
                         }

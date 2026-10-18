@@ -247,6 +247,9 @@ impl Xf {
 pub fn build_path(ops: &[Op], xf: &Xf, paint: &Paint, zoom: f64) -> Option<gpui_kit::Path<Pixels>> {
     let mut b = match paint {
         Paint::Fill => PathBuilder::fill(),
+        Paint::FillNonZero => PathBuilder::fill().with_style(gpui_kit::PathStyle::Fill(
+            gpui_kit::FillOptions::default().with_fill_rule(gpui_kit::FillRule::NonZero),
+        )),
         Paint::Stroke { width, dash } => {
             let w = px((*width as f64 * zoom).max(0.5) as f32);
             if let Some([a, g]) = dash {
