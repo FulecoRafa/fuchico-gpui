@@ -6,7 +6,9 @@
 //! * Main thread: [`emit`] delivers synchronously.
 //! * Views in every window subscribe with [`subscribe`] / [`subscribe_in`].
 
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
+#[cfg(not(test))]
+use std::sync::OnceLock;
 
 use futures::StreamExt;
 use futures::channel::mpsc::{UnboundedSender, unbounded};
@@ -62,14 +64,43 @@ struct BusGlobal(Entity<EventBus>);
 
 impl Global for BusGlobal {}
 
+#[cfg(not(test))]
 static TX: OnceLock<UnboundedSender<AppEvent>> = OnceLock::new();
+
+// Tests run many gpui apps in one process, one per libtest thread; a process
+// global would route one test's events into another test's scheduler.
+#[cfg(test)]
+thread_local! {
+    static TEST_TX: std::cell::RefCell<Option<UnboundedSender<AppEvent>>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(not(test))]
+fn set_tx(tx: UnboundedSender<AppEvent>) -> bool {
+    TX.set(tx).is_ok()
+}
+
+#[cfg(test)]
+fn set_tx(tx: UnboundedSender<AppEvent>) -> bool {
+    TEST_TX.with(|t| *t.borrow_mut() = Some(tx));
+    true
+}
+
+#[cfg(not(test))]
+fn tx() -> Option<UnboundedSender<AppEvent>> {
+    TX.get().cloned()
+}
+
+#[cfg(test)]
+fn tx() -> Option<UnboundedSender<AppEvent>> {
+    TEST_TX.with(|t| t.borrow().clone())
+}
 
 /// Creates the bus and starts the main-thread pump. Call once at startup.
 pub fn init(cx: &mut App) {
     let bus = cx.new(|_| EventBus);
     cx.set_global(BusGlobal(bus));
     let (tx, mut rx) = unbounded::<AppEvent>();
-    if TX.set(tx).is_err() {
+    if !set_tx(tx) {
         log::warn!("bus::init called twice");
         return;
     }
@@ -90,7 +121,7 @@ pub fn emit(cx: &mut App, ev: AppEvent) {
 
 /// Queues `ev` from any thread.
 pub fn send(ev: AppEvent) {
-    match TX.get() {
+    match tx() {
         Some(tx) => {
             let _ = tx.unbounded_send(ev);
         }
