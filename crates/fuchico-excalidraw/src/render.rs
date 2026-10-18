@@ -92,11 +92,10 @@ pub type SharedCaches = Rc<RefCell<Caches>>;
 impl Caches {
     pub fn shape(&mut self, el: &Element) -> Rc<Shape> {
         let key = shape::shape_key(el);
-        if let Some((k, s)) = self.shapes.get(&el.id) {
-            if *k == key {
+        if let Some((k, s)) = self.shapes.get(&el.id)
+            && *k == key {
                 return s.clone();
             }
-        }
         let s = Rc::new(shape::generate(el));
         self.shapes.insert(el.id.clone(), (key, s.clone()));
         s
@@ -138,7 +137,40 @@ pub fn decode_data_url(url: &str) -> Option<image::RgbaImage> {
     } else {
         data.as_bytes().to_vec()
     };
+    if url[..url.find(',')?].contains("image/svg") || looks_like_svg(&bytes) {
+        return rasterize_svg(&bytes, 2048);
+    }
     image::load_from_memory(&bytes).ok().map(|i| i.to_rgba8())
+}
+
+/// Whether `bytes` is SVG markup.
+pub fn looks_like_svg(bytes: &[u8]) -> bool {
+    let head = String::from_utf8_lossy(&bytes[..bytes.len().min(512)]).to_ascii_lowercase();
+    head.contains("<svg")
+}
+
+/// Rasterises SVG at its intrinsic size (longest side capped at `max`, at
+/// least 2x for crispness up to that cap), unpremultiplied RGBA.
+pub fn rasterize_svg(bytes: &[u8], max: u32) -> Option<image::RgbaImage> {
+    let tree = resvg::usvg::Tree::from_data(bytes, &resvg::usvg::Options::default()).ok()?;
+    let sz = tree.size();
+    let (w, h) = (sz.width().max(1.0), sz.height().max(1.0));
+    let scale = (2.0f32).min(max as f32 / w.max(h));
+    let (pw, ph) = ((w * scale).ceil().max(1.0) as u32, (h * scale).ceil().max(1.0) as u32);
+    let mut pm = resvg::tiny_skia::Pixmap::new(pw, ph)?;
+    resvg::render(&tree, resvg::tiny_skia::Transform::from_scale(scale, scale), &mut pm.as_mut());
+    let mut out = image::RgbaImage::new(pw, ph);
+    for (o, p) in out.pixels_mut().zip(pm.pixels()) {
+        let c = p.demultiply();
+        o.0 = [c.red(), c.green(), c.blue(), c.alpha()];
+    }
+    Some(out)
+}
+
+/// Intrinsic (CSS px) size of SVG markup.
+pub fn svg_size(bytes: &[u8]) -> Option<(f64, f64)> {
+    let tree = resvg::usvg::Tree::from_data(bytes, &resvg::usvg::Options::default()).ok()?;
+    Some((tree.size().width() as f64, tree.size().height() as f64))
 }
 
 fn to_render_image(rgba: &image::RgbaImage) -> RenderImage {
@@ -520,11 +552,10 @@ pub fn paint_screen_ops(ops: &[Op], at: Point<Pixels>, color: Rgba, window: &mut
             Op::Close => b.close(),
         }
     }
-    if any {
-        if let Ok(path) = b.build() {
+    if any
+        && let Ok(path) = b.build() {
             window.paint_path(path, color.to_hsla());
         }
-    }
 }
 
 /// Content mask for a frame's children (frames are never rotated in

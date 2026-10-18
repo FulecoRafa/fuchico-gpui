@@ -28,6 +28,28 @@ enum Job {
     Barrier(Sender<()>),
 }
 
+#[cfg(test)]
+thread_local! {
+    static TEST_DIR: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Tests: points this test thread's config at `dir`. libtest runs tests in
+/// parallel threads of one process, so a process-wide env var would race.
+#[cfg(test)]
+pub fn set_test_dir(dir: impl Into<PathBuf>) {
+    TEST_DIR.with(|d| *d.borrow_mut() = Some(dir.into()));
+}
+
+/// Tests never see the real config dir: the thread's override, else a
+/// fresh scratch dir per test thread.
+#[cfg(test)]
+fn dir() -> Option<PathBuf> {
+    TEST_DIR
+        .with(|d| d.borrow().clone())
+        .or_else(|| Some(std::env::temp_dir().join(format!("fuchico-test-config-{}-{:?}", std::process::id(), std::thread::current().id()))))
+}
+
+#[cfg(not(test))]
 fn dir() -> Option<PathBuf> {
     static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
     DIR.get_or_init(|| {

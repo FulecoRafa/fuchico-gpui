@@ -15,6 +15,7 @@ mod agenda;
 mod assets;
 mod backlinks;
 mod bus;
+mod caldav;
 mod editor;
 mod excalidraw;
 mod explorer;
@@ -27,7 +28,11 @@ mod persist;
 mod search;
 mod settings;
 mod settings_view;
+#[cfg(test)]
+mod snapshot;
 mod tags;
+#[cfg(test)]
+mod test_ui;
 mod theme;
 mod ui;
 mod windows;
@@ -61,6 +66,7 @@ fn main() {
         cx.set_global(ui_state);
         cx.set_global(window_states);
         bus::init(cx);
+        caldav::init(cx);
         theme::init(cx);
         keymap::bind_global_keys(cx);
         windows::register_global_actions(cx);

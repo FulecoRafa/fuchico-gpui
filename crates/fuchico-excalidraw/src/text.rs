@@ -98,12 +98,12 @@ fn fonts() -> &'static Fonts {
 }
 
 /// Excalidraw `FONT_FAMILY` ids: 1 Virgil, 2 Helvetica, 3 Cascadia,
-/// 5 Excalifont, 6 Nunito, 7 Lilita One, 8 Comic Shanns.
+/// 5 Excalifont, 6 Nunito, 7 Lilita One, 8 Comic Shanns, 9 Liberation Sans.
 pub fn face(family: u32) -> &'static FontFace {
     let f = fonts();
     match family {
         1 => &f.virgil,
-        2 => &f.helvetica,
+        2 | 9 => &f.helvetica,
         3 => &f.cascadia,
         6 => &f.nunito,
         7 => &f.lilita,

@@ -6,6 +6,12 @@
 //! window appearance is followed. The host (this example) owns all IO:
 //! `Save` events write the file, and external edits are picked up by
 //! polling the file's mtime and calling `reload`.
+//!
+//! `EXCALIDRAW_DRIVE=<dir>` enables the scripted-input driver
+//! (`support/driver.rs`) and leaves the app inactive (no focus stealing).
+
+#[path = "support/driver.rs"]
+mod driver;
 
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -38,7 +44,8 @@ fn main() {
         };
         let dark = Rc::new(Cell::new(forced.unwrap_or(false)));
         let path2 = path.clone();
-        let (_, view) = gpui_kit::open_window(opts, cx, move |window, cx| {
+        let drive = std::env::var_os("EXCALIDRAW_DRIVE").map(PathBuf::from);
+        let (handle, view) = gpui_kit::open_window(opts, cx, move |window, cx| {
             if forced.is_none() {
                 dark.set(matches!(window.appearance(), WindowAppearance::Dark | WindowAppearance::VibrantDark));
             }
@@ -69,6 +76,10 @@ fn main() {
         })
         .expect("window");
 
+        if let Some(dir) = drive.clone() {
+            driver::start(dir, handle, view.clone(), cx);
+        }
+
         // Reload on external change.
         let watch = path.clone();
         let view = view.downgrade();
@@ -79,15 +90,15 @@ fn main() {
                 let now = mtime(&watch);
                 if now != last {
                     last = now;
-                    if let Ok(s) = std::fs::read_to_string(&watch) {
-                        if view.update(cx, |v, cx| v.reload(&s, cx)).is_err() {
+                    if let Ok(s) = std::fs::read_to_string(&watch)
+                        && view.update(cx, |v, cx| v.reload(&s, cx)).is_err() {
                             break;
                         }
-                    }
                 }
             }
         })
         .detach();
-        cx.activate(true);
+        if drive.is_none()
+            && std::env::var_os("FUCHICO_BACKGROUND").is_none() { cx.activate(true); }
     });
 }

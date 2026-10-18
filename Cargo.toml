@@ -26,6 +26,7 @@ unicode-segmentation = "1"
 log = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 fuchico-excalidraw = { path = "crates/fuchico-excalidraw" }
+fuchico-editor = { path = "crates/fuchico-editor" }
 roughr = "0.14"
 euclid = "0.22"
 palette = "0.7"
@@ -36,4 +37,8 @@ sha2 = "0.11"
 rand = "0.8"
 indexmap = { version = "2", features = ["serde"] }
 mermaid-rs-renderer = { version = "0.3.1", default-features = false }
+png = "0.17"
+dirs = "6"
+objc = "0.2"
+raw-window-handle = "0.6"
 resvg = { version = "0.46", default-features = false, features = ["text", "system-fonts", "memmap-fonts"] }

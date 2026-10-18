@@ -13,6 +13,7 @@ use indexmap::IndexMap;
 use serde_json::{Map, Value};
 
 use crate::fractional::key_between;
+use crate::elbow;
 use crate::geom;
 use crate::model::{Binding, BoundElement, Element, Field, LoadError, Num, Roundness};
 use crate::text;
@@ -59,6 +60,8 @@ pub struct ItemDefaults {
     pub start_arrowhead: Option<String>,
     pub end_arrowhead: Option<String>,
     pub round: bool,
+    /// `"sharp" | "round" | "elbow"` (`currentItemArrowType`).
+    pub arrow_type: String,
 }
 
 impl Default for ItemDefaults {
@@ -77,6 +80,7 @@ impl Default for ItemDefaults {
             start_arrowhead: None,
             end_arrowhead: Some("arrow".into()),
             round: true,
+            arrow_type: "round".into(),
         }
     }
 }
@@ -230,6 +234,42 @@ impl Scene {
             .insert("viewBackgroundColor".into(), Value::from(c));
     }
 
+    /// Sets one `appState` key (creating `appState` if needed).
+    pub fn set_app_state(&mut self, key: &str, v: Value) {
+        let app = self
+            .top
+            .entry("appState")
+            .or_insert_with(|| Value::Object(default_app_state()));
+        if !app.is_object() {
+            *app = Value::Object(default_app_state());
+        }
+        app.as_object_mut().unwrap().insert(key.into(), v);
+    }
+
+    pub fn app_bool(&self, key: &str) -> bool {
+        self.app_state().and_then(|a| a.get(key)).and_then(|v| v.as_bool()).unwrap_or(false)
+    }
+
+    pub fn grid_enabled(&self) -> bool {
+        self.app_bool("gridModeEnabled")
+    }
+
+    pub fn grid_size(&self) -> f64 {
+        self.app_state()
+            .and_then(|a| a.get("gridSize"))
+            .and_then(|v| v.as_f64())
+            .filter(|g| *g > 0.0)
+            .unwrap_or(20.0)
+    }
+
+    pub fn grid_step(&self) -> u32 {
+        self.app_state()
+            .and_then(|a| a.get("gridStep"))
+            .and_then(|v| v.as_u64())
+            .filter(|g| *g > 0)
+            .unwrap_or(5) as u32
+    }
+
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             items: self.items.clone(),
@@ -343,7 +383,8 @@ impl Scene {
         let roundness = |t: f64| Roundness { kind: Num(t), value: Field::Absent, extra: Map::new() };
         match kind {
             "rectangle" | "diamond" if d.round => f.roundness.set(roundness(3.0)),
-            "line" | "arrow" if d.round => f.roundness.set(roundness(2.0)),
+            "arrow" if d.arrow_type == "round" => f.roundness.set(roundness(2.0)),
+            "line" if d.round => f.roundness.set(roundness(2.0)),
             _ => f.roundness.set_null(),
         }
         f.seed.set(Num(random_int()));
@@ -374,7 +415,12 @@ impl Scene {
                 if kind == "arrow" {
                     f.start_arrowhead.set_opt(d.start_arrowhead.clone());
                     f.end_arrowhead.set_opt(d.end_arrowhead.clone());
-                    f.elbowed.set(false);
+                    f.elbowed.set(d.arrow_type == "elbow");
+                    if d.arrow_type == "elbow" {
+                        f.extra.insert("fixedSegments".into(), Value::Null);
+                        f.extra.insert("startIsSpecial".into(), Value::Bool(false));
+                        f.extra.insert("endIsSpecial".into(), Value::Bool(false));
+                    }
                 } else {
                     f.start_arrowhead.set_null();
                     f.end_arrowhead.set_null();
@@ -411,11 +457,10 @@ impl Scene {
     pub fn remove(&mut self, ids: &HashSet<String>) {
         let mut all = ids.clone();
         for el in self.elements() {
-            if let Some(c) = el.container_id() {
-                if ids.contains(c) {
+            if let Some(c) = el.container_id()
+                && ids.contains(c) {
                     all.insert(el.id.clone());
                 }
-            }
         }
         self.items
             .retain(|i| !matches!(i, Item::El(e) if all.contains(&e.id)));
@@ -429,22 +474,19 @@ impl Scene {
                 }
             }
             for binding in [&mut el.f.start_binding, &mut el.f.end_binding] {
-                if let Some(bd) = binding.get() {
-                    if all.contains(&bd.element_id) {
+                if let Some(bd) = binding.get()
+                    && all.contains(&bd.element_id) {
                         binding.set_null();
                     }
-                }
             }
-            if let Some(c) = el.f.container_id.get() {
-                if all.contains(c) {
+            if let Some(c) = el.f.container_id.get()
+                && all.contains(c) {
                     el.f.container_id.set_null();
                 }
-            }
-            if let Some(fr) = el.f.frame_id.get() {
-                if all.contains(fr) {
+            if let Some(fr) = el.f.frame_id.get()
+                && all.contains(fr) {
                     el.f.frame_id.set_null();
                 }
-            }
         }
     }
 
@@ -613,39 +655,89 @@ impl Scene {
             .map(|e| e.id.clone())
             .collect();
         for aid in arrows {
-            let Some(arrow) = self.get(&aid).cloned() else { continue };
-            let mut world: Vec<geom::P> = arrow.points().iter().map(|p| geom::to_world(&arrow, *p)).collect();
-            if world.len() < 2 {
-                continue;
-            }
-            let n = world.len();
-            for (start, b) in [(true, arrow.f.start_binding.get()), (false, arrow.f.end_binding.get())] {
-                let Some(b) = b else { continue };
-                let Some(target) = self.get(&b.element_id) else { continue };
-                let (i, j) = if start { (0, 1) } else { (n - 1, n - 2) };
-                let adj = if n == 2 {
-                    // Aim from the other end (or the other bound shape's centre).
-                    let other = if start { arrow.f.end_binding.get() } else { arrow.f.start_binding.get() };
-                    other
-                        .and_then(|o| self.get(&o.element_id))
-                        .map(geom::center)
-                        .unwrap_or(world[j])
-                } else {
-                    world[j]
-                };
-                let gap = b.gap.get().map(|g| g.0).unwrap_or(4.0).clamp(0.0, 20.0);
-                let p = geom::outline_toward_center(target, adj);
-                let d = geom::dist(adj, p);
-                world[i] = if d > 1e-6 {
-                    [p[0] + (adj[0] - p[0]) / d * gap, p[1] + (adj[1] - p[1]) / d * gap]
-                } else {
-                    p
-                };
-            }
-            if let Some(a) = self.get_mut(&aid) {
-                set_world_points(a, &world);
-            }
+            self.reroute_arrow(&aid);
         }
+    }
+
+    /// Recomputes a bound arrow's end points (focus bindings) or route
+    /// (elbow arrows, fixed points), then its label.
+    pub fn reroute_arrow(&mut self, aid: &str) {
+        let Some(arrow) = self.get(aid).cloned() else { return };
+        let mut world: Vec<geom::P> = arrow.points().iter().map(|p| geom::to_world(&arrow, *p)).collect();
+        if world.len() < 2 {
+            return;
+        }
+        if arrow.f.elbowed.get().copied().unwrap_or(false) {
+            let end = |b: Option<&Binding>, fallback: geom::P| -> (geom::P, Option<elbow::Heading>) {
+                let Some(b) = b else { return (fallback, None) };
+                let Some(t) = self.get(&b.element_id) else { return (fallback, None) };
+                let gap = b.gap.get().map(|g| g.0).unwrap_or(4.0).clamp(0.0, 20.0);
+                let fp = b
+                    .fixed_point
+                    .get()
+                    .and_then(|v| v.as_array())
+                    .and_then(|a| Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?]))
+                    .unwrap_or_else(|| elbow::fixed_point_for(t, fallback));
+                let (p, h) = elbow::fixed_point_world(t, fp, gap);
+                (p, Some(h))
+            };
+            let (s, hs) = end(arrow.f.start_binding.get(), world[0]);
+            let (e, he) = end(arrow.f.end_binding.get(), *world.last().unwrap());
+            let pts = elbow::route(s, hs, e, he);
+            if let Some(a) = self.get_mut(aid) {
+                a.f.angle.set(Num(0.0));
+                set_world_points(a, &pts);
+            }
+            self.layout_bound_text(aid);
+            return;
+        }
+        let n = world.len();
+        for (start, b) in [(true, arrow.f.start_binding.get()), (false, arrow.f.end_binding.get())] {
+            let Some(b) = b else { continue };
+            let Some(target) = self.get(&b.element_id) else { continue };
+            let (i, j) = if start { (0, 1) } else { (n - 1, n - 2) };
+            let adj = if n == 2 {
+                // Aim from the other end (or the other bound shape's centre).
+                let other = if start { arrow.f.end_binding.get() } else { arrow.f.start_binding.get() };
+                other
+                    .and_then(|o| self.get(&o.element_id))
+                    .map(geom::center)
+                    .unwrap_or(world[j])
+            } else {
+                world[j]
+            };
+            let gap = b.gap.get().map(|g| g.0).unwrap_or(4.0).clamp(0.0, 20.0);
+            let focus = b.focus.get().map(|f| f.0).unwrap_or(0.0).clamp(-1.0, 1.0);
+            let aim = geom::focus_point(target, adj, focus);
+            let p = geom::ray_outline(target, adj, aim).unwrap_or_else(|| geom::outline_toward_center(target, adj));
+            let d = geom::dist(adj, p);
+            world[i] = if d > 1e-6 {
+                [p[0] + (adj[0] - p[0]) / d * gap, p[1] + (adj[1] - p[1]) / d * gap]
+            } else {
+                p
+            };
+        }
+        if let Some(a) = self.get_mut(aid) {
+            set_world_points(a, &world);
+        }
+        self.layout_bound_text(aid);
+    }
+
+    /// Route for an elbow arrow being drawn from `s` to `e`, attaching to
+    /// the given targets (if any) at the sides nearest those points.
+    pub fn elbow_route(&self, s: geom::P, st: Option<&str>, e: geom::P, et: Option<&str>) -> Vec<geom::P> {
+        let end = |t: Option<&str>, p: geom::P| -> (geom::P, Option<elbow::Heading>) {
+            match t.and_then(|t| self.get(t)) {
+                Some(t) => {
+                    let (q, h) = elbow::fixed_point_world(t, elbow::fixed_point_for(t, p), 4.0);
+                    (q, Some(h))
+                }
+                None => (p, None),
+            }
+        };
+        let (s, hs) = end(st, s);
+        let (e, he) = end(et, e);
+        elbow::route(s, hs, e, he)
     }
 
     /// Re-lays out text bound to `container` (wrap, centre, grow container).
@@ -669,6 +761,31 @@ impl Scene {
             .get()
             .cloned()
             .unwrap_or_else(|| t.text().to_string());
+        if c.is_linear() {
+            let w: Vec<geom::P> = c.points().iter().map(|p| geom::to_world(&c, *p)).collect();
+            if w.is_empty() {
+                return;
+            }
+            let n = w.len();
+            let mid = if n % 2 == 1 {
+                w[n / 2]
+            } else {
+                let (a, b) = (w[n / 2 - 1], w[n / 2]);
+                [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]
+            };
+            let max_w = (0.7 * c.width().abs()).max(11.0 * size);
+            let wrapped = text::wrap(&original, fam, size, max_w);
+            let (tw, th) = text::measure(&wrapped, fam, size, lh);
+            if let Some(tm) = self.get_mut(&tid) {
+                tm.f.text.set(wrapped);
+                tm.f.width.set(Num(tw));
+                tm.f.height.set(Num(th));
+                tm.f.x.set(Num(mid[0] - tw / 2.0));
+                tm.f.y.set(Num(mid[1] - th / 2.0));
+                tm.f.angle.set(Num(0.0));
+            }
+            return;
+        }
         let pad = 5.0;
         let (cw, ch) = (c.width().abs(), c.height().abs());
         let max_w = match c.kind.as_str() {
@@ -692,11 +809,10 @@ impl Scene {
                 _ => th + pad * 2.0,
             };
         }
-        if (container_h - ch).abs() > 0.01 {
-            if let Some(cm) = self.get_mut(container) {
+        if (container_h - ch).abs() > 0.01
+            && let Some(cm) = self.get_mut(container) {
                 cm.f.height.set(Num(container_h));
             }
-        }
         let c = self.get(container).cloned().unwrap();
         let cc = [c.x() + c.width() / 2.0, c.y() + c.height() / 2.0];
         let tw = tw.min(max_w.max(tw.min(max_w)));
@@ -737,16 +853,37 @@ impl Scene {
             if start { a.f.start_binding.get() } else { a.f.end_binding.get() }
                 .map(|b| b.element_id.clone())
         });
+        // Where the arrow currently meets the target decides the focus
+        // (or, for elbow arrows, the fixed point on the target's box).
+        let geo = target.and_then(|t| {
+            let a = self.get(arrow)?;
+            let te = self.get(t)?;
+            let w: Vec<geom::P> = a.points().iter().map(|p| geom::to_world(a, *p)).collect();
+            if w.len() < 2 {
+                return None;
+            }
+            let (end, adj) = if start { (w[0], w[1]) } else { (w[w.len() - 1], w[w.len() - 2]) };
+            if a.f.elbowed.get().copied().unwrap_or(false) {
+                let fp = elbow::fixed_point_for(te, end);
+                Some((0.0, Value::from(vec![fp[0], fp[1]])))
+            } else {
+                Some((geom::focus_of(te, adj, end), Value::Null))
+            }
+        });
         if let Some(a) = self.get_mut(arrow) {
             let field = if start { &mut a.f.start_binding } else { &mut a.f.end_binding };
             match target {
-                Some(t) => field.set(Binding {
-                    element_id: t.to_string(),
-                    focus: Field::Value(Num(0.0)),
-                    gap: Field::Value(Num(4.0)),
-                    fixed_point: Field::Null,
-                    extra: Map::new(),
-                }),
+                Some(t) => {
+                    let (focus, fixed) = geo.unwrap_or((0.0, Value::Null));
+                    let focus = (focus * 1e4).round() / 1e4;
+                    field.set(Binding {
+                        element_id: t.to_string(),
+                        focus: Field::Value(Num(focus)),
+                        gap: Field::Value(Num(4.0)),
+                        fixed_point: if fixed.is_null() { Field::Null } else { Field::Value(fixed) },
+                        extra: Map::new(),
+                    })
+                }
                 None => field.set_null(),
             }
         }
@@ -761,24 +898,20 @@ impl Scene {
                 })
                 .unwrap_or(false)
         };
-        if let Some(o) = old {
-            if Some(o.as_str()) != target && !still(self, &o) {
-                if let Some(t) = self.get_mut(&o) {
-                    if let Some(b) = t.f.bound_elements.get_mut() {
+        if let Some(o) = old
+            && Some(o.as_str()) != target && !still(self, &o)
+                && let Some(t) = self.get_mut(&o)
+                    && let Some(b) = t.f.bound_elements.get_mut() {
                         b.retain(|be| be.id != arrow);
                     }
-                }
-            }
-        }
-        if let Some(t) = target {
-            if let Some(te) = self.get_mut(t) {
+        if let Some(t) = target
+            && let Some(te) = self.get_mut(t) {
                 let mut b = te.bound_elements().to_vec();
                 if !b.iter().any(|be| be.id == arrow) {
                     b.push(BoundElement { id: arrow.to_string(), kind: "arrow".into(), extra: Map::new() });
                     te.f.bound_elements.set(b);
                 }
             }
-        }
     }
 }
 
