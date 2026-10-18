@@ -37,7 +37,7 @@ impl AssetSource for Assets {
 }
 
 /// Inter (UI) and JetBrains Mono (editor), the original's defaults.
-const FONTS: &[&[u8]] = &[
+pub const FONTS: &[&[u8]] = &[
     include_bytes!("../assets/fonts/Inter-Regular.ttf"),
     include_bytes!("../assets/fonts/Inter-Medium.ttf"),
     include_bytes!("../assets/fonts/Inter-SemiBold.ttf"),

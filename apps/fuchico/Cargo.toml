@@ -16,3 +16,12 @@ chrono.workspace = true
 futures = "0.3"
 sys-locale = "0.3"
 rand = "0.9"
+fuchico-excalidraw.workspace = true
+fuchico-mermaid.workspace = true
+fuchico-markdown.workspace = true
+pulldown-cmark.workspace = true
+typst = "0.15"
+typst-pdf = "0.15"
+typst-kit = { version = "0.15", default-features = false, features = ["scan-fonts", "embedded-fonts"] }
+base64.workspace = true
+typst-layout = "0.15"

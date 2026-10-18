@@ -5,6 +5,8 @@
 //! opens the print window. The bus already carries `ExportRequest` /
 //! `ExportHtml` for the cross-window handshake.
 
+pub mod pdf;
+
 use gpui_kit::{App, Window};
 
 pub fn export_html(path: &str, window: &mut Window, cx: &mut App) {
