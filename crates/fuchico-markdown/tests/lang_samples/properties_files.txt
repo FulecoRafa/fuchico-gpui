@@ -1,0 +1,4 @@
+# c
+key = value
+[section]
+num = 42

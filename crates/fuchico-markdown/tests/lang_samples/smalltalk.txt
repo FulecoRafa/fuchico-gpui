@@ -1,0 +1,7 @@
+"A simple counter"
+| count |
+count := 0.
+#(1 2 3) do: [:each | count := count + each].
+Transcript show: 'Total: ', count printString; cr.
+x := #foo -> $a.
+^ self size > 10 ifTrue: [nil] ifFalse: [true]

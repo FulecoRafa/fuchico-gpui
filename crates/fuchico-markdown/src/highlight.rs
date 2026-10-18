@@ -13,9 +13,11 @@ use crate::languages::{resolve_file_language, FileLanguage};
 use crate::style::{flatten_spans, StyleId, StyleRun};
 use crate::text::{LineIndex, TextEdit};
 
-/// The bundled syntax set (two-face's extended set, newline variant).
+/// The bundled syntax set: two-face's extended set (newline variant) plus
+/// the `grammars/` ports, precompiled by `build.rs` and decoded on first use.
 pub fn syntax_set() -> &'static SyntaxSet {
-    static SET: LazyLock<SyntaxSet> = LazyLock::new(two_face::syntax::extra_newlines);
+    static DUMP: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/syntaxes.packdump"));
+    static SET: LazyLock<SyntaxSet> = LazyLock::new(|| syntect::dumps::from_uncompressed_data(DUMP).expect("bundled syntax dump"));
     &SET
 }
 
@@ -63,8 +65,30 @@ fn classify_str(s: &str) -> Class {
         || has("entity.name.tag")
     {
         StyleId::Type
-    } else if has("entity.other.attribute-name") || has("variable.other.property") || has("variable.other.member") {
+    } else if has("entity.other.attribute-name")
+        || has("variable.other.property")
+        || has("variable.other.member")
+        || has("variable.other.definition")
+    {
         StyleId::Property
+    } else if has("markup.inserted") {
+        // Not coloured by the original theme (it has no `t.inserted` /
+        // `t.deleted` rule); string/destructive colours read as +/-.
+        StyleId::String
+    } else if has("markup.deleted") {
+        StyleId::Invalid
+    } else if has("markup.heading") {
+        StyleId::Heading
+    } else if has("markup.bold") {
+        StyleId::Strong
+    } else if has("markup.italic") {
+        StyleId::Emphasis
+    } else if has("markup.strikethrough") {
+        StyleId::Strikethrough
+    } else if has("markup.underline.link") {
+        StyleId::Link
+    } else if has("markup.quote") {
+        StyleId::Quote
     } else if has("punctuation") {
         StyleId::Punctuation
     } else if has("invalid") {
@@ -269,7 +293,7 @@ mod tests {
                 resolved += 1;
             }
         }
-        assert!(resolved >= 90, "{resolved}");
+        assert_eq!(resolved, 143);
     }
 
     #[test]

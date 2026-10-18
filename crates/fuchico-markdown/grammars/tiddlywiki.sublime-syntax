@@ -1,0 +1,92 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/tiddlywiki.js (MIT).
+name: TiddlyWiki
+scope: source.tiddlywiki
+contexts:
+  main:
+    # start-of-line blocks
+    - match: '^\{\{\{$'
+      scope: comment.block.tiddlywiki
+      push: code-block
+    - match: '^<<<$'
+      scope: markup.quote.tiddlywiki
+    - match: '^(?:/\*\*\*|\*\*\*/|//\{\{\{|//\}\}\}|<!--\{\{\{-->|<!--\}\}\}-->)$'
+      scope: comment.block.tiddlywiki
+    - match: '^----+$'
+      scope: meta.separator.tiddlywiki
+    - match: '^!.*$'
+      scope: markup.heading.tiddlywiki
+    - match: '^\*+|^#+|^;+|^:+'
+      scope: comment.line.tiddlywiki
+    - match: '^>+'
+      scope: markup.quote.tiddlywiki
+    - match: '^\|'
+      scope: markup.heading.tiddlywiki
+    # inline code
+    - match: '\{\{\{'
+      scope: comment.block.tiddlywiki
+      push: inline-code
+    - match: '(?i)\b(?:https?|ftp|file)://[\-A-Z0-9+&@#/%?=~_|$!:,.;]*[A-Z0-9+&@#/%=~_|$]'
+      scope: markup.underline.link.tiddlywiki
+    - match: '"'
+      scope: string.quoted.double.tiddlywiki
+    - match: '~'
+      scope: punctuation.section.tiddlywiki
+    - match: '\[\[|\]\]'
+      scope: punctuation.section.tiddlywiki
+    - match: '@[\w_\-]*'
+      scope: markup.underline.link.tiddlywiki
+    - match: '\d+'
+      scope: constant.numeric.tiddlywiki
+    - match: '/%'
+      push: invisible-comment
+    - match: '//'
+      push: emphasis
+    - match: '__'
+      push: underline
+    - match: '--(?= )'
+      scope: punctuation.section.tiddlywiki
+    - match: '--'
+      push: strike
+    - match: "''"
+      push: strong
+    - match: '<<'
+      scope: meta.macro.tiddlywiki
+      push: macro
+  code-block:
+    - meta_content_scope: comment.block.tiddlywiki
+    - match: '^\}\}\}$'
+      scope: comment.block.tiddlywiki
+      pop: true
+  inline-code:
+    - meta_content_scope: comment.block.tiddlywiki
+    - match: '\}\}\}'
+      scope: comment.block.tiddlywiki
+      pop: true
+  invisible-comment:
+    - meta_scope: comment.block.tiddlywiki
+    - match: '%/'
+      pop: true
+  emphasis:
+    - meta_scope: markup.italic.tiddlywiki
+    - match: '//'
+      pop: true
+  underline:
+    - meta_scope: markup.underline.link.tiddlywiki
+    - match: '__'
+      pop: true
+  strike:
+    - meta_scope: markup.deleted.tiddlywiki
+    - match: '--'
+      pop: true
+  strong:
+    - meta_scope: markup.bold.tiddlywiki
+    - match: "''"
+      pop: true
+  macro:
+    - match: '>>'
+      scope: meta.macro.tiddlywiki
+      pop: true
+    - match: '\b(?:allTags|closeAll|list|newJournal|newTiddler|permaview|saveChanges|search|slider|tabs|tag|tagging|tags|tiddler|timeline|today|version|option|with|filter)\b'
+      scope: keyword.control.tiddlywiki

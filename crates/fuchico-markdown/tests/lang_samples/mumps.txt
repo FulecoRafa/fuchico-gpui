@@ -1,0 +1,6 @@
+START ; entry point
+ SET X=10
+ WRITE "Hello, MUMPS",!
+ FOR I=1:1:X DO
+ . WRITE $PIECE("a,b,c",",",2),!
+ QUIT

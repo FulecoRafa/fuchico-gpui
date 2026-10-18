@@ -1,0 +1,6 @@
+; dialplan
+[default]
+exten => 100,1,Answer()
+same => n,Playback(hello-world)
+same => n,Set(COUNT=${COUNT}+1)
+same => n,Hangup()

@@ -1,0 +1,5 @@
+# c
+key: "value"
+list:
+  - 1
+  - true

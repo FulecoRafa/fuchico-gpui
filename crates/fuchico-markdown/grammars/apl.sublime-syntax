@@ -1,0 +1,29 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/apl.js (MIT).
+name: APL
+scope: source.apl
+contexts:
+  main:
+    - match: '"[^"]*"?'
+      scope: string.quoted.double.apl
+    - match: "'[^']*'?"
+      scope: string.quoted.single.apl
+    - match: '[\[{(\]})]'
+      scope: punctuation.section.apl
+    - match: '⍬'
+      scope: constant.language.apl
+    - match: '[¯\d][\w.]*'
+      scope: constant.numeric.apl
+    - match: '∘\.'
+      scope: support.function.apl
+    - match: '[./⌿⍀¨⍣]'
+      scope: keyword.operator.apl
+    - match: '←'
+      scope: keyword.operator.apl
+    - match: '[+−×÷⌈⌊∣⍳?⋆⍟○!⌹<≤=>≥≠≡≢∈⍷∪∩∼∨∧⍱⍲⍴,⍪⌽⊖⍉↑↓⊂⊃⌷⍋⍒⊤⊥⍕⍎⊣⊢]'
+      scope: support.function.apl
+    - match: '[⍝#].*$'
+      scope: comment.line.apl
+    - match: '[\w$_]+'
+      scope: keyword.control.apl

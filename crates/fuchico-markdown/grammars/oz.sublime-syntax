@@ -1,0 +1,67 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/oz.js (MIT).
+name: Oz
+scope: source.oz-port
+contexts:
+  main:
+    - match: '[{}]'
+      scope: punctuation.section.oz
+    - match: '\[\]'
+      scope: keyword.control.oz
+    - match: ':::|\.\.\.|=<:|>=:|<-|:=|=<|>=|<=|<:|>:|=:|\\=|!!|==|::'
+      scope: keyword.operator.oz
+    - match: '\b(?:true|false|nil|unit)\b'
+      scope: constant.language.oz
+    - match: '\b(proc|fun)\b(?:\s*(\{)\s*([A-Z][A-Za-z0-9_]*|`[^`\n]+`|\$))?'
+      captures:
+        1: keyword.control.oz
+        2: punctuation.section.oz
+        3: variable.other.definition.oz
+    - match: '\b(class)\b(?:\s+([A-Z][A-Za-z0-9_]*|`[^`\n]+`))?'
+      captures:
+        1: keyword.control.oz
+        2: entity.name.type.oz
+    - match: '\b(meth)\b(?:\s+([a-zA-Z][A-Za-z0-9_]*|`[^`\n]+`))?'
+      captures:
+        1: keyword.control.oz
+        2: variable.other.definition.oz
+    - match: '\b(?:local|case|if|cond|or|dis|choice|not|thread|try|raise|lock|for|suchthat|functor)\b'
+      scope: keyword.control.oz
+    - match: '\b(?:in|then|else|of|elseof|elsecase|elseif|catch|finally|with|require|prepare|import|export|define|do)\b'
+      scope: keyword.control.oz
+    - match: '\b(?:andthen|at|attr|declare|feat|from|lex|mod|div|mode|orelse|parser|prod|prop|scanner|self|syn|token)\b'
+      scope: keyword.control.oz
+    - match: '\bend\b'
+      scope: keyword.control.oz
+    - match: '"'
+      scope: punctuation.definition.string.begin.oz
+      push: dq-string
+    - match: "'"
+      scope: punctuation.definition.string.begin.oz
+      push: sq-string
+    - match: '~?(?:0[xX][0-9a-fA-F]+|[0-9]+(?:\.[0-9]+)?(?:[eE][~+]?[0-9]+)?)'
+      scope: constant.numeric.oz
+    - match: '%.*$'
+      scope: comment.line.percent.oz
+    - match: '/\*'
+      scope: punctuation.definition.comment.oz
+      push: block-comment
+    - match: '[\^@!|<>#.*\-+\\/,=]'
+      scope: keyword.operator.oz
+    - match: '\w+'
+      scope: variable.other.oz
+  block-comment:
+    - meta_scope: comment.block.oz
+    - match: '\*/'
+      pop: true
+  dq-string:
+    - meta_scope: string.quoted.double.oz
+    - match: '\\.'
+    - match: '"|$'
+      pop: true
+  sq-string:
+    - meta_scope: string.quoted.single.oz
+    - match: '\\.'
+    - match: "'|$"
+      pop: true

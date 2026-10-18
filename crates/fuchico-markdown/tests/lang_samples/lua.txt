@@ -1,0 +1,2 @@
+-- c
+local function f(x) return "s" .. (x + 42) end

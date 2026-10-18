@@ -1,0 +1,41 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/ttcn-cfg.js (MIT).
+name: TTCN_CFG
+scope: source.ttcn-cfg
+contexts:
+  main:
+    - match: '"'
+      scope: string.quoted.double.ttcn-cfg
+      push: string-double
+    - match: "'"
+      scope: string.quoted.single.ttcn-cfg
+      push: string-single
+    - match: '[:=]'
+      scope: punctuation.separator.ttcn-cfg
+    - match: '#.*$'
+      scope: comment.line.ttcn-cfg
+    - match: '\d[\w.]*'
+      scope: constant.numeric.ttcn-cfg
+    - match: '\|+'
+      scope: keyword.operator.ttcn-cfg
+    - match: '\[[\w\]]*'
+      scope: constant.numeric.ttcn-cfg
+    - match: '\b(?:Yes|No|LogFile|FileMask|ConsoleMask|AppendFile|TimeStampFormat|LogEventTypes|SourceInfoFormat|LogEntityName|LogSourceInfo|DiskFullAction|LogFileNumber|LogFileSize|MatchingHints|Detailed|Compact|SubCategories|Stack|Single|None|Seconds|DateTime|Time|Stop|Error|Retry|Delete|TCPPort|KillTimer|NumHCs|UnixSocketsEnabled|LocalAddress)\b'
+      scope: keyword.control.ttcn-cfg
+    - match: '\b(?:STATISTICS_UNQUALIFIED|DEFAULTOP_UNQUALIFIED|PORTEVENT_UNQUALIFIED|VERDICTOP_UNQUALIFIED|DEFAULTOP_DEACTIVATE|EXECUTOR_UNQUALIFIED|FUNCTION_UNQUALIFIED|MATCHING_UNQUALIFIED|PARALLEL_UNQUALIFIED|TESTCASE_UNQUALIFIED|VERDICTOP_GETVERDICT|VERDICTOP_SETVERDICT|EXECUTOR_CONFIGDATA|EXECUTOR_EXTCOMMAND|EXECUTOR_LOGOPTIONS|TIMEROP_UNQUALIFIED|WARNING_UNQUALIFIED|ACTION_UNQUALIFIED|DEFAULTOP_ACTIVATE|EXECUTOR_COMPONENT|MATCHING_MCSUCCESS|MATCHING_MMSUCCESS|MATCHING_PCSUCCESS|MATCHING_PMSUCCESS|PORTEVENT_DUALRECV|PORTEVENT_DUALSEND|STATISTICS_VERDICT|DEBUG_UNQUALIFIED|ERROR_UNQUALIFIED|MATCHING_MCUNSUCC|MATCHING_MMUNSUCC|MATCHING_PCUNSUCC|MATCHING_PMUNSUCC|PARALLEL_PORTCONN|EXECUTOR_RUNTIME|MATCHING_PROBLEM|MATCHING_TIMEOUT|PARALLEL_PORTMAP|PORTEVENT_MCRECV|PORTEVENT_MCSEND|PORTEVENT_MMRECV|PORTEVENT_MMSEND|PORTEVENT_MQUEUE|PORTEVENT_PQUEUE|USER_UNQUALIFIED|TTCN_STATISTICS|PORTEVENT_PCOUT|PORTEVENT_PMOUT|PORTEVENT_STATE|TESTCASE_FINISH|TIMEROP_TIMEOUT|VERDICTOP_FINAL|TTCN_PORTEVENT|TTCN_VERDICTOP|TTCN_DEFAULTOP|DEBUG_TESTPORT|DEFAULTOP_EXIT|PORTEVENT_PCIN|PORTEVENT_PMIN|TESTCASE_START|TTCN_EXECUTOR|TTCN_TESTCASE|TTCN_FUNCTION|TTCN_PARALLEL|TTCN_MATCHING|MATCHING_DONE|TIMEROP_GUARD|TIMEROP_START|TTCN_WARNING|TTCN_TIMEROP|DEBUG_ENCDEC|FUNCTION_RND|PARALLEL_PTC|TIMEROP_READ|TIMEROP_STOP|TTCN_ACTION|LOG_NOTHING|TTCN_ERROR|TTCN_DEBUG|STATISTICS|TTCN_USER|PORTEVENT|VERDICTOP|DEFAULTOP|EXECUTOR|TESTCASE|FUNCTION|PARALLEL|MATCHING|WARNING|TIMEROP|LOG_ALL|ACTION|ERROR|DEBUG|USER)\b'
+      scope: constant.language.ttcn-cfg
+    - match: '\b(?:BeginControlPart|EndControlPart|BeginTestCase|EndTestCase)\b'
+      scope: markup.deleted.ttcn-cfg
+    - match: '[\w$]+'
+      scope: variable.other.ttcn-cfg
+  string-double:
+    - meta_scope: string.quoted.double.ttcn-cfg
+    - match: '\\.'
+    - match: '"[bhoBHO]?'
+      pop: true
+  string-single:
+    - meta_scope: string.quoted.single.ttcn-cfg
+    - match: '\\.'
+    - match: "'[bhoBHO]?"
+      pop: true

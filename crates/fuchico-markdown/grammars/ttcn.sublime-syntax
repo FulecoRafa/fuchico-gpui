@@ -1,0 +1,58 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/ttcn.js (MIT).
+name: TTCN
+scope: source.ttcn
+contexts:
+  main:
+    - match: '/\*'
+      scope: comment.block.ttcn
+      push: block-comment
+    - match: '//.*$'
+      scope: comment.line.ttcn
+    - match: '"'
+      scope: string.quoted.double.ttcn
+      push: string-double
+    - match: "'"
+      scope: string.quoted.single.ttcn
+      push: string-single
+    - match: '#.*$'
+      scope: constant.language.ttcn
+    - match: '%'
+      scope: constant.language.ttcn
+    - match: '\d[\w.]*'
+      scope: constant.numeric.ttcn
+    - match: '@(?:try|catch|lazy)'
+      scope: keyword.control.ttcn
+    - match: '[+\-*&@=<>!/]+'
+      scope: keyword.operator.ttcn
+    - match: '\b(?:activate|address|alive|all|alt|altstep|and|and4b|any|break|case|component|const|continue|control|deactivate|display|do|else|encode|enumerated|except|exception|execute|extends|extension|external|for|from|function|goto|group|if|import|in|infinity|inout|interleave|label|language|length|log|match|message|mixed|mod|modifies|module|modulepar|mtc|noblock|not|not4b|nowait|of|on|optional|or|or4b|out|override|param|pattern|port|procedure|record|recursive|rem|repeat|return|runs|select|self|sender|set|signature|system|template|testcase|to|type|union|value|valueof|var|variant|while|with|xor|xor4b)\b'
+      scope: keyword.control.ttcn
+    - match: '\b(?:bit2hex|bit2int|bit2oct|bit2str|char2int|char2oct|encvalue|decomp|decvalue|float2int|float2str|hex2bit|hex2int|hex2oct|hex2str|int2bit|int2char|int2float|int2hex|int2oct|int2str|int2unichar|isbound|ischosen|ispresent|isvalue|lengthof|log2str|oct2bit|oct2char|oct2hex|oct2int|oct2str|regexp|replace|rnd|sizeof|str2bit|str2float|str2hex|str2int|str2oct|substr|unichar2int|unichar2char|enum2int)\b'
+      scope: support.function.ttcn
+    - match: '\b(?:read|running|start|stop|timeout|call|catch|check|clear|getcall|getreply|halt|raise|receive|reply|send|trigger|create|connect|disconnect|done|kill|killed|map|unmap|getverdict|setverdict|action|apply|derefers|refers)\b'
+      scope: variable.other.definition.ttcn
+    - match: '\b(?:error|fail|inconc|none|pass|true|false|null|NULL|omit)\b'
+      scope: string.quoted.double.ttcn
+    - match: '\b(?:anytype|bitstring|boolean|char|charstring|default|float|hexstring|integer|objid|octetstring|universal|verdicttype|timer)\b'
+      scope: entity.name.type.ttcn
+    - match: '\b(?:private|public|friend)\b'
+      scope: keyword.control.ttcn
+    - match: '\b(?:complement|ifpresent|subset|superset|permutation)\b'
+      scope: constant.language.ttcn
+    - match: '[\w$\x{a1}-\x{ffff}]+'
+      scope: variable.other.ttcn
+  block-comment:
+    - meta_scope: comment.block.ttcn
+    - match: '\*/'
+      pop: true
+  string-double:
+    - meta_scope: string.quoted.double.ttcn
+    - match: '\\.'
+    - match: '"[bhoBHO]?'
+      pop: true
+  string-single:
+    - meta_scope: string.quoted.single.ttcn
+    - match: '\\.'
+    - match: "'[bhoBHO]?"
+      pop: true

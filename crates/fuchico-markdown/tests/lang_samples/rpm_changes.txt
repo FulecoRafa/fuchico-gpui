@@ -1,0 +1,5 @@
+-------------------------------------------------------------------
+Mon Jan  8 10:22:11 UTC 2024 - Jane Doe <jane@example.com>
+
+- Update to version 1.2.3
+- Fix build with newer glibc (bsc#12345)

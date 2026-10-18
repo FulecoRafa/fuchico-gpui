@@ -1,0 +1,9 @@
+; compute a plot
+pro demo, n
+  x = findgen(n)
+  y = sin(x / 3.5) + 1.0e-2
+  if n gt 10 then begin
+    plot, x, y, title='Sine'
+  endif
+  print, "done", 0x1F
+end

@@ -1,0 +1,11 @@
+require ["fileinto", "reject"];
+# Spam filter
+if header :contains "Subject" "viagra" {
+    fileinto "Junk";
+    stop;
+} elsif size :over 100K {
+    reject text:
+Too large.
+.
+}
+/* done */

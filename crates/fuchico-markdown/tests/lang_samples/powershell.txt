@@ -1,0 +1,2 @@
+# c
+function F($x) { if ($x -gt 1) { return "s" } }

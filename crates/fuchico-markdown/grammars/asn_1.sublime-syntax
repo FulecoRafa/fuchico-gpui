@@ -1,0 +1,51 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/asn1.js (MIT).
+name: ASN.1
+scope: source.asn1
+contexts:
+  main:
+    - match: '"'
+      scope: string.quoted.double.asn1
+      push: dq_string
+    - match: "'"
+      scope: string.quoted.single.asn1
+      push: sq_string
+    - match: '[\[\](){}]'
+      scope: punctuation.section.asn1
+    - match: '[:=,;]'
+      scope: punctuation.separator.asn1
+    - match: '--.*$'
+      scope: comment.line.asn1
+    - match: '\d[\w.]*'
+      scope: constant.numeric.asn1
+    - match: '[|^]+'
+      scope: keyword.operator.asn1
+    - match: '(?<![\w\-])(?:DEFINITIONS|OBJECTS|IF|DERIVED|INFORMATION|ACTION|REPLY|ANY|NAMED|CHARACTERIZED|BEHAVIOUR|REGISTERED|WITH|AS|IDENTIFIED|CONSTRAINED|BY|PRESENT|BEGIN|IMPORTS|FROM|UNITS|SYNTAX|MIN\-ACCESS|MAX\-ACCESS|MINACCESS|MAXACCESS|REVISION|STATUS|DESCRIPTION|SEQUENCE|SET|COMPONENTS|OF|CHOICE|DistinguishedName|ENUMERATED|SIZE|MODULE|END|INDEX|AUGMENTS|EXTENSIBILITY|IMPLIED|EXPORTS)(?![\w\-])'
+      scope: keyword.control.asn1
+    - match: '(?<![\w\-])(?:ACTIONS|ADD|GET|NOTIFICATIONS|REPLACE|REMOVE)(?![\w\-])'
+      scope: variable.other.asn1
+    - match: '(?<![\w\-])(?:OPTIONAL|DEFAULT|MANAGED|MODULE\-TYPE|MODULE_IDENTITY|MODULE\-COMPLIANCE|OBJECT\-TYPE|OBJECT\-IDENTITY|OBJECT\-COMPLIANCE|MODE|CONFIRMED|CONDITIONAL|SUBORDINATE|SUPERIOR|CLASS|TRUE|FALSE|NULL|TEXTUAL\-CONVENTION)(?![\w\-])'
+      scope: constant.language.asn1
+    - match: '(?<![\w\-])(?:current|deprecated|mandatory|obsolete)(?![\w\-])'
+      scope: comment.line.asn1
+    - match: '(?<![\w\-])(?:APPLICATION|AUTOMATIC|EXPLICIT|IMPLICIT|PRIVATE|TAGS|UNIVERSAL)(?![\w\-])'
+      scope: entity.name.type.asn1
+    - match: '(?<![\w\-])(?:BOOLEAN|INTEGER|OBJECT|IDENTIFIER|BIT|OCTET|STRING|UTCTime|InterfaceIndex|IANAifType|CMIP\-Attribute|REAL|PACKAGE|PACKAGES|IpAddress|PhysAddress|NetworkAddress|BITS|BMPString|TimeStamp|TimeTicks|TruthValue|RowStatus|DisplayString|GeneralString|GraphicString|IA5String|NumericString|PrintableString|SnmpAdminString|TeletexString|UTF8String|VideotexString|VisibleString|StringStore|ISO646String|T61String|UniversalString|Unsigned32|Integer32|Gauge|Gauge32|Counter|Counter32|Counter64)(?![\w\-])'
+      scope: storage.modifier.asn1
+    - match: '(?<![\w\-])(?:ATTRIBUTE|ATTRIBUTES|MANDATORY\-GROUP|MANDATORY\-GROUPS|GROUP|GROUPS|ELEMENTS|EQUALITY|ORDERING|SUBSTRINGS|DEFINED)(?![\w\-])'
+      scope: storage.modifier.asn1
+    - match: '(?<![\w\-])(?:not\-accessible|accessible\-for\-notify|read\-only|read\-create|read\-write)(?![\w\-])'
+      scope: storage.modifier.asn1
+    - match: '[\w\-]+'
+      scope: variable.other.asn1
+  dq_string:
+    - meta_scope: string.quoted.double.asn1
+    - match: '\\.'
+    - match: '"[bBhHoO]?'
+      pop: true
+  sq_string:
+    - meta_scope: string.quoted.single.asn1
+    - match: '\\.'
+    - match: "'[bBhHoO]?"
+      pop: true

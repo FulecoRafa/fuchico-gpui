@@ -1,0 +1,2 @@
+-- c
+main = text ("s" ++ String.fromInt 42)

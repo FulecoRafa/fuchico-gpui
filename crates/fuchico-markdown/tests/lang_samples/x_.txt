@@ -1,0 +1,9 @@
+# Xu sequence chart
+xu {
+  watermark = "draft";
+  a [label="Client"], b [label="Server", activate=true];
+  a => b [label="request"];
+  alt [label="ok"] {
+    b >> a [label="200"];
+  };
+}

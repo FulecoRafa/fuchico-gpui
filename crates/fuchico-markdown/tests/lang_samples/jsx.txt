@@ -1,0 +1,2 @@
+// c
+const A = () => <div className="x">{1 + 2}</div>;

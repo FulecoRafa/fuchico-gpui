@@ -1,0 +1,4 @@
+% c
+function y = f(x)
+  y = x + 42;
+end

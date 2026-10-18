@@ -1,0 +1,13 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/rpm.js (MIT).
+name: RPM Changes
+scope: source.rpm-changes
+contexts:
+  main:
+    - match: '^-+$'
+      scope: entity.name.tag.rpm-changes
+    - match: '^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)  ?\d{1,2} \d{2}:\d{2}(?::\d{2})? [A-Z]{3,4} \d{4} - '
+      scope: entity.name.tag.rpm-changes
+    - match: '[\w+.-]+@[\w.-]+'
+      scope: string.quoted.double.rpm-changes

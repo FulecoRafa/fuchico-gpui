@@ -1,0 +1,3 @@
+// c
+#import <Foundation/Foundation.h>
+class A { int f() { return 42; } };

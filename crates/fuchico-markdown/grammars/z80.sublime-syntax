@@ -1,0 +1,95 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/z80.js (MIT).
+name: Z80
+scope: source.z80
+variables:
+  kw1: '(?<!\w)(?:exx?|(?:ld|cp|in)(?:[di]r?)?|pop|push|ad[cd]|cpl|daa|dec|inc|neg|sbc|sub|and|bit|[cs]cf|x?or|res|set|r[lr]c?a?|r[lr]d|s[lr]a|srl|djnz|nop|rst|[de]i|halt|im|ot[di]r|out[di]?)(?!\w)'
+  kw2: '(?<!\w)(?:call|j[pr]|ret[in]?|b_?(?:call|jump))(?!\w)'
+  reg: '(?<!\w)(?:af?|bc?|c|de?|e|hl?|l|i[xy]?|r|sp)(?!\w)'
+  cond: '(?<!\w)(?:n?[zc]|p[oe]?|m)(?!\w)'
+  err: '(?<!\w)(?:[hl][xy]|i[xy][hl]|slia|sll)(?!\w)'
+  num: '(?<!\w)(?:[\da-f]+h|[0-7]+o|[01]+b|\d+d?)(?!\w)'
+contexts:
+  main:
+    # a line that starts in column 0 holds a label / directive: words stay uncoloured
+    - match: '^(?=\S)'
+      push: flat-line
+    - match: '^(?=\s)'
+      push: ctx0
+  shared:
+    - match: ';.*$'
+      scope: comment.line.z80
+    - match: '"(?:[^"\\]|\\.)*"?'
+      scope: string.quoted.double.z80
+    - match: "'\\\\?.'"
+      scope: constant.numeric.z80
+    - match: '\.\w+|^#\w+'
+      scope: variable.other.definition.z80
+    - match: '\$[\da-fA-F]+'
+      scope: constant.numeric.z80
+    - match: '%[01]+'
+      scope: constant.numeric.z80
+  eol:
+    - match: '$\n?'
+      pop: true
+  flat-line:
+    - include: eol
+    - include: shared
+    - match: '\w+'
+  ctx0:
+    - include: eol
+    - include: shared
+    - match: '(?i){{kw1}}'
+      scope: keyword.control.z80
+      set: ctx1
+    - match: '(?i){{kw2}}'
+      scope: keyword.control.z80
+      set: ctx2
+    - match: '(?i){{err}}'
+      scope: invalid.illegal.z80
+    - match: '\w+'
+  ctx1:
+    - include: eol
+    - include: shared
+    - match: '(?i){{reg}}'
+      scope: variable.other.z80
+      set: ctx4
+    - match: '(?i){{kw1}}'
+      scope: keyword.control.z80
+    - match: '(?i){{kw2}}'
+      scope: keyword.control.z80
+      set: ctx2
+    - match: '(?i){{err}}'
+      scope: invalid.illegal.z80
+    - match: '\w+'
+  ctx2:
+    - include: eol
+    - include: shared
+    - match: '(?i){{cond}}'
+      scope: variable.other.special.z80
+      set: ctx4
+    - match: '(?i){{kw1}}'
+      scope: keyword.control.z80
+      set: ctx1
+    - match: '(?i){{kw2}}'
+      scope: keyword.control.z80
+    - match: '(?i){{err}}'
+      scope: invalid.illegal.z80
+    - match: '\w+'
+  ctx4:
+    - include: eol
+    - include: shared
+    - match: '(?i){{reg}}'
+      scope: variable.other.z80
+    - match: '(?i){{kw1}}'
+      scope: keyword.control.z80
+      set: ctx1
+    - match: '(?i){{kw2}}'
+      scope: keyword.control.z80
+      set: ctx2
+    - match: '(?i){{num}}'
+      scope: constant.numeric.z80
+    - match: '(?i){{err}}'
+      scope: invalid.illegal.z80
+    - match: '\w+'

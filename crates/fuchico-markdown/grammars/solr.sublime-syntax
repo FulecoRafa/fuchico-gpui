@@ -1,0 +1,27 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/solr.js (MIT).
+name: Solr
+scope: source.solr
+variables:
+  sc: '[^\s|!+\-*?~^&:()\[\]{}"\\]'
+contexts:
+  main:
+    - match: '"'
+      push: string
+    - match: '\|\|?|&&?|[!+\-*?~^]'
+      scope: keyword.operator.solr
+    - match: '(?<!{{sc}})(?:OR|AND|NOT|TO)(?!{{sc}})'
+      scope: keyword.operator.solr
+    - match: '(?<!{{sc}})[+-]?(?:0|[1-9]\d*)(?:\.\d*[1-9])?(?!{{sc}})'
+      scope: constant.numeric.solr
+    - match: '{{sc}}+(?=:)'
+      scope: variable.other.property.solr
+    - match: '{{sc}}+'
+      scope: string.unquoted.solr
+  string:
+    - meta_scope: string.quoted.double.solr
+    - match: '\\.'
+      scope: constant.character.escape.solr
+    - match: '"|$'
+      pop: true

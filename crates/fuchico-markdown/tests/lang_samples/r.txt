@@ -1,0 +1,2 @@
+# c
+f <- function(x) { if (x > 1) "s" else 42 }

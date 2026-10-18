@@ -1,0 +1,5 @@
+! c
+program p
+  integer :: x = 42
+  print *, "s", x
+end program p

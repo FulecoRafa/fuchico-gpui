@@ -1,0 +1,104 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/tiki.js (MIT).
+name: Tiki wiki
+scope: source.tiki-wiki
+contexts:
+  main:
+    - match: '\{/?[ \t]*[^\s\x{00a0}="''/?(}]*'
+      scope: entity.name.tag.tiki-wiki
+      push: plugin
+    - match: '__'
+      push: strong
+    - match: "''"
+      push: emphasis
+    - match: '\(\('
+      push: wiki-link
+    - match: '\['
+      push: web-link
+    - match: '\|\|'
+      push: table
+    - match: '-='
+      push: title-bar
+    - match: '--'
+      push: deleted
+    - match: '==='
+      push: underline
+    - match: '::'
+      push: centered
+    - match: '\^'
+      push: box
+    - match: '~np~'
+      push: no-parse
+    - match: '^!.*$'
+      scope: markup.heading.tiki-wiki
+    - match: '^[*#+].*$'
+      scope: punctuation.section.tiki-wiki
+  plugin:
+    - match: '\}'
+      scope: entity.name.tag.tiki-wiki
+      pop: true
+    - match: '[()]'
+      scope: punctuation.section.tiki-wiki
+    - match: '(=>?)([^\s''"][^ ,)}]*)?'
+      captures:
+        1: keyword.operator.tiki-wiki
+        2: string.quoted.double.tiki-wiki
+    - match: '"'
+      push: plugin-dq
+    - match: "'"
+      push: plugin-sq
+    - match: '[^\s\x{00a0}="''/?(){}]+'
+      scope: entity.other.attribute-name.tiki-wiki
+  plugin-dq:
+    - meta_scope: string.quoted.double.tiki-wiki
+    - match: '"'
+      pop: true
+  plugin-sq:
+    - meta_scope: string.quoted.single.tiki-wiki
+    - match: "'"
+      pop: true
+  strong:
+    - meta_scope: markup.bold.tiki-wiki
+    - match: '__'
+      pop: true
+  emphasis:
+    - meta_scope: markup.italic.tiki-wiki
+    - match: "''"
+      pop: true
+  wiki-link:
+    - meta_scope: markup.underline.link.tiki-wiki
+    - match: '\)\)'
+      pop: true
+  web-link:
+    - meta_scope: markup.underline.link.tiki-wiki
+    - match: '\]'
+      pop: true
+  table:
+    - meta_scope: comment.block.tiki-wiki
+    - match: '\|\|'
+      pop: true
+  title-bar:
+    - meta_scope: markup.heading.tiki-wiki
+    - match: '=-'
+      pop: true
+  deleted:
+    - meta_scope: invalid.illegal.tiki-wiki
+    - match: '--'
+      pop: true
+  underline:
+    - meta_scope: markup.underline.tiki-wiki
+    - match: '==='
+      pop: true
+  centered:
+    - meta_scope: comment.block.tiki-wiki
+    - match: '::'
+      pop: true
+  box:
+    - meta_scope: meta.box.tiki-wiki
+    - match: '\^'
+      pop: true
+  no-parse:
+    - meta_scope: meta.no-parse.tiki-wiki
+    - match: '~/np~'
+      pop: true

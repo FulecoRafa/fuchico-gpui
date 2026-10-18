@@ -1,0 +1,33 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/fcl.js (MIT).
+name: FCL
+scope: source.fcl-port
+contexts:
+  main:
+    - match: '\(\*'
+      scope: punctuation.definition.comment.fcl
+      push: block-comment-paren
+    - match: '/\*'
+      scope: punctuation.definition.comment.fcl
+      push: block-comment-c
+    - match: '//.*$'
+      scope: comment.line.double-slash.fcl
+    - match: '0[xX][0-9a-fA-F]+|0[0-7]+|\.[0-9]+(?:[eE][-+]?[0-9]+)?|[0-9][0-9]*\.?[0-9]*(?:[eE][-+]?[0-9]+)?'
+      scope: constant.numeric.fcl
+    - match: '(?i)(?<![\w$\x{00a1}-\x{ffff}])(?:term|method|accu|rule|then|is|and|or|if|default|var_input|var_output|fuzzify|defuzzify|function_block|ruleblock|end_ruleblock|end_defuzzify|end_function_block|end_fuzzify|end_var)(?![\w$\x{00a1}-\x{ffff}])'
+      scope: keyword.control.fcl
+    - match: '(?i)(?<![\w$\x{00a1}-\x{ffff}])(?:true|false|nan|real|min|max|cog|cogs)(?![\w$\x{00a1}-\x{ffff}])'
+      scope: constant.language.fcl
+    - match: '[+\-*&^%:=<>!|/]+'
+      scope: keyword.operator.fcl
+    - match: '[\w$\x{00a1}-\x{ffff}]+'
+      scope: variable.other.fcl
+  block-comment-paren:
+    - meta_scope: comment.block.fcl
+    - match: '\*\)'
+      pop: true
+  block-comment-c:
+    - meta_scope: comment.block.fcl
+    - match: '\*/'
+      pop: true

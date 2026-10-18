@@ -1,0 +1,57 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/mathematica.js (MIT).
+name: Mathematica
+scope: source.mathematica-port
+variables:
+  id: '[a-zA-Z$][a-zA-Z0-9$]*'
+  float: '(?:\.\d+|\d+\.\d*|\d+)'
+  fprec: '(?:`(?:`?(?:\.\d+|\d+\.\d*|\d+))?)'
+  fbase: '(?:\.\w+|\w+\.\w*|\w+)'
+contexts:
+  main:
+    - match: '\(\*'
+      scope: punctuation.definition.comment.mathematica
+      push: comment
+    - match: '"'
+      scope: punctuation.definition.string.begin.mathematica
+      push: string
+    - match: '\d+\^\^{{fbase}}{{fprec}}?(?:\*\^[+-]?\d+)?'
+      scope: constant.numeric.base.mathematica
+    - match: '{{float}}{{fprec}}?(?:\*\^[+-]?\d+)?'
+      scope: constant.numeric.mathematica
+    - match: '(?:In|Out)\[[0-9]*\]'
+      scope: constant.language.mathematica
+    - match: '{{id}}(?:`[a-zA-Z0-9$]+)*::usage'
+      scope: meta.usage.mathematica
+    - match: '{{id}}(?:`[a-zA-Z0-9$]+)*::{{id}}:?'
+      scope: string.other.message.mathematica
+    - match: '{{id}}_+{{id}}'
+      scope: variable.other.pattern.mathematica
+    - match: '{{id}}_+'
+      scope: variable.other.pattern.mathematica
+    - match: '_+{{id}}'
+      scope: variable.other.pattern.mathematica
+    - match: '\\\[{{id}}\]'
+      scope: constant.character.escape.mathematica
+    - match: '[\[\]{}()]'
+      scope: punctuation.section.mathematica
+    - match: '#{{id}}|#+[0-9]?'
+      scope: variable.other.constant.mathematica
+    - match: '`?{{id}}(?:`{{id}})*`?'
+      scope: keyword.control.mathematica
+    - match: '[\\+\-*/,;.:@~=><&|_`''^?!%]'
+      scope: keyword.operator.mathematica
+    - match: '\S'
+      scope: invalid.illegal.mathematica
+  comment:
+    - meta_scope: comment.block.mathematica
+    - match: '\(\*'
+      push: comment
+    - match: '\*\)'
+      pop: true
+  string:
+    - meta_scope: string.quoted.double.mathematica
+    - match: '\\.'
+    - match: '"'
+      pop: true

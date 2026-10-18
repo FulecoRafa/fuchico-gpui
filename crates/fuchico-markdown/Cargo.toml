@@ -11,5 +11,8 @@ ropey.workspace = true
 regex.workspace = true
 chrono.workspace = true
 pulldown-cmark.workspace = true
-syntect.workspace = true
+syntect = { workspace = true, features = ["dump-load"] }
+
+[build-dependencies]
+syntect = { workspace = true, features = ["yaml-load", "dump-create"] }
 two-face.workspace = true

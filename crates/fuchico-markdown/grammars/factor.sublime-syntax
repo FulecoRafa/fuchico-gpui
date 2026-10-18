@@ -1,0 +1,82 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/factor.js (MIT).
+name: Factor
+scope: source.factor
+contexts:
+  main:
+    - match: '(?<!\S)#?!.*$'
+      scope: comment.line.factor
+    - match: '(?<!\S)"""'
+      scope: string.quoted.double.factor
+      push: string3
+    - match: '(?<!\S)(STRING:)(\s)'
+      captures:
+        1: keyword.control.factor
+      push: string2
+    - match: '(?<!\S)\S*?"'
+      scope: string.quoted.double.factor
+      push: string
+    - match: '(?<!\S)(?:(?:0x[\d,a-f]+)|(?:0o[0-7]+)|(?:0b[0,1]+)|(?:\-?\d+.?\d*)(?=\s|$))'
+      scope: constant.numeric.factor
+    - match: '(?<!\S)((?:GENERIC)|\:?\:)(\s+)(\S+)(\s+)(\()'
+      captures:
+        1: keyword.control.factor
+        3: variable.other.definition.factor
+        5: punctuation.section.factor
+      push: stack
+    - match: '(?<!\S)(M\:)(\s+)(\S+)(\s+)(\S+)'
+      captures:
+        1: keyword.control.factor
+        3: variable.other.definition.factor
+        5: entity.name.tag.factor
+    - match: '(?<!\S)USING\:'
+      scope: keyword.control.factor
+      push: vocabulary
+    - match: '(?<!\S)(USE\:|IN\:)(\s+)(\S+)(?=\s|$)'
+      captures:
+        1: keyword.control.factor
+        3: entity.name.tag.factor
+    - match: '(?<!\S)(\S+\:)(\s+)(\S+)(?=\s|$)'
+      captures:
+        1: keyword.control.factor
+        3: variable.other.definition.factor
+    - match: '(?<!\S)(?:;|\\|t|f|if|loop|while|until|do|PRIVATE>|<PRIVATE|\.|\S*\[|\]|\S*\{|\})(?=\s|$)'
+      scope: keyword.control.factor
+    - match: '(?<!\S)\S+[\)>\.\*\?]+(?=\s|$)'
+      scope: support.function.factor
+    - match: '(?<!\S)[\)><]+\S+(?=\s|$)'
+      scope: support.function.factor
+    - match: '(?<!\S)[+\-=/*<>](?=\s|$)'
+      scope: keyword.control.factor
+    - match: '(?<!\S)\S+'
+      scope: variable.other.factor
+  vocabulary:
+    - match: ';'
+      scope: keyword.control.factor
+      pop: true
+    - match: '\S+'
+      scope: entity.name.tag.factor
+  string:
+    - meta_scope: string.quoted.double.factor
+    - match: '\\.'
+    - match: '"'
+      pop: true
+  string2:
+    - meta_scope: string.quoted.double.factor
+    - match: '^;'
+      scope: keyword.control.factor
+      pop: true
+  string3:
+    - meta_scope: string.quoted.double.factor
+    - match: '\\.'
+    - match: '"""'
+      pop: true
+  stack:
+    - match: '\)'
+      scope: punctuation.section.factor
+      pop: true
+    - match: '--'
+      scope: punctuation.section.factor
+    - match: '\S+'
+      scope: meta.stack.factor

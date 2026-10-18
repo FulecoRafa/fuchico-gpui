@@ -1,0 +1,54 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/sql.js (MIT).
+name: Esper
+scope: source.esper
+contexts:
+  main:
+    - match: '0[xX][0-9a-fA-F]+'
+      scope: constant.numeric.esper
+    - match: "[xX]'[0-9a-fA-F]*'"
+      scope: constant.numeric.esper
+    - match: "[bB]'[01]+'"
+      scope: constant.numeric.esper
+    - match: '0b[01]*'
+      scope: constant.numeric.esper
+    - match: '(?<!\w)[0-9][0-9]*(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?(?:\.(?!\.))?'
+      scope: constant.numeric.esper
+    - match: '\.\d+(?i:e[+-]?\d+)?'
+      scope: constant.numeric.esper
+    - match: '\?(?=\s|;|$)'
+      scope: variable.other.placeholder.esper
+    - match: "'"
+      scope: string.quoted.single.esper
+      push: sq_string
+    - match: '--.*$'
+      scope: comment.line.esper
+    - match: '/\*'
+      scope: comment.block.esper
+      push: block_comment
+    - match: '[*+\-%<>!=&|^/#@?~]+'
+      scope: keyword.operator.esper
+    - match: '[{}()\[\]]'
+      scope: punctuation.section.esper
+    - match: '[;,:]+'
+      scope: punctuation.separator.esper
+    - match: '(?i)(?<!\w)time +''[^'']*'''
+      scope: constant.numeric.esper
+    - match: '(?i)(?<!\w)(?:false|true|null)(?!\w)'
+      scope: constant.language.esper
+    - match: '(?i)(?<!\w)(?:alter|and|as|asc|between|by|count|create|delete|desc|distinct|drop|from|group|having|in|insert|into|is|join|like|not|on|or|order|select|set|table|union|update|values|where|limit|after|all|at|avedev|avg|case|cast|coalesce|current_timestamp|day|days|define|else|end|escape|events|every|exists|first|full|hour|hours|inner|instanceof|irstream|istream|last|lastweekday|left|max|match_recognize|matches|median|measures|metadatasql|min|minute|minutes|msec|millisecond|milliseconds|offset|outer|output|partition|pattern|prev|prior|regexp|right|rstream|sec|second|seconds|some|snapshot|sql|stddev|sum|then|unidirectional|until|variable|weekday|when|window)(?!\w)'
+      scope: keyword.control.esper
+    - match: '(?i)(?<!\w)source(?!\w)'
+      scope: support.function.esper
+  sq_string:
+    - meta_scope: string.quoted.single.esper
+    - match: '\\.'
+    - match: "'"
+      pop: true
+  block_comment:
+    - meta_scope: comment.block.esper
+    - match: '/\*'
+      push: block_comment
+    - match: '\*/'
+      pop: true

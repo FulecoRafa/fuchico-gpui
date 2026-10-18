@@ -1,0 +1,9 @@
+; greet on join
+on *:JOIN:#:{
+  /* say hello */
+  if ($nick != $me) {
+    msg $chan Welcome $nick $+ !
+    set %count 42
+  }
+}
+alias hi { echo -a $time }

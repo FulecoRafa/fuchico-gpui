@@ -1,0 +1,77 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/velocity.js (MIT).
+name: Velocity
+scope: source.velocity
+variables:
+  directive: '(?:if|elseif|foreach|set|include|parse|macro|define|evaluate)'
+  special: '\$(?:!?bodyContent|velocityCount|foreach\.(?:parent\.(?:count|hasNext|first|last)|count|hasNext|first|last|topmost|parent))(?![\w$._{}-])'
+contexts:
+  main:
+    - match: '#\*'
+      scope: comment.block.velocity
+      push: block-comment
+    - match: '#\s*\[\s*\['
+      scope: meta.unparsed.velocity
+      push: unparsed
+    - match: '##.*$'
+      scope: comment.line.velocity
+    # directives or macro calls followed by "(" start a parameter list
+    - match: '(#\{?(?:{{directive}}\}?|@?[A-Za-z0-9_]+))(\s*)(\()'
+      captures:
+        1: keyword.control.velocity
+      push: params
+    - match: '(\$!?[\w$._{}-]*)(\()'
+      captures:
+        1: support.function.velocity
+      push: params
+    - include: common
+  common:
+    - match: '#(?:end|else|break|stop|\{end\}|\{else\}|\{break\}|\{stop\})(?![\w$_{}@])'
+      scope: keyword.control.velocity
+    - match: '#\{?{{directive}}\}?(?![\w$_{}@])'
+      scope: keyword.control.velocity
+    - match: '{{special}}'
+      scope: keyword.control.velocity
+    - match: '\$!?[\w$._{}-]*'
+      scope: support.function.velocity
+    - match: '(?<=\))(\.)(\w+)'
+      captures:
+        2: support.function.velocity
+    - match: '\d[\w.]*'
+      scope: constant.numeric.velocity
+    - match: '[+\-*&%=<>!?:/|]+'
+      scope: keyword.operator.velocity
+    - match: '[\w$_{}@]+'
+  params:
+    - match: '\)'
+      pop: true
+    - match: '"'
+      scope: string.quoted.double.velocity
+      push: string-double
+    - match: "'"
+      scope: string.quoted.single.velocity
+      push: string-single
+    - include: common
+  string-double:
+    - meta_scope: string.quoted.double.velocity
+    - match: '\\.'
+    - match: '"'
+      pop: true
+    - match: '{{special}}'
+      scope: keyword.control.velocity
+    - match: '\$!?[\w$._{}-]*'
+      scope: support.function.velocity
+  string-single:
+    - meta_scope: string.quoted.single.velocity
+    - match: '\\.'
+    - match: "'"
+      pop: true
+  block-comment:
+    - meta_scope: comment.block.velocity
+    - match: '\*#'
+      pop: true
+  unparsed:
+    - meta_scope: meta.unparsed.velocity
+    - match: '\]\s*\]\s*#'
+      pop: true

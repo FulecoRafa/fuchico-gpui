@@ -1,0 +1,3 @@
+-- c
+main :: IO ()
+main = putStrLn ("s" ++ show 42)

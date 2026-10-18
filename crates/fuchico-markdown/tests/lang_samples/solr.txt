@@ -1,0 +1,3 @@
+title:"hello world" AND (price:[10 TO 100] OR category:books)
+-author:smith +year:2020 NOT status:draft
+name:foo* && rating:4.5

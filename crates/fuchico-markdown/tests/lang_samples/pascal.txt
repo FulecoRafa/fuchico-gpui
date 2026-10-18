@@ -1,0 +1,5 @@
+{ c }
+program P;
+begin
+  writeln('s', 42);
+end.

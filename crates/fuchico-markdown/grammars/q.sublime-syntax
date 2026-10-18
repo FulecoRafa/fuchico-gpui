@@ -1,0 +1,59 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/q.js (MIT).
+name: Q
+scope: source.q
+contexts:
+  main:
+    # A lone "/" line opens a block comment closed by a lone "\" line.
+    - match: '^/[ \t]*$'
+      scope: comment.block.q
+      push: block-comment
+    - match: '^/.*$'
+      scope: comment.line.q
+    # A lone "\" line comments out the rest of the file.
+    - match: '^\\[ \t]*$'
+      scope: comment.block.q
+      push: to-eof
+    - match: '^\\(?=\S)'
+      scope: support.function.q
+    - match: '(?<=\s)/.*$'
+      scope: comment.line.q
+    - match: '"'
+      scope: punctuation.definition.string.begin.q
+      push: string
+    - match: '`[A-Za-z\d_:/.]*'
+      scope: string.other.q
+    # temporal literals
+    - match: '\b\d{4}\.\d{2}(?:m|\.\d{2}(?:[DT](?:\d{2}(?::\d{2}(?::\d{2}(?:\.\d{1,9})?)?)?)?)?)'
+      scope: constant.numeric.q
+    - match: '\b\d+D(?:\d{2}(?::\d{2}(?::\d{2}(?:\.\d{1,9})?)?)?)'
+      scope: constant.numeric.q
+    - match: '\b\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?'
+      scope: constant.numeric.q
+    - match: '\b\d+[ptuv]\b'
+      scope: constant.numeric.q
+    - match: '\b0[NwW]\b|\b0x[\da-fA-F]*|\b[01]+b\b|\b\d+[chijn]\b'
+      scope: constant.numeric.q
+    - match: '(?<![\w.])(?:\d+\.?\d*|\.\d+)(?:e[+\-]?\d+)?[ef]?(?![\w.])'
+      scope: constant.numeric.q
+    - match: '(?<![\w.])(?:reciprocal|distinct|ceiling|reverse|sublist|ungroup|delete|deltas|differ|enlist|except|getenv|hclose|hcount|insert|mcount|ratios|rotate|select|setenv|signum|string|system|tables|update|upsert|within|xgroup|count|cross|fills|first|fkeys|floor|group|gtime|hopen|idesc|inter|lower|ltime|ltrim|parse|peach|plist|prior|read0|read1|rload|rsave|rtrim|union|upper|value|views|where|while|xcols|xdesc|xprev|xrank|acos|asin|asof|atan|attr|avgs|cols|desc|each|eval|exec|exit|flip|from|hdel|hsym|iasc|keys|last|like|list|load|mavg|maxs|mdev|meta|mins|mmax|mmin|msum|next|null|over|prds|prev|rand|rank|raze|save|scan|show|sqrt|sums|trim|type|view|wavg|wsum|xasc|xbar|xcol|xexp|xkey|xlog|abs|aj0|all|and|any|asc|avg|bin|cor|cos|cov|csv|cut|dev|div|exp|fby|get|inv|key|log|lsq|max|md5|med|min|mmu|mod|neg|not|prd|set|sin|ssr|sum|tan|til|txf|var|wj1|aj|by|do|ej|if|ij|in|lj|or|pj|ss|sv|uj|vs|wj)(?![\w.])'
+      scope: keyword.control.q
+    - match: '[|/&^!+:\\\-*%$=~#;@><,?_'']'
+      scope: keyword.operator.q
+    - match: '[{}()\[\]]'
+      scope: punctuation.section.q
+  string:
+    - meta_scope: string.quoted.double.q
+    - match: '\\.'
+      scope: constant.character.escape.q
+    - match: '"'
+      scope: punctuation.definition.string.end.q
+      pop: true
+  block-comment:
+    - meta_content_scope: comment.block.q
+    - match: '^\\[ \t]*$'
+      scope: comment.block.q
+      pop: true
+  to-eof:
+    - meta_content_scope: comment.block.q

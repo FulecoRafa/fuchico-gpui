@@ -1,0 +1,8 @@
+// Squirrel sample
+class Point {
+    x = 0;
+    constructor(px) { x = px; }
+}
+local p = Point(0x1F);
+function greet(name) { print("hi " + name); return null; }
+foreach (i, v in [1, 2.5, true]) { ::print(v); }

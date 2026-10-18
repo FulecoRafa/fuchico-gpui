@@ -1,0 +1,2 @@
+(* c *)
+fun f x = if x > 1 then "s" else Int.toString 42

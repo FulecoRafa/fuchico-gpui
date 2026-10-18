@@ -1,0 +1,7 @@
+xquery version "3.1";
+(: list expensive books :)
+declare variable $limit as xs:integer := 20;
+for $b in doc("books.xml")//book
+where $b/price > $limit
+order by $b/title
+return <book id="{$b/@id}">{ fn:string($b/title) }</book>

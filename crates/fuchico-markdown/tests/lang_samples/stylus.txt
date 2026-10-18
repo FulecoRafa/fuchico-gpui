@@ -1,0 +1,4 @@
+// c
+.a
+  color #fff
+  margin 4px

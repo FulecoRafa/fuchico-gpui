@@ -1,0 +1,101 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/sas.js (MIT).
+name: SAS
+scope: source.sas
+variables:
+  all_builtin: '(?:libname|filename|options?)'
+  all_def: '(?:nosource2|footnote|%sysfunc|pagesize|libname|%global|source2|pageno|title|%eval|%let|%put|page|ods)'
+contexts:
+  main:
+    - include: common
+    - match: '(?i)\b(proc)\b(?:(\s+)(\w+))?'
+      captures:
+        1: support.function.sas
+        3: variable.other.special.sas
+      push: proc
+    - match: '(?i)\b(data)\b(?!\s*=)(?:(\s+)(\w+))?'
+      captures:
+        1: support.function.sas
+        3: variable.other.special.sas
+      push: datastep
+    - match: '(?i)%(macro)\b(?:(\s+)(\w+))?'
+      captures:
+        0: support.function.sas
+        3: variable.other.special.sas
+      push: macro
+    - include: everywhere
+  everywhere:
+    - match: '(?i)(?<![\w&%])(?:libname|filename|options?)\b'
+      scope: support.function.sas
+    - match: '(?i)(?<![\w&%])(?:title[1-9]?|footnote[1-9]?)\b'
+      scope: variable.other.definition.sas
+    - match: '(?i)(?<![\w&%])(?:ods|source2|nosource2|page|pageno|pagesize)\b|(?i)(?<![\w&])%(?:let|put|global|sysfunc|eval)\b'
+      scope: variable.other.definition.sas
+    - match: '(?i)&(?:systcpiphostname|syslogapplname|sysprocessname|syswarningtext|syscharwidth|syserrortext|sysmacroname|sysprocessid|sysstartname|sysencoding|syshostname|sysprocname|sysodspath|sysstartid|sysuserid|sysvlong4|sysbuffr|sysdate9|sysdevic|sysfilrc|sysindex|sysjobid|syslckrc|syslibrc|syspbuff|sysvlong|sysdate|sysinfo|syslast|sysmenv|sysncpu|sysparm|sysscpl|syssite|systime|syscmd|sysday|sysdmg|sysdsn|sysenv|syserr|sysmsg|sysscp|sysver|syscc|sysrc)\b'
+      scope: variable.other.sas
+    - match: '&\w+'
+      scope: variable.other.sas
+  common:
+    - match: '/\*'
+      scope: punctuation.definition.comment.begin.sas
+      push: block-comment
+    - match: '^\s*\*.*$'
+      scope: comment.line.sas
+    - match: '"'
+      push: dq-string
+    - match: "'"
+      push: sq-string
+    - match: '\b0[xX][0-9a-fA-F]+\b|\b(?:\d+\.?\d*|\.\d+)(?:[eE][\-+]?\d+)?'
+      scope: constant.numeric.sas
+    - match: '<=|>=|!=|<>'
+      scope: keyword.operator.sas
+    - match: '\b(?:eq|lt|le|gt|ge|in|ne|or)(?= )'
+      scope: keyword.operator.sas
+    - match: '[=():,{}.*<>+\-/^\[\]]'
+      scope: keyword.operator.sas
+  keyword-ops:
+    - match: '(?i)\b(?:and|not)\b'
+      scope: keyword.operator.sas
+  datastep:
+    - include: common
+    - match: '(?i)\brun\s*;'
+      scope: support.function.sas
+      pop: true
+    - match: '(?i)\b(?:data|run)\b'
+      scope: support.function.sas
+    - include: keyword-ops
+    - match: '(?i)(?<![\w&%])(?:extendobscounter|honorappearance|splashlocation|noexitwindows|nomultenvappl|awsmenumerge|noduplicates|noerrorabend|nofullstimer|nummousekeys|sysprintfont|transformout|dldmgaction|vinformatdx|vinformatnx|vinformatwx|_character_|_temporary_|emailserver|invaliddata|mautosource|nocardimage|noprintinit|nosymbolgen|unformatted|encryptkey|vinformatd|vinformatn|vinformatw|vinformatx|authserver|awscontrol|calculated|datalines4|descending|errorcheck|msymtabmax|nocharcode|nodmsbatch|noechoauto|noloadlist|norsasuser|sascontrol|wincharset|yearcutoff|fileclose|vformatdx|vformatnx|vformatwx|vinarrayx|vinformat|_numeric_|blocksize|datalines|delimiter|fileexist|fmtsearch|fontalias|formatted|formdelim|getoption|hostprint|nodetails|noimplmac|nomrecall|nomsgcase|nomstored|nopercent|nosetinit|notsorted|noverbose|otherwise|parmcards|procleave|rtraceloc|sasmstore|sasscript|selection|separated|symbolgen|tapeclose|translate|truncover|compress|repempty|sortedby|firstobs|pointobs|idxwhere|fipnamel|fipstate|varinfmt|varlabel|vformatd|vformatn|vformatw|vformatx|vinarray|vlengthx|zipnamel|zipstate|_infile_|altprint|autoexec|awstitle|backward|catcache|coalesce|compound|continue|crosstab|daccdbsl|datepart|datetime|dbcslang|dbcstype|descript|distinct|dkricond|dkrocond|doptname|dropnote|emaildlg|emailsys|feedback|fetchobs|filename|foptname|formchar|formdlim|hosthelp|initstmt|kurtosis|linesize|lostcard|macrogen|measures|missover|msglevel|mvarsize|nocenter|nocmdmac|nodupkey|noequals|nomlogic|nomprint|nonumber|nosplash|notitles|pathname|position|probbeta|probbnml|probhypr|probnegb|probnorm|register|repeated|sasautos|sasfrscr|siteinfo|skewness|sortsize|stopover|subgroup|sysleave|sysprint|tbufsize|terminal|timepart|trigamma|usericon|validate|workinit|workterm|nesting|_error_|bufsize|cntllev|encrypt|replace|whereup|idxname|filevar|fipname|varname|varrayx|vartype|vformat|vlabelx|vlength|weekday|zipfips|zipname|awsmenu|betainv|between|blshift|brshift|cleanup|codegen|collate|comamid|comaux1|comaux2|convert|daccsyd|dacctab|datejul|depdbsl|dequote|digamma|display|doptnum|dsnferr|emailid|emailpw|fappend|fdelete|filefmt|fileref|foptnum|forward|frewind|getvarc|getvarn|gwindow|helpenv|helploc|ibessel|initcmd|jbessel|juldate|library|lowcase|memtype|missing|mrecall|nobatch|nonotes|noprint|notitle|noxsync|noxwait|numkeys|ordinal|pathdll|poisson|printer|probchi|probgam|probsig|resolve|reverse|rsquare|samploc|sasuser|setcomm|sortpgm|sortseq|soundex|stnamel|subpopn|sysparm|sysprod|tooldef|trantab|tranwrd|uniform|source|nolist|cancel|format|genmax|gennum|obsbuf|outrep|tobsno|rename|varfmt|varlen|varnum|varray|verify|vlabel|vnamex|vnferr|vtypex|_freq_|_last_|_null_|_type_|adjrsq|altlog|attrib|awsdef|byline|cards4|cbufno|center|cexist|change|cnonct|collin|column|comdef|compbl|config|create|curobs|daccdb|daccsl|dclose|delete|depsyd|deptab|device|dflang|dsname|endsas|engine|errors|fclose|fexist|fmterr|fnonct|fpoint|fwrite|gaminv|hbound|indexc|indexw|inputc|inputn|insert|lbound|length|levels|lgamma|libref|logpdf|logpmf|logsdf|maxdec|median|merror|minute|mlogic|modify|mprint|nocaps|nodate|nodbcs|noicon|nomiss|normal|number|output|paired|probit|ranbin|rancau|random|ranexp|rangam|rannor|ranpoi|rantbl|rantri|ranuni|remote|remove|repeat|retain|return|rewind|rtrace|sasmsg|saving|second|select|serror|simple|spedis|stderr|stfips|stimer|stname|substr|sumwgt|symbol|symget|symput|sysget|sysmsg|system|tables|tnonct|totper|upcase|update|weight|window|stack|debug|while|until|label|alter|bufno|index|pwreq|reuse|spill|write|where|finfo|first|floor|vname|vtype|_all_|_cmd_|_msg_|abort|alpha|arcos|array|arsin|attrc|attrn|byerr|cards|chisq|class|close|cpuid|cross|dairy|depdb|depsl|dinfo|dopen|dread|error|exist|fetch|fnote|fopen|force|fread|frlen|gamma|group|inner|input|intck|intnx|intrr|kentb|leave|log10|lrecl|macro|merge|model|month|mopen|netpv|nmiss|nocol|nocum|nodmr|nodms|nodup|noint|noobs|noovp|nopad|norow|notes|order|outer|peekc|pfkey|point|probf|probt|quote|range|ranks|rcorr|recfm|right|round|setot|split|spool|start|stdin|sysin|sysrc|table|today|trimn|trunc|union|value|xsync|xwait|view|then|else|read|role|type|drop|keep|finv|putc|putn|addr|airy|atan|band|base|bnot|bxor|byte|call|ceil|cinv|cosh|ddfm|dhms|dnum|echo|erfc|fcol|fget|file|font|fpos|fput|from|fsep|fuzz|goto|hbar|hour|hpct|html|hvar|into|join|last|left|line|link|list|log2|maps|maxr|mean|mode|mort|nest|news|nobs|note|null|nway|open|over|pad2|parm|path|peek|poke|regr|scan|sign|sinh|skip|sqrt|stop|tanh|test|tinv|trim|user|when|work|wsum|pgm|for|end|_n_|obs|put|_i_|abs|and|bor|cdf|col|cos|css|day|ddm|dif|dim|dlm|eof|eov|erf|exp|hms|ibr|inr|int|irr|lag|lib|log|max|mdy|min|mod|myy|new|npv|out|ovp|pad|pdf|pmf|prt|qtr|rtf|sdf|seq|set|sin|sle|sls|std|sub|sum|tan|tol|uss|var|yes|yyq|if|do|pw|in|as|by|cv|go|id|is|ls|no|on|10|25|50|75|90|95|ps|s2|to|n|5|r|s|t)\b'
+      scope: variable.other.definition.sas
+    - include: everywhere
+  proc:
+    - include: common
+    - match: '(?i)\b(?:run|quit)\s*;'
+      scope: support.function.sas
+      pop: true
+    - include: keyword-ops
+    - match: '(?i)(?<![\w&%])(?:honorappearance|splashlocation|noexitwindows|nomultenvappl|awsmenumerge|noduplicates|noerrorabend|nofullstimer|nummousekeys|sysprintfont|transformout|_character_|_temporary_|emailserver|invaliddata|mautosource|nocardimage|noprintinit|nosymbolgen|unformatted|authserver|awscontrol|calculated|datalines4|descending|errorcheck|msymtabmax|nocharcode|nodmsbatch|noechoauto|noloadlist|norsasuser|sascontrol|wincharset|yearcutoff|_numeric_|blocksize|datalines|delimiter|fileclose|fileexist|fmtsearch|fontalias|formatted|formdelim|getoption|hostprint|nodetails|noimplmac|nomrecall|nomsgcase|nomstored|nopercent|nosetinit|notsorted|noverbose|otherwise|parmcards|procleave|rtraceloc|sasmstore|sasscript|selection|separated|symbolgen|tapeclose|translate|truncover|_infile_|altprint|autoexec|awstitle|backward|catcache|coalesce|compound|compress|continue|crosstab|daccdbsl|datepart|datetime|dbcslang|dbcstype|descript|distinct|dkricond|dkrocond|doptname|dropnote|emaildlg|emailsys|feedback|fetchobs|filename|foptname|formchar|formdlim|hosthelp|initstmt|kurtosis|linesize|lostcard|macrogen|measures|missover|msglevel|mvarsize|nocenter|nocmdmac|nodupkey|noequals|nomlogic|nomprint|nonumber|nosplash|notitles|pathname|position|probbeta|probbnml|probhypr|probnegb|probnorm|register|repeated|sasautos|sasfrscr|siteinfo|skewness|sortedby|sortsize|stopover|subgroup|sysleave|sysprint|tbufsize|terminal|timepart|trigamma|usericon|validate|workinit|workterm|awsmenu|betainv|between|blshift|brshift|bufsize|cleanup|cntllev|codegen|collate|comamid|comaux1|comaux2|convert|daccsyd|dacctab|datejul|depdbsl|dequote|digamma|display|doptnum|dsnferr|emailid|emailpw|encrypt|fappend|fdelete|filefmt|fileref|foptnum|forward|frewind|getvarc|getvarn|gwindow|helpenv|helploc|ibessel|initcmd|jbessel|juldate|library|lowcase|memtype|missing|mrecall|nobatch|nonotes|noprint|notitle|noxsync|noxwait|numkeys|ordinal|pathdll|poisson|printer|probchi|probgam|probsig|replace|resolve|reverse|rsquare|samploc|sasuser|setcomm|sortpgm|sortseq|soundex|stnamel|subpopn|sysparm|sysprod|tooldef|trantab|tranwrd|uniform|_freq_|_last_|_null_|_type_|adjrsq|altlog|attrib|awsdef|byline|cards4|cbufno|center|cexist|change|cnonct|collin|column|comdef|compbl|config|create|curobs|daccdb|daccsl|dclose|delete|depsyd|deptab|device|dflang|dsname|endsas|engine|errors|fclose|fexist|fmterr|fnonct|fpoint|fwrite|gaminv|hbound|indexc|indexw|inputc|inputn|insert|lbound|length|levels|lgamma|libref|logpdf|logpmf|logsdf|maxdec|median|merror|minute|mlogic|modify|mprint|nocaps|nodate|nodbcs|noicon|nolist|nomiss|normal|number|output|paired|probit|ranbin|rancau|random|ranexp|rangam|rannor|ranpoi|rantbl|rantri|ranuni|remote|remove|rename|repeat|retain|return|rewind|rtrace|sasmsg|saving|second|select|serror|simple|spedis|stderr|stfips|stimer|stname|substr|sumwgt|symbol|symget|symput|sysget|sysmsg|system|tables|tnonct|totper|upcase|update|weight|window|_all_|_cmd_|_msg_|abort|alpha|alter|arcos|array|arsin|attrc|attrn|bufno|byerr|cards|chisq|class|close|cpuid|cross|dairy|depdb|depsl|dinfo|dopen|dread|error|exist|fetch|fnote|fopen|force|fread|frlen|gamma|group|index|inner|input|intck|intnx|intrr|kentb|label|leave|log10|lrecl|macro|merge|model|month|mopen|netpv|nmiss|nocol|nocum|nodmr|nodms|nodup|noint|noobs|noovp|nopad|norow|notes|order|outer|peekc|pfkey|point|probf|probt|pwreq|quote|range|ranks|rcorr|recfm|reuse|right|round|setot|split|spool|start|stdin|sysin|sysrc|table|today|trimn|trunc|union|until|value|where|while|write|xsync|xwait|data|addr|airy|atan|band|base|bnot|bxor|byte|call|ceil|cinv|cosh|ddfm|dhms|dnum|drop|echo|else|erfc|fcol|fget|file|font|fpos|fput|from|fsep|fuzz|goto|hbar|hour|hpct|html|hvar|into|join|keep|last|left|line|link|list|log2|maps|maxr|mean|mode|mort|nest|news|nobs|note|null|nway|open|over|pad2|parm|path|peek|poke|read|regr|scan|sign|sinh|skip|sqrt|stop|tanh|test|then|tinv|trim|type|user|when|work|wsum|_i_|abs|and|bor|cdf|col|cos|css|day|ddm|dif|dim|dlm|end|eof|eov|erf|exp|hms|ibr|inr|int|irr|lag|lib|log|max|mdy|min|mod|myy|new|npv|obs|out|ovp|pad|pdf|pmf|prt|qtr|rtf|sdf|seq|set|sin|sle|sls|std|sub|sum|tan|tol|uss|var|yes|yyq|as|by|cv|do|go|id|if|is|ls|no|on|10|25|50|75|90|95|ps|pw|s2|to|n|5|r|s|t)\b'
+      scope: variable.other.definition.sas
+    - include: everywhere
+  macro:
+    - include: common
+    - match: '(?i)%mend\b;?'
+      scope: support.function.sas
+      pop: true
+    - match: '(?i)(?<![\w&])%(?:if|end|else|do|then|let|put|global|sysfunc|eval)\b'
+      scope: variable.other.definition.sas
+    - include: everywhere
+    - match: '[%\w]+'
+      scope: constant.language.sas
+  block-comment:
+    - meta_scope: comment.block.sas
+    - match: '\*/'
+      pop: true
+  dq-string:
+    - meta_scope: string.quoted.double.sas
+    - match: '"'
+      pop: true
+  sq-string:
+    - meta_scope: string.quoted.single.sas
+    - match: "'"
+      pop: true

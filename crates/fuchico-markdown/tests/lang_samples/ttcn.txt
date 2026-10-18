@@ -1,0 +1,10 @@
+// Simple TTCN-3 test case
+module Demo {
+  const integer c_max := 10;
+  testcase tc_hello() runs on MyComponent {
+    var charstring v_msg := "hello";
+    var octetstring v_o := '0A1B'O;
+    p.send(v_msg); /* send it */
+    setverdict(pass);
+  }
+}

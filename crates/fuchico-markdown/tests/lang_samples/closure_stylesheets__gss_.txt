@@ -1,0 +1,2 @@
+/* c */
+.a { color: #fff; width: 10px; }

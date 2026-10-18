@@ -1,0 +1,2 @@
+// c
+public class A { public int F() { return 42; } string s = "x"; }

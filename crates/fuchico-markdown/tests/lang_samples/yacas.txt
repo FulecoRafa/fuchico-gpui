@@ -1,0 +1,6 @@
+// Yacas sample
+/* factorial */
+Factorial(n_IsPositiveInteger) <-- n * Factorial(n-1);
+10 # x_IsInteger <-- x + 1.5e3;
+Echo("Result: ", Factorial(5));
+While (i < 10) [ i := i + 1; ];

@@ -1,0 +1,4 @@
+# c
+def f(x)
+  return "s" if x > 42
+end

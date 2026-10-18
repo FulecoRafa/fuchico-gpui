@@ -1,0 +1,4 @@
+BEGIN
+  -- c
+  UPDATE t SET a = 1 WHERE b = 'x';
+END;

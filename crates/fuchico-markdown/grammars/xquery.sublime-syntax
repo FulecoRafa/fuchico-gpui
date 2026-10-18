@@ -1,0 +1,136 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/xquery.js (MIT).
+name: XQuery
+scope: source.xquery
+variables:
+  namech: '[\w$_-]'
+contexts:
+  main:
+    - include: code
+  code:
+    - match: '\(:'
+      scope: comment.block.xquery
+      push: comment
+    - match: '<!--'
+      scope: comment.block.xquery
+      push: xml-comment
+    - match: '<!\[CDATA\['
+      scope: entity.name.tag.xquery
+      push: cdata
+    - match: '<\?'
+      scope: meta.preprocessor.xquery
+      push: pi
+    - match: '(<)([^\s\x{a0}=<>"''/?]+)'
+      captures:
+        1: entity.name.tag.xquery
+        2: entity.name.tag.xquery
+      push: xml-tag
+    - match: '\{'
+      push: codeblock
+    - match: '"'
+      scope: string.quoted.double.xquery
+      push: string-double
+    - match: "'"
+      scope: string.quoted.single.xquery
+      push: string-single
+    - match: '\$(?:"[^"]*"|{{namech}}*)(?::(?!=){{namech}}*)?'
+      scope: variable.other.xquery
+    - match: '\d+(?:\.\d*)?(?:E[+\-]?\d+)?'
+      scope: constant.numeric.xquery
+    - match: ':='
+      scope: keyword.operator.xquery
+    - match: '(?:self|attribute|child|descendant(?:-or-self)?|parent|ancestor(?:-or-self)?|following(?:-sibling)?|preceding(?:-sibling)?)::'
+      scope: meta.qualifier.xquery
+    - match: '(?<![\w$:-])(?:xs:nonNegativeInteger|xs:nonPositiveInteger|xs:yearMonthDuration|xs:normalizedString|xs:precisionDecimal|xs:dayTimeDuration|xs:negativeInteger|xs:positiveInteger|xs:anyAtomicType|xs:anySimpleType|xs:dateTimeStamp|xs:unsignedShort|xs:untypedAtomic|xs:base64Binary|xs:unsignedByte|xs:unsignedLong|xs:unsignedInt|xs:gYearMonth|xs:gMonthDay|xs:hexBinary|xs:dateTime|xs:duration|xs:ENTITIES|xs:language|xs:NMTOKENS|xs:NOTATION|xs:anyType|xs:boolean|xs:decimal|xs:integer|xs:NMTOKEN|xs:numeric|xs:untyped|xs:anyURI|xs:double|xs:ENTITY|xs:gMonth|xs:IDREFS|xs:NCName|xs:string|xs:float|xs:gYear|xs:IDREF|xs:QName|xs:short|xs:token|xs:byte|xs:date|xs:gDay|xs:item|xs:java|xs:long|xs:Name|xs:time|xs:int|xs:ID)(?![\w$-])'
+      scope: constant.language.xquery
+    - match: '(?<![\w$:-])(?:eq|ne|lt|le|gt|ge|and|or|div|idiv|mod)(?![\w$:-])'
+      scope: keyword.operator.xquery
+    - match: '(?<![\w$:-])(?:processing-instruction|descendant-or-self|following-sibling|preceding-sibling|ancestor-or-self|schema-attribute|copy-namespaces|boundary-space|decimal-format|empty-sequence|schema-element|document-node|construction|relationship|revalidation|insensitive|no-preserve|descendant|descending|diacritics|no-inherit|paragraphs|typeswitch|ascending|attribute|collation|different|following|ft-option|intersect|lowercase|namespace|paragraph|preceding|satisfies|sensitive|sentences|thesaurus|transform|unordered|uppercase|wildcards|allowing|ancestor|base-uri|castable|contains|distance|document|encoding|external|function|greatest|instance|language|ordering|preserve|previous|sentence|sequence|stemming|tumbling|updating|validate|variable|comment|content|context|declare|default|element|exactly|inherit|ordered|replace|sliding|version|without|before|delete|entire|except|import|insert|invoke|levels|modify|module|occurs|option|parent|phrase|rename|return|schema|stable|strict|switch|update|weight|window|xquery|after|array|catch|child|count|empty|every|first|ftand|ftnot|fuzzy|group|least|nodes|order|score|start|strip|times|treat|union|using|value|where|words|case|cast|copy|else|from|ftor|into|item|last|most|next|node|only|same|self|skip|some|stop|text|then|type|when|with|word|all|any|end|for|lax|let|map|not|try|as|at|by|if|in|is|no|of|to)(?![\w$:-])'
+      scope: keyword.control.xquery
+    - match: '{{namech}}+(?::{{namech}}+)?(?=[ \t]*\()'
+      scope: variable.other.definition.xquery
+    - match: '{{namech}}+(?::{{namech}}+)?'
+      scope: variable.other.xquery
+    - match: '[>=<|?*/+.-]'
+      scope: keyword.operator.xquery
+  codeblock:
+    - match: '\}'
+      pop: true
+    - include: code
+  comment:
+    - meta_scope: comment.block.xquery
+    - match: '\(:'
+      push: comment
+    - match: ':\)'
+      pop: true
+  xml-comment:
+    - meta_scope: comment.block.xquery
+    - match: '-->'
+      pop: true
+  cdata:
+    - meta_scope: comment.block.xquery
+    - match: '\]\]'
+      pop: true
+  pi:
+    - meta_scope: meta.preprocessor.xquery
+    - match: '\?>'
+      pop: true
+  string-double:
+    - meta_scope: string.quoted.double.xquery
+    - match: '"'
+      pop: true
+  string-single:
+    - meta_scope: string.quoted.single.xquery
+    - match: "'"
+      pop: true
+  xml-tag:
+    - match: '/>'
+      scope: entity.name.tag.xquery
+      pop: true
+    - match: '>'
+      scope: entity.name.tag.xquery
+      set: xml-content
+    - match: '"'
+      scope: string.quoted.double.xquery
+      push: attr-double
+    - match: "'"
+      scope: string.quoted.single.xquery
+      push: attr-single
+    - match: '='
+    - match: '[a-zA-Z_:][-a-zA-Z0-9_:.]*'
+      scope: entity.other.attribute-name.xquery
+  attr-double:
+    - meta_scope: string.quoted.double.xquery
+    - match: '"'
+      pop: true
+    - match: '\{'
+      push: codeblock
+  attr-single:
+    - meta_scope: string.quoted.single.xquery
+    - match: "'"
+      pop: true
+    - match: '\{'
+      push: codeblock
+  xml-content:
+    - match: '</[^>]*>'
+      scope: entity.name.tag.xquery
+      pop: true
+    - match: '<!--'
+      scope: comment.block.xquery
+      push: xml-comment
+    - match: '<!\[CDATA\['
+      scope: entity.name.tag.xquery
+      push: cdata
+    - match: '<\?'
+      scope: meta.preprocessor.xquery
+      push: pi
+    - match: '(<)([^\s\x{a0}=<>"''/?]+)'
+      captures:
+        1: entity.name.tag.xquery
+        2: entity.name.tag.xquery
+      push: xml-tag
+    - match: '\{'
+      push: codeblock
+    - match: '[^<{]+'
+      scope: variable.other.xquery

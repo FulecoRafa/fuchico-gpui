@@ -1,0 +1,91 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/dylan.js (MIT).
+name: Dylan
+scope: source.dylan
+contexts:
+  main:
+    - match: '"'
+      scope: string.quoted.double.dylan
+      push: dq_string
+    - match: "'"
+      scope: string.quoted.single.dylan
+      push: sq_string
+    - match: '#"'
+      scope: string.quoted.double.dylan
+      push: dq_string
+    - match: '/\*'
+      scope: comment.block.dylan
+      push: block_comment
+    - match: '//.*$'
+      scope: comment.line.dylan
+    - match: '#b[01]*'
+      scope: constant.numeric.dylan
+    - match: '#x[\da-fA-F]*'
+      scope: constant.numeric.dylan
+    - match: '#o[0-7]*'
+      scope: constant.numeric.dylan
+    - match: '##'
+      scope: punctuation.separator.dylan
+    - match: '#[\[(]'
+      scope: punctuation.section.dylan
+    - match: '(?i)#(?:f|t|all-keys|include|key|next|rest)'
+      scope: constant.language.dylan
+    - match: '#[-a-zA-Z]*'
+      scope: invalid.illegal.dylan
+    - match: '(?<![\w\-])[+-]?[0-9]*\.[0-9]+(?:[esdxESDX][+-]?[0-9]+)?'
+      scope: constant.numeric.dylan
+    - match: '(?<![\w\-])[+-]?[0-9]+\.[0-9]*(?:[esdxESDX][+-]?[0-9]+)?'
+      scope: constant.numeric.dylan
+    - match: '(?<![\w\-])[+-]?[0-9]+(?:[esdxESDX][+-]?[0-9]+)?'
+      scope: constant.numeric.dylan
+    - match: '~==?'
+      scope: keyword.operator.dylan
+    - match: ':='
+      scope: keyword.operator.dylan
+    - match: '::'
+      scope: punctuation.separator.dylan
+    - match: '[\[\](){}]'
+      scope: punctuation.section.dylan
+    - match: '[.,:]'
+      scope: punctuation.separator.dylan
+    - match: '(?<![\w\-])end(?![\w\-])'
+      scope: keyword.control.dylan
+    - match: '[-_a-zA-Z?!*@<>$%]+:'
+      scope: constant.language.dylan
+    - match: '<[-_a-zA-Z?!*@<>$%]+>'
+      scope: entity.name.tag.dylan
+    - match: '\*[-_a-zA-Z?!*@<>$%]+\*'
+      scope: variable.other.dylan
+    - match: '\$[-_a-zA-Z?!*@<>$%]+'
+      scope: variable.other.dylan
+    - match: '(?<![\w\-])with(?:out)?-[-_a-zA-Z?!*@<>$%]+'
+      scope: keyword.control.dylan
+    - match: '[+\-*/^=<>&|]'
+      scope: keyword.operator.dylan
+    - match: '(?<![\w\-])define(?![\w\-])'
+      scope: variable.other.definition.dylan
+    - match: '(?<![\w\-])(?:if|block|begin|case|for|select|when|unless|until|while|iterate|profiling|dynamic\-bind|finally|exception|cleanup|else|elseif|afterwards|above|below|by|from|handler|in|instance|let|local|otherwise|slot|subclass|then|to|keyed\-by|virtual)(?![\w\-])'
+      scope: keyword.control.dylan
+    - match: '(?<![\w\-])(?:method|class|C\-subtype|C\-mapped\-subtype|interface|function|C\-variable|C\-address|constant|variable|generic|domain|C\-pointer\-type|table)(?![\w\-])'
+      scope: variable.other.definition.dylan
+    - match: '(?<![\w\-])(?:signal|error|cerror|break|check\-type|abort)(?![\w\-])'
+      scope: support.function.dylan
+    - match: '[-_a-zA-Z?!*@<>$%]+'
+      scope: variable.other.dylan
+  dq_string:
+    - meta_scope: string.quoted.double.dylan
+    - match: '\\.'
+    - match: '"'
+      pop: true
+  sq_string:
+    - meta_scope: string.quoted.single.dylan
+    - match: '\\.'
+    - match: "'"
+      pop: true
+  block_comment:
+    - meta_scope: comment.block.dylan
+    - match: '/\*'
+      push: block_comment
+    - match: '\*/'
+      pop: true

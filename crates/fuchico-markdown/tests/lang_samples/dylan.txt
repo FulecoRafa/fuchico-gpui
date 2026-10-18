@@ -1,0 +1,5 @@
+// greeting
+define method greet (name :: <string>) => ()
+  format-out("Hello, %s\n", name);
+  let x = 42;
+end method greet;

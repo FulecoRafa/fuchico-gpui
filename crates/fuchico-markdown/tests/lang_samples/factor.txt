@@ -1,0 +1,5 @@
+! square a number
+USING: math io ;
+IN: example
+: square ( x -- y ) dup * ;
+5 square . "done" print

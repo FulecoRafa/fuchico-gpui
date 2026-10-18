@@ -1,0 +1,25 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/ntriples.js (MIT).
+name: NTriples
+scope: source.ntriples-port
+contexts:
+  main:
+    - match: '<'
+      push: uri
+    - match: '#[^> \n]*'
+      scope: markup.underline.link.ntriples
+    - match: '\^\^'
+      scope: variable.other.ntriples
+    - match: '_[^ \n]*'
+      scope: support.function.ntriples
+    - match: '"[^"\n]*"?'
+      scope: string.quoted.double.ntriples
+    - match: '@[^ \n]*'
+      scope: string.other.language.ntriples
+  uri:
+    - meta_scope: variable.other.uri.ntriples
+    - match: '#[^> \n]*'
+      scope: markup.underline.link.ntriples
+    - match: '>|$'
+      pop: true

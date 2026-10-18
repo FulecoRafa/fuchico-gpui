@@ -1,0 +1,2 @@
+// c
+void main() { int x = 42; writeln("s", x); }

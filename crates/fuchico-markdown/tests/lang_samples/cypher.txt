@@ -1,0 +1,4 @@
+// find friends
+MATCH (p:Person {name: "Alice"})-[:KNOWS]->(f)
+WHERE f.age > 30
+RETURN f.name, count(*) AS total

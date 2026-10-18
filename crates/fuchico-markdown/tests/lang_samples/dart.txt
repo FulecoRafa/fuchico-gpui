@@ -1,0 +1,2 @@
+// c
+void main() { final x = 42; print("s $x"); }

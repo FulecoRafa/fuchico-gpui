@@ -119,9 +119,12 @@ let options = model.completions(&fuchico_markdown::CompletionContext {
 - For code files, `code_foldable(text, idx, line, CodeFoldStyle, tab)` folds by brackets or by indent. Indent is used for Python and HTML.
 
 ### Highlighting (highlight.rs, languages.rs)
-- `languages::LANGUAGES` holds the 143 `@codemirror/language-data` entries, in order. Each entry has its exact names and aliases and a syntect grammar name.
-  - 90 entries have a syntect/two-face grammar.
-  - The other 53 are recognised (toolbar and `language_for_info`) but have no grammar, so they render monospace without colours.
+- `languages::LANGUAGES` holds the 143 `@codemirror/language-data` entries, in order. Each entry has its exact names and aliases and a syntect grammar name. **All 143 entries have a grammar:**
+  - 90 use two-face (bat) grammars.
+  - 53 use `.sublime-syntax` ports of the CodeMirror legacy modes the original loaded, in `grammars/<slug>.sublime-syntax`. Brainfuck, APL, Cobol, Haxe, Pug, SAS, XQuery and others are among them. Each keeps the legacy mode's keyword, builtin and atom lists and its comment, string and number rules, and maps legacy token types to scopes the way `StreamLanguage` maps them to highlight tags.
+- `build.rs` links two-face's set with `grammars/` and writes an uncompressed syntect dump to `OUT_DIR`. `syntax_set()` decodes it lazily on first use, in about 2.7 ms.
+  - A grammar file that fails to load is skipped with a cargo warning.
+  - `tests/languages.rs` then reports that language as missing.
 - `match_language_name(name, fuzzy)` matches CodeMirror's `LanguageDescription.matchLanguageName`, including the fuzzy word-boundary search.
 - Other functions:
   - `toolbar_options`;
@@ -163,8 +166,8 @@ The test document is a 5,000-line note (97 KB) with headings, lists, tasks, tabl
 
 | Operation | Time |
 |---|---|
-| Initial parse | 2.4-4.9 ms |
-| Cold first `decorations` (syntax-set load + first fence highlight) | 3.7-7.2 ms |
+| Initial parse | 1.6-4.9 ms |
+| Cold first `decorations` (syntax-set dump decode + first fence highlight) | 2.6-2.7 ms (about 9 ms on a cold page cache) |
 | `update` (full reparse), average | 1.2-1.6 ms |
 | `decorations` for 60 visible lines, average | 0.04-0.06 ms |
 | Worst keystroke (update + decorations) | 1.5-2.8 ms |
@@ -193,9 +196,14 @@ The test document is a 5,000-line note (97 KB) with headings, lists, tasks, tabl
   - These are single-line only. A link whose text wraps a newline stays raw, as in the original, where the regex rejected it.
 - **Indent guides**
   - These are new. The original had none.
-- **Fences without a grammar**
-  - A recognised language without a syntect grammar gets monospace.
-  - The original loaded a legacy CodeMirror mode. Those 53 languages are uncoloured here.
+- **Legacy-mode ports**
+  - The tokenizer state machines (indent tracking, parser-driven scopes in Haxe, Gherkin's `allow*` flags, Pug's embedded JS and similar) are approximated with sublime contexts and lookarounds, so a few edge tokens differ.
+  - Two legacy bugs are fixed:
+    - Pig strings are coloured, where the legacy mode returned `error`.
+    - The mscgen constants need word boundaries.
+- **Diff colours**
+  - `diff` additions take the string colour and deletions the destructive colour.
+  - The original theme had no `inserted` / `deleted` rule, so diff fences only coloured punctuation there.
 - **Code-file folding**
   - This uses bracket and indent heuristics in place of Lezer/legacy-mode syntax folds.
 - **Unclosed-fence copy text**
@@ -215,6 +223,7 @@ This crate adds:
 | `tests/golden.rs` | Golden render per construct, cursor on vs off: ATX/setext headings, emphasis, strike, code, blockquotes, all callouts, hr, lists, checkboxes, links, autolinks, images, wikilinks (resolved/unresolved/alias), tags, fences + toolbar + mermaid button, tables, frontmatter, regions, indent guides, viewport windowing |
 | `tests/folding.rs` | Fold sources, priorities, region placeholder, mapping, reveal, fold_all |
 | `tests/completion.rs` | Every provider's trigger, ranking, caps, apply edits, picked flags, ordering |
+| `tests/languages.rs` | All 143 fence languages: grammar present in the set, and the sample in `tests/lang_samples/<slug>.txt` highlights with at least 2 distinct styles (`LANG_FILTER=slug,...` for a subset) |
 | `tests/rulers.rs` | JS `Number` parsing edge cases and positions |
 | `tests/perf.rs` | 5k-line bench (asserts a generous budget, prints numbers) |
 | Unit tests | Language matching, highlight scopes, table ops/state machine, text mapping, code folding |

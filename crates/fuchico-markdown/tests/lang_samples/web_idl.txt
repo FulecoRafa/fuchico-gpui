@@ -1,0 +1,9 @@
+// A Web IDL fragment
+[Exposed=Window]
+interface Widget : Node {
+  const unsigned short MAX = 0x10;
+  attribute DOMString name;
+  readonly attribute double ratio;
+  boolean check(optional long count = 3);
+};
+typedef sequence<DOMString> Names;

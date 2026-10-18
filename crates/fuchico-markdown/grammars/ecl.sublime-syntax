@@ -1,0 +1,52 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/ecl.js (MIT).
+name: ECL
+scope: source.ecl
+contexts:
+  main:
+    - match: '^\s*#.*$'
+      scope: meta.preprocessor.ecl
+    - match: '"'
+      scope: string.quoted.double.ecl
+      push: dq_string
+    - match: "'"
+      scope: string.quoted.single.ecl
+      push: sq_string
+    - match: '\d[\w.]*'
+      scope: constant.numeric.ecl
+    - match: '/\*'
+      scope: comment.block.ecl
+      push: block_comment
+    - match: '//.*$'
+      scope: comment.line.ecl
+    - match: '[+\-*&%=<>!?|/]+'
+      scope: keyword.operator.ecl
+    - match: '(?i)(?<![\w$])(?:abs|acos|allnodes|ascii|asin|asstring|atan|atan2|ave|case|choose|choosen|choosesets|clustersize|combine|correlation|cos|cosh|count|covariance|cron|dataset|dedup|define|denormalize|distribute|distributed|distribution|ebcdic|enth|error|evaluate|event|eventextra|eventname|exists|exp|failcode|failmessage|fetch|fromunicode|getisvalid|global|graph|group|hash|hash32|hash64|hashcrc|hashmd5|having|if|index|intformat|isvalid|iterate|join|keyunicode|length|library|limit|ln|local|log|loop|map|matched|matchlength|matchposition|matchtext|matchunicode|max|merge|mergejoin|min|nolocal|nonempty|normalize|parse|pipe|power|preload|process|project|pull|random|range|rank|ranked|realformat|recordof|regexfind|regexreplace|regroup|rejected|rollup|round|roundup|row|rowdiff|sample|set|sin|sinh|sizeof|soapcall|sort|sorted|sqrt|stepped|stored|sum|table|tan|tanh|thisnode|topn|tounicode|transfer|trim|truncate|typeof|ungroup|unicodeorder|variance|which|workunit|xmldecode|xmlencode|xmltext|xmlunicode)(?![\w$])'
+      scope: keyword.control.ecl
+    - match: '(?i)(?<![\w$])(?:apply|assert|build|buildindex|fail|keydiff|keypatch|loadxml|nothor|notify|output|parallel|sequential|wait)(?![\w$])'
+      scope: variable.other.ecl
+    - match: '(?i)(?<![\w$])(?:__compressed__|all|and|any|as|atmost|before|beginc\+\+|best|between|const|counter|csv|descend|encrypt|end|endc\+\+|endmacro|except|exclusive|expire|export|extend|false|few|first|flat|from|full|function|header|heading|hole|ifblock|import|in|interface|joined|keep|keyed|last|left|load|locale|lookup|macro|many|maxcount|maxlength|skew|module|named|nocase|noroot|noscan|nosort|not|of|only|opt|or|outer|overwrite|packed|partition|penalty|physicallength|quote|record|relationship|repeat|return|right|scan|self|separator|service|shared|skip|sql|store|terminator|thor|threshold|token|transform|true|type|unsorted|validate|virtual|whole|wild|within|xml|xpath)(?![\w$])'
+      scope: storage.modifier.ecl
+    - match: '(?i)(?<![\w$])(?:big_endian|boolean|data|decimal|integer|pattern|qstring|real|rule|string|udecimal|unicode|unsigned|varstring|varunicode)(?![\w$])'
+      scope: entity.name.type.ecl
+    - match: '(?i)(?<![\w$])(?:checkpoint|deprecated|failure|independent|onwarning|persist|priority|recovery|success|when)(?![\w$])'
+      scope: support.function.ecl
+    - match: '(?i)(?<![\w$])(?:ascii|big_endian|boolean|data|decimal|ebcdic|integer|pattern|qstring|real|record|rule|set|of|string|token|udecimal|unicode|unsigned|varstring|varunicode)[0-9_]+(?![\w$])'
+      scope: entity.name.type.ecl
+    - match: '(?i)(?<![\w$])(?:null)(?![\w$])'
+      scope: constant.language.ecl
+  dq_string:
+    - meta_scope: string.quoted.double.ecl
+    - match: '\\.'
+    - match: '"'
+      pop: true
+  sq_string:
+    - meta_scope: string.quoted.single.ecl
+    - match: '\\.'
+    - match: "'"
+      pop: true
+  block_comment:
+    - meta_scope: comment.block.ecl
+    - match: '\*/'
+      pop: true

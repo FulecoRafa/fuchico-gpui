@@ -1,0 +1,7 @@
+# Find people
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+SELECT ?name ?age
+WHERE {
+  ?p a foaf:Person ; foaf:name ?name .
+  OPTIONAL { ?p foaf:age ?age } FILTER (?age > 18 && lang(?name) = "en")
+} ORDER BY DESC(?age) LIMIT 10

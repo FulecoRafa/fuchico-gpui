@@ -1,0 +1,201 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/pug.js (MIT).
+# Embedded JavaScript is approximated with simple JS-like rules.
+name: Pug
+scope: source.pug
+variables:
+  tag_prefix: '(?:\w[-:\w]*)?(?:[#.][\w-]+)*(?:\((?:[^()]|\([^()]*\))*\))?'
+contexts:
+  main:
+    # Indented comment block.
+    - match: '^([ \t]*)(?=//)'
+      push: [comment-block, comment-line]
+    # Filter with an indented text block.
+    - match: '^([ \t]*)(?=:[\w-]+)'
+      push: [text-block, filter-line]
+    - match: '^[ \t]*doctype\b.*$'
+      scope: meta.doctype.pug
+    - match: '^[ \t]*\|[ \t]?'
+      scope: punctuation.definition.pug
+      push: text-line
+    - match: '^[ \t]*<.*$'
+      scope: string.unquoted.pug
+    - match: '^[ \t]*(?:case|when|mixin|if|unless|else if|else|while)\b'
+      scope: keyword.control.pug
+      push: js-line
+    - match: '^[ \t]*(?:default|yield)\b'
+      scope: keyword.control.pug
+    - match: '^[ \t]*(extends?|include)\b(.*)$'
+      captures:
+        1: keyword.control.pug
+        2: string.unquoted.pug
+    - match: '^[ \t]*(append|prepend|block(?:[ \t]+(?:prepend|append))?)\b(.*)$'
+      captures:
+        1: keyword.control.pug
+        2: variable.other.pug
+    - match: '^[ \t]*(?:-[ \t]*)?(each|for)\b(.*?)\b(in)\b'
+      captures:
+        1: keyword.control.pug
+        2: variable.other.pug
+        3: keyword.control.pug
+      push: js-line
+    # Indented text block after "tag."
+    - match: '^([ \t]*)(?={{tag_prefix}}\.[ \t]*$)'
+      push: [text-block, tag-line]
+    - match: '^[ \t]*\+[-\w]+'
+      scope: variable.other.pug
+      push: tag-rest
+    - match: '^[ \t]*(!?=|-)'
+      captures:
+        1: punctuation.definition.pug
+      push: js-line
+    - match: '^[ \t]*(?=[\w#.&])'
+      push: tag-line
+  tag-line:
+    - match: '\w(?:[-:\w]*\w)?/?'
+      scope: entity.name.tag.pug
+      set: tag-rest
+    - match: '(?=[#.])'
+      set: tag-rest
+    - match: '$'
+      pop: true
+  filter-line:
+    - match: ':[\w-]+'
+      scope: constant.language.pug
+      set: tag-rest
+    - match: '$'
+      pop: true
+  tag-rest:
+    - match: '$'
+      pop: true
+    - match: '#[\w-]+'
+      scope: support.function.pug
+    - match: '\.(?=[ \t]*$)'
+      scope: punctuation.definition.pug
+    - match: '\.[\w-]+'
+      scope: entity.name.type.class.pug
+    - match: '\('
+      scope: punctuation.section.pug
+      push: attrs
+    - match: '&attributes\b'
+      scope: keyword.control.pug
+    - match: '(!?=)'
+      scope: punctuation.definition.pug
+      set: js-line
+    - match: ':[ \t]+(?=\w)'
+      scope: punctuation.definition.pug
+      set: tag-line
+    - match: '/'
+      scope: punctuation.definition.pug
+    - match: '[ \t]'
+      set: text-line
+  text-line:
+    - meta_content_scope: string.unquoted.pug
+    - match: '#\{'
+      scope: punctuation.section.pug
+      push: interpolation
+    - match: '$'
+      pop: true
+  interpolation:
+    - match: '\}'
+      scope: punctuation.section.pug
+      pop: true
+    - match: '\{'
+      push: js-nest-brace
+    - include: js-core
+    - match: '[()\[\]]'
+      scope: punctuation.section.pug
+  js-nest-brace:
+    - match: '\}'
+      pop: true
+    - match: '\{'
+      push: js-nest-brace
+    - include: js-core
+  comment-line:
+    - match: '.*$'
+      scope: comment.line.pug
+      pop: true
+  comment-block:
+    - meta_content_scope: comment.block.pug
+    - match: '^(?![ \t]*$|\1[ \t]+)'
+      pop: true
+  text-block:
+    - meta_content_scope: string.unquoted.pug
+    - match: '^(?![ \t]*$|\1[ \t]+)'
+      pop: true
+  attrs:
+    - match: '\)'
+      scope: punctuation.section.pug
+      pop: true
+    - match: ','
+      scope: punctuation.separator.pug
+    - match: '(?:\[|\{|\()'
+      push: js-nest
+    - match: '[\w:@.\-]+'
+      scope: entity.other.attribute-name.pug
+    - match: '!?='
+      scope: keyword.operator.pug
+      push: attr-value
+  attr-value:
+    - match: '(?=[,)]|[ \t]+[\w:@.\-]+[ \t]*(?:!?=[^=]|[,)]|$)|$)'
+      pop: true
+    - match: '[\[{(]'
+      scope: punctuation.section.pug
+      push: js-nest
+    - include: js-core
+  js-nest:
+    - match: '[\]})]'
+      scope: punctuation.section.pug
+      pop: true
+    - match: '[\[{(]'
+      scope: punctuation.section.pug
+      push: js-nest
+    - include: js-core
+  js-line:
+    - match: '$'
+      pop: true
+    - include: js-core
+    - match: '[()\[\]{}]'
+      scope: punctuation.section.pug
+  js-core:
+    - match: '//.*$'
+      scope: comment.line.pug
+    - match: '/\*'
+      push: js-comment
+    - match: '"'
+      push: dq-string
+    - match: "'"
+      push: sq-string
+    - match: '`'
+      push: bt-string
+    - match: '\b(?:0[xX][\da-fA-F]+|\d+\.?\d*(?:[eE][+-]?\d+)?)|\.\d+'
+      scope: constant.numeric.pug
+    - match: '\b(?:true|false|null|undefined|NaN|Infinity)\b'
+      scope: constant.language.pug
+    - match: '\b(?:break|case|catch|continue|debugger|default|delete|do|else|finally|for|function|if|in|of|instanceof|new|return|switch|this|throw|try|typeof|var|let|const|void|while|with|yield|class|extends|async|await)\b'
+      scope: keyword.control.pug
+    - match: '[-+*/%=<>!&|^~?:]+'
+      scope: keyword.operator.pug
+  js-comment:
+    - meta_scope: comment.block.pug
+    - match: '\*/'
+      pop: true
+  dq-string:
+    - meta_scope: string.quoted.double.pug
+    - match: '\\.'
+      scope: constant.character.escape.pug
+    - match: '"|$'
+      pop: true
+  sq-string:
+    - meta_scope: string.quoted.single.pug
+    - match: '\\.'
+      scope: constant.character.escape.pug
+    - match: "'|$"
+      pop: true
+  bt-string:
+    - meta_scope: string.quoted.other.pug
+    - match: '\\.'
+      scope: constant.character.escape.pug
+    - match: '`'
+      pop: true

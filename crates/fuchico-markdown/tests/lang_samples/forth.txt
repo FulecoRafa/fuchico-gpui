@@ -1,0 +1,7 @@
+\ square and print
+: square ( n -- n*n ) DUP * ;
+VARIABLE counter
+10 counter !
+." Hello, Forth" CR
+5 square . CR
+counter @ 0 > IF 1 counter +! THEN

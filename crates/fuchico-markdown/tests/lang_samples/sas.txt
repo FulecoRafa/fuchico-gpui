@@ -1,0 +1,13 @@
+/* Sample SAS program */
+libname mylib "/data/sas";
+data work.scores;
+  set mylib.raw;
+  if score > 90 then grade = 'A';
+  total = sum(a, b, 1.5);
+run;
+proc print data=work.scores; run;
+%let n = 5;
+%macro hello(name);
+  %put Hello &name &sysdate;
+  %if &n eq 1 %then %do; title1 "x"; %end;
+%mend hello;

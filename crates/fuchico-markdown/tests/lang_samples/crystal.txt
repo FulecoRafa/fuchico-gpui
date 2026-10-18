@@ -1,0 +1,4 @@
+# c
+def f(x : Int32) : String
+  "s#{x + 42}"
+end

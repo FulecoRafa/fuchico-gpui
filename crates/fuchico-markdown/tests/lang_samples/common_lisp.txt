@@ -1,0 +1,2 @@
+; c
+(defun f (x) (format t "s ~a" (+ x 42)))

@@ -1,0 +1,50 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/mscgen.js (MIT).
+name: MscGen
+scope: source.mscgen
+contexts:
+  main:
+    - include: base
+    - match: '\['
+      scope: punctuation.section.mscgen
+      push: attr-list
+  base:
+    - match: '[{}]'
+      scope: punctuation.section.mscgen
+    - match: '/\*'
+      scope: comment.block.mscgen
+      push: block-comment
+    - match: '(?://|#).*$'
+      scope: comment.line.mscgen
+    - match: '"'
+      scope: string.quoted.double.mscgen
+      push: string
+    - match: '(?i)\b(?:msc)\b'
+      scope: keyword.control.mscgen
+    - match: '(?i)\b(?:wordwraparcs|arcgradient|hscale|width)\b'
+      scope: keyword.control.mscgen
+    - match: '(?i)\b(?:note|abox|rbox|box)\b'
+      scope: keyword.control.mscgen
+    - match: '(?i)\|\|\||\.\.\.|---|--|<->|==|<<=>>|<=>|\.\.|<<>>|::|<:>|->|=>>|=>|>>|:>|<-|<<=|<=|<<|<:|x-|-x'
+      scope: keyword.control.mscgen
+    - match: '='
+      scope: keyword.operator.mscgen
+    - match: '(?i)\b(?:false|true|off|on)\b'
+      scope: variable.other.mscgen
+  attr-list:
+    - match: '\]'
+      scope: punctuation.section.mscgen
+      pop: true
+    - include: base
+    - match: '(?i)\b(?:arctextbgcolour|arctextbgcolor|arclinecolour|arctextcolour|textbgcolour|arclinecolor|arctextcolor|textbgcolor|linecolour|textcolour|linecolor|textcolor|arcskip|label|idurl|url|id)\b'
+      scope: entity.other.attribute-name.mscgen
+  block-comment:
+    - meta_scope: comment.block.mscgen
+    - match: '\*/'
+      pop: true
+  string:
+    - meta_scope: string.quoted.double.mscgen
+    - match: '\\.'
+    - match: '"'
+      pop: true

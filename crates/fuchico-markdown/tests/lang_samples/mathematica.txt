@@ -1,0 +1,6 @@
+(* square and sum *)
+f[x_] := x^2 + 3.5`20
+Sum[f[i], {i, 1, 10}]
+msg = "Hello (* not a comment *)"
+Plot[Sin[x], {x, 0, 2 Pi}]
+In[1] := #1 & /@ {1, 2, 3}

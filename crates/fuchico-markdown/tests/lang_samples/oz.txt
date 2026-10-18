@@ -1,0 +1,8 @@
+% factorial
+declare
+fun {Fact N}
+   if N == 0 then 1 else N * {Fact N-1} end
+end
+/* print it */
+{Browse {Fact 10}}
+{Browse 'atom'#"text"#~3.5}

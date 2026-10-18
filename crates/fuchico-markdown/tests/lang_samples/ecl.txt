@@ -1,0 +1,7 @@
+// count records
+Person := RECORD
+  STRING20 name;
+  INTEGER4 age;
+END;
+ds := DATASET('~people', Person, THOR);
+OUTPUT(COUNT(ds(age > 30)));

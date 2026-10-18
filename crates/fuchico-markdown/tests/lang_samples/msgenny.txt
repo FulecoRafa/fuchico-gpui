@@ -1,0 +1,8 @@
+# MsGenny sequence chart
+hscale=1.5;
+a => b : request;
+b >> a : response;
+a note a : done;
+alt {
+  b -> a : fine;
+};

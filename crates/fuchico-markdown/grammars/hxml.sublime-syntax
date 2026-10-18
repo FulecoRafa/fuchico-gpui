@@ -1,0 +1,22 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/haxe.js (MIT), the `hxml` export.
+name: HXML
+scope: source.hxml-port
+contexts:
+  main:
+    - match: '#.*$'
+      scope: comment.line.number-sign.hxml
+    - match: '^--?D[A-Za-z]*'
+      scope: keyword.control.define.hxml
+    - match: '^--[A-Za-z]*'
+      scope: keyword.control.hxml
+    - match: '^-[A-Za-z]*'
+      scope: variable.other.option.hxml
+    - match: "'"
+      scope: punctuation.definition.string.begin.hxml
+      push: string
+  string:
+    - meta_scope: string.quoted.single.hxml
+    - match: "'"
+      pop: true

@@ -1,0 +1,8 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+hello
+-----BEGIN PGP SIGNATURE-----
+iQEzBAEBCAAdFiEE
+=abcd
+-----END PGP SIGNATURE-----

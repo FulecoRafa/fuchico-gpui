@@ -1,0 +1,8 @@
+// simple model
+model Pendulum
+  parameter Real L = 1.5 "length";
+  Real theta(start = 0.1);
+  /* dynamics */
+equation
+  der(theta) = -sin(theta) / L;
+end Pendulum;

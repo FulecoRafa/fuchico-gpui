@@ -1,0 +1,5 @@
+% c
+\documentclass{article}
+\begin{document}
+\textbf{x} $a^2$
+\end{document}

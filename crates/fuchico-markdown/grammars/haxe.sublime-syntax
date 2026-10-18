@@ -1,0 +1,71 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/haxe.js (MIT).
+name: Haxe
+scope: source.haxe-port
+variables:
+  nb: '(?<![\w])'
+  ne: '(?![\w])'
+contexts:
+  main:
+    - match: '/\*'
+      scope: punctuation.definition.comment.haxe
+      push: block-comment
+    - match: '//.*$'
+      scope: comment.line.double-slash.haxe
+    - match: '"'
+      scope: punctuation.definition.string.begin.haxe
+      push: dq-string
+    - match: "'"
+      scope: punctuation.definition.string.begin.haxe
+      push: sq-string
+    - match: '~/(?:[^/\\\n]|\\.)*/?[gimsu]*'
+      scope: string.other.regexp.haxe
+    - match: '#.*$'
+      scope: meta.preprocessor.haxe
+    - match: '@:?\w*'
+      scope: meta.annotation.haxe
+    - match: '0[xX][\da-fA-F]*'
+      scope: constant.numeric.hex.haxe
+    - match: '-?\d+(?:\.\d*(?!\.))?(?:[eE][+\-]?\d+)?'
+      scope: constant.numeric.haxe
+    - match: '\b(function)\s+([A-Za-z_]\w*)'
+      captures:
+        1: keyword.control.haxe
+        2: variable.other.definition.haxe
+    - match: '\b(var)\s+([A-Za-z_]\w*)'
+      captures:
+        1: keyword.control.haxe
+        2: variable.other.definition.haxe
+    - match: '(?<=\.)[A-Z][\w<>]*'
+      scope: entity.name.type.haxe
+    - match: '(?<=\.)[a-z_]\w*'
+      scope: variable.other.property.haxe
+    - match: '{{nb}}(?:true|false|null){{ne}}'
+      scope: constant.language.haxe
+    - match: '{{nb}}(?:inline|static|public|private){{ne}}'
+      scope: entity.other.attribute-name.haxe
+    - match: '{{nb}}in{{ne}}'
+      scope: keyword.operator.haxe
+    - match: '{{nb}}(?:if|while|else|do|try|return|break|continue|new|throw|var|using|cast|import|macro|function|catch|untyped|callback|for|switch|case|default|never|trace|class|abstract|enum|interface|typedef|extends|implements|dynamic){{ne}}'
+      scope: keyword.control.haxe
+    - match: '[A-Z][\w<>]*'
+      scope: entity.name.type.haxe
+    - match: '[A-Za-z_]\w*'
+      scope: variable.other.haxe
+    - match: '[+\-*&%=<>!?|/]+'
+      scope: keyword.operator.haxe
+  block-comment:
+    - meta_scope: comment.block.haxe
+    - match: '\*/'
+      pop: true
+  dq-string:
+    - meta_scope: string.quoted.double.haxe
+    - match: '\\.'
+    - match: '"'
+      pop: true
+  sq-string:
+    - meta_scope: string.quoted.single.haxe
+    - match: '\\.'
+    - match: "'"
+      pop: true

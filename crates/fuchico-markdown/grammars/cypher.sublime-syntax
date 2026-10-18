@@ -1,0 +1,25 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/cypher.js (MIT).
+name: Cypher
+scope: source.cypher
+contexts:
+  main:
+    - match: '"[^"\n]*"'
+      scope: string.quoted.double.cypher
+    - match: "'[^'\\n]*'"
+      scope: string.quoted.single.cypher
+    - match: '//.*$'
+      scope: comment.line.cypher
+    - match: '[{}(),.;\[\]]'
+      scope: punctuation.separator.cypher
+    - match: '\w+:[\w\-]*'
+      scope: constant.language.cypher
+    - match: '(?i)(?<![\w:])(?:abs|acos|allShortestPaths|asin|atan|atan2|avg|ceil|coalesce|collect|cos|cot|count|degrees|e|endnode|exp|extract|filter|floor|haversin|head|id|keys|labels|last|left|length|log|log10|lower|ltrim|max|min|node|nodes|percentileCont|percentileDisc|pi|radians|rand|range|reduce|rel|relationship|relationships|replace|reverse|right|round|rtrim|shortestPath|sign|sin|size|split|sqrt|startnode|stdev|stdevp|str|substring|sum|tail|tan|timestamp|toFloat|toInt|toString|trim|type|upper)(?!\w)'
+      scope: support.function.cypher
+    - match: '(?i)(?<![\w:])(?:all|and|any|contains|exists|has|in|none|not|or|single|xor)(?!\w)'
+      scope: variable.other.definition.cypher
+    - match: '(?i)(?<![\w:])(?:as|asc|ascending|assert|by|case|commit|constraint|create|csv|cypher|delete|desc|descending|detach|distinct|drop|else|end|ends|explain|false|fieldterminator|foreach|from|headers|index|is|join|limit|load|match|merge|null|on|optional|order|periodic|profile|remove|return|scan|set|skip|start|starts|then|true|union|unique|unwind|using|when|where|with|call|yield|access|active|assign|alter|catalog|change|copy|constraints|current|database|databases|dbms|default|deny|element|elements|grant|graph|graphs|if|indexes|label|management|name|names|new|of|password|populated|privileges|property|read|required|revoke|role|roles|show|status|stop|suspended|to|traverse|types|user|users|write)(?!\w)'
+      scope: keyword.control.cypher
+    - match: '[*+\-<>=&|~%^]+'
+      scope: keyword.operator.cypher

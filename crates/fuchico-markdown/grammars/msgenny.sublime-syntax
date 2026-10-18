@@ -1,0 +1,38 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/mscgen.js (MIT).
+name: MsGenny
+scope: source.msgenny
+contexts:
+  main:
+    - include: base
+  base:
+    - match: '[{}]'
+      scope: punctuation.section.msgenny
+    - match: '/\*'
+      scope: comment.block.msgenny
+      push: block-comment
+    - match: '(?://|#).*$'
+      scope: comment.line.msgenny
+    - match: '"'
+      scope: string.quoted.double.msgenny
+      push: string
+    - match: '(?i)\b(?:wordwrapentities|wordwraparcs|arcgradient|watermark|hscale|width)\b'
+      scope: keyword.control.msgenny
+    - match: '(?i)\b(?:critical|consider|strict|ignore|assert|break|note|abox|rbox|else|loop|box|alt|opt|par|seq|neg|ref|exc)\b'
+      scope: keyword.control.msgenny
+    - match: '(?i)\|\|\||\.\.\.|---|--|<->|==|<<=>>|<=>|\.\.|<<>>|::|<:>|->|=>>|=>|>>|:>|<-|<<=|<=|<<|<:|x-|-x'
+      scope: keyword.control.msgenny
+    - match: '='
+      scope: keyword.operator.msgenny
+    - match: '(?i)\b(?:false|true|auto|off|on)\b'
+      scope: variable.other.msgenny
+  block-comment:
+    - meta_scope: comment.block.msgenny
+    - match: '\*/'
+      pop: true
+  string:
+    - meta_scope: string.quoted.double.msgenny
+    - match: '\\.'
+    - match: '"'
+      pop: true

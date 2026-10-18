@@ -1,0 +1,6 @@
+/ trade analytics
+t:([] sym:`a`b`c; price:10.5 20.25 30f; size:100 200 300)
+select avg price by sym from t where size>100
+f:{[x;y] x+y*2}
+d:2024.01.15; tm:09:30:00.000
+show "done"

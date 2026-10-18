@@ -1,0 +1,2 @@
+; c
+(define (f x) (string-append "s" (number->string 42)))

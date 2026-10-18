@@ -1,0 +1,49 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/spreadsheet.js (MIT).
+name: Spreadsheet
+scope: source.spreadsheet
+contexts:
+  main:
+    - match: '"'
+      push: dq-string
+    - match: "'"
+      push: sq-string
+    - match: '\['
+      scope: punctuation.section.spreadsheet
+      push: char-class
+    - match: ':'
+      scope: keyword.operator.spreadsheet
+    - match: '\\[a-z]+'
+      scope: string.other.spreadsheet
+    - match: '[\\.,;*\-+^</=]'
+      scope: constant.language.spreadsheet
+    - match: '\$'
+      scope: support.function.spreadsheet
+    - match: '\d+(?=\w)\w+'
+      scope: invalid.illegal.spreadsheet
+    - match: '\d+'
+      scope: constant.numeric.spreadsheet
+    - match: '[a-zA-Z_]\w*(?=[(.])'
+      scope: keyword.control.spreadsheet
+    - match: '[a-zA-Z_]\w*'
+      scope: variable.other.spreadsheet
+    - match: '[\](){}]'
+      scope: punctuation.section.spreadsheet
+  dq-string:
+    - meta_scope: string.quoted.double.spreadsheet
+    - match: '\\.'
+      scope: constant.character.escape.spreadsheet
+    - match: '"'
+      pop: true
+  sq-string:
+    - meta_scope: string.quoted.single.spreadsheet
+    - match: '\\.'
+      scope: constant.character.escape.spreadsheet
+    - match: "'"
+      pop: true
+  char-class:
+    - meta_content_scope: keyword.operator.spreadsheet
+    - match: '\]'
+      scope: punctuation.section.spreadsheet
+      pop: true

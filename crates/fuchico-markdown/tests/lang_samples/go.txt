@@ -1,0 +1,3 @@
+package main
+// main
+func main() { fmt.Println("hi", 42) }

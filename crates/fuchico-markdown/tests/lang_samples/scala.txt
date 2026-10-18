@@ -1,0 +1,2 @@
+// c
+object A { def f(x: Int): String = "s" + 42 }

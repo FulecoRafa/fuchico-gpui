@@ -1,0 +1,4 @@
+// c
+module m(input logic clk);
+  always_ff @(posedge clk) x <= 8'd42;
+endmodule

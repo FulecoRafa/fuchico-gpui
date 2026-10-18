@@ -1,0 +1,10 @@
+// entry point
+class Main {
+  static public function main():Void {
+    var count:Int = 10;
+    var name = "haxe";
+    /* loop */
+    for (i in 0...count) trace('item $i');
+    if (count > 5) return;
+  }
+}

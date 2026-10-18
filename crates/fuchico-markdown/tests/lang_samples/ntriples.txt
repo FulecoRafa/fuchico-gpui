@@ -1,0 +1,3 @@
+<http://example.org/a> <http://xmlns.com/foaf/0.1/name> "Alice"@en .
+_:b1 <http://xmlns.com/foaf/0.1/knows> <http://example.org/a#me> .
+<http://example.org/a> <http://example.org/age> "42"^^<http://www.w3.org/2001/XMLSchema#integer> .

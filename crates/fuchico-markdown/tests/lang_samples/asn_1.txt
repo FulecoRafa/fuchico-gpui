@@ -1,0 +1,7 @@
+-- a simple module
+MyModule DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+  Person ::= SEQUENCE {
+    name UTF8String,
+    age INTEGER (0..150) OPTIONAL
+  }
+END

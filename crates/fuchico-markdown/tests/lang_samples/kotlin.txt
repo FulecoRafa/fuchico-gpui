@@ -1,0 +1,2 @@
+// c
+fun main() { val x = 42; println("s $x") }

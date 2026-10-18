@@ -1,0 +1,3 @@
+#include <stdio.h>
+/* entry */
+int main(void) { return printf("hi %d", 42); }

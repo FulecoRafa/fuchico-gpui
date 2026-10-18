@@ -1,0 +1,43 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/smalltalk.js (MIT).
+name: Smalltalk
+scope: source.smalltalk
+contexts:
+  main:
+    - match: '"'
+      push: comment
+    - match: "'"
+      push: string
+    - match: "#'"
+      push: symbol
+    - match: "#[^\\s.{}\\[\\]()]+"
+      scope: string.other.smalltalk
+    - match: '#'
+      scope: meta.symbol.smalltalk
+    - match: '\$<[^\s>]*>?'
+      scope: string.other.smalltalk
+    - match: '\$.'
+      scope: string.other.smalltalk
+    - match: '\|[^|]*\|?'
+      scope: variable.other.smalltalk
+    - match: '[\[\]{}()]'
+      scope: punctuation.section.smalltalk
+    - match: '[+\-/\\*~<>=@%|&?!.,:;^]+'
+      scope: keyword.operator.smalltalk
+    - match: '\d[\w\d]*'
+      scope: constant.numeric.smalltalk
+    - match: '\b(?:true|false|nil|self|super|thisContext)\b'
+      scope: keyword.control.smalltalk
+  comment:
+    - meta_scope: comment.block.smalltalk
+    - match: '"'
+      pop: true
+  string:
+    - meta_scope: string.quoted.single.smalltalk
+    - match: "'"
+      pop: true
+  symbol:
+    - meta_scope: string.other.smalltalk
+    - match: "'"
+      pop: true

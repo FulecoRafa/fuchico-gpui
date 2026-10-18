@@ -1,0 +1,3 @@
+% c
+-module(m).
+f(X) -> io:format("s ~p", [X + 42]).

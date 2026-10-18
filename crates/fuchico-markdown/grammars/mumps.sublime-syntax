@@ -1,0 +1,36 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/mumps.js (MIT).
+name: MUMPS
+scope: source.mumps-port
+contexts:
+  main:
+    - match: '^[%A-Za-z][A-Za-z0-9]*'
+      scope: entity.name.tag.mumps
+    - match: ';.*$'
+      scope: comment.line.semicolon.mumps
+    - match: '[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?'
+      scope: constant.numeric.mumps
+    - match: '"[^"\n]*"'
+      scope: string.quoted.double.mumps
+    - match: '".*$'
+      scope: invalid.illegal.mumps
+    - match: "'=|<=|>=|'>|'<|\\[\\[|\\]\\]|[-+*/&#!_?\\\\<>='\\[\\]]"
+      scope: keyword.operator.mumps
+    - match: '[.,:]'
+    - match: '[()]'
+      scope: punctuation.section.mumps
+    - match: '(?i)(?<=^|[ \t])(?:break|close|do|else|for|goto|halt|hang|if|job|kill|lock|merge|new|open|quit|read|set|tcommit|trollback|tstart|use|view|write|xecute|tc|tro|ts|[bcdefghijklmnoqrsuvwx])\b'
+      scope: keyword.control.mumps
+    - match: '(?i)\$(?:ascii|char|data|ecode|estack|etrap|extract|find|fnumber|get|horolog|io|increment|job|justify|length|name|next|order|piece|qlength|qsubscript|query|quit|random|reverse|select|stack|test|text|translate|view|x|y|a|c|d|e|ec|es|et|f|fn|g|h|i|j|l|n|na|o|p|q|ql|qs|r|re|s|st|t|tr|v|z)\b'
+      scope: support.function.mumps
+    - match: '[%A-Za-z][A-Za-z0-9]*'
+      scope: variable.other.mumps
+    - match: '[$^]'
+      scope: support.function.mumps
+    - match: '@'
+      scope: string.other.indirection.mumps
+    - match: '[\w%]+'
+      scope: variable.other.mumps
+    - match: '\S'
+      scope: invalid.illegal.mumps

@@ -1,0 +1,52 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/modelica.js (MIT).
+name: Modelica
+scope: source.modelica-port
+contexts:
+  main:
+    - match: |-
+        //.*$
+      scope: comment.line.double-slash.modelica
+    - match: /\*
+      scope: punctuation.definition.comment.modelica
+      push: block-comment
+    - match: '"'
+      scope: punctuation.definition.string.begin.modelica
+      push: string
+    - match: |-
+        '[^'\n]*'
+      scope: variable.other.quoted.modelica
+    - match: |-
+        '[^'\n]*$
+      scope: invalid.illegal.modelica
+    - match: |-
+        (?<![_a-zA-Z0-9])\d+(?:\.\d*)?(?:[eE][-+]?\d*)?
+      scope: constant.numeric.modelica
+    - match: |-
+        (?<![_a-zA-Z0-9])(?:algorithm|and|annotation|assert|block|break|class|connect|connector|constant|constrainedby|der|discrete|each|else|elseif|elsewhen|encapsulated|end|enumeration|equation|expandable|extends|external|false|final|flow|for|function|if|import|impure|in|initial|inner|input|loop|model|not|operator|or|outer|output|package|parameter|partial|protected|public|pure|record|redeclare|replaceable|return|stream|then|true|type|when|while|within)(?![_a-zA-Z0-9])
+      scope: keyword.control.modelica
+    - match: |-
+        (?<![_a-zA-Z0-9])(?:abs|acos|actualStream|asin|atan|atan2|cardinality|ceil|cos|cosh|delay|div|edge|exp|floor|getInstanceName|homotopy|inStream|integer|log|log10|mod|pre|reinit|rem|semiLinear|sign|sin|sinh|spatialDistribution|sqrt|tan|tanh)(?![_a-zA-Z0-9])
+      scope: support.function.modelica
+    - match: |-
+        (?<![_a-zA-Z0-9])(?:Real|Boolean|Integer|String)(?![_a-zA-Z0-9])
+      scope: constant.language.modelica
+    - match: |-
+        [_a-zA-Z][_a-zA-Z0-9]*
+      scope: variable.other.modelica
+    - match: |-
+        :=|<=|>=|==|<>|\.\+|\.-|\.\*|\./|\.\^|[;=():,{}.*<>+\-/^\[\]]
+      scope: keyword.operator.modelica
+    - match: |-
+        \S
+      scope: invalid.illegal.modelica
+  block-comment:
+    - meta_scope: comment.block.modelica
+    - match: \*/
+      pop: true
+  string:
+    - meta_scope: string.quoted.double.modelica
+    - match: '\\.'
+    - match: '"'
+      pop: true

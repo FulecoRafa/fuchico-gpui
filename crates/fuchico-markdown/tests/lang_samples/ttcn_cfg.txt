@@ -1,0 +1,9 @@
+# TTCN-3 runtime configuration
+[LOGGING]
+LogFile := "logs/%e.%h-%r.%s"
+FileMask := LOG_ALL | TTCN_DEBUG
+ConsoleMask := ERROR | WARNING | TESTCASE
+TimeStampFormat := DateTime
+[MAIN_CONTROLLER]
+TCPPort := 0
+KillTimer := 10.0

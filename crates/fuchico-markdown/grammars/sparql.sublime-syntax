@@ -1,0 +1,47 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/sparql.js (MIT).
+name: SPARQL
+scope: source.sparql
+variables:
+  pn_local: '(?:\.(?=[\w\-\\%])|[:\w\-]|\\[-\\_~.!$&''()*+,;=/?#@%]|%(?i:[a-f\d]{2}))*'
+contexts:
+  main:
+    - match: '[?$](?=\s)'
+      scope: keyword.operator.sparql
+    - match: '[?$][\w\x{00C0}-\x{FFFD}][\w\x{00B7}-\x{FFFD}]*'
+      scope: variable.other.local.sparql
+    - match: '<(?![\s\x{00a0}=])[^\s\x{00a0}>]*>?'
+      scope: constant.language.sparql
+    - match: '"'
+      push: dq-string
+    - match: "'"
+      push: sq-string
+    - match: '[{}(),.;\[\]]'
+      scope: punctuation.section.sparql
+    - match: '#.*$'
+      scope: comment.line.number-sign.sparql
+    - match: '[*+\-<>=&|^/!?]'
+      scope: keyword.operator.sparql
+    - match: ':{{pn_local}}'
+      scope: constant.language.sparql
+    - match: '@[a-zA-Z\d\-]*'
+      scope: meta.language-tag.sparql
+    - match: '[A-Za-z](?:(?:[\w\-]|\.)*[\w\-])?:{{pn_local}}'
+      scope: constant.language.sparql
+    - match: '(?i)\b(?:str|lang|langmatches|datatype|bound|sameterm|isiri|isuri|iri|uri|bnode|count|sum|min|max|avg|sample|group_concat|rand|abs|ceil|floor|round|concat|substr|strlen|replace|ucase|lcase|encode_for_uri|contains|strstarts|strends|strbefore|strafter|year|month|day|hours|minutes|seconds|timezone|tz|now|uuid|struuid|md5|sha1|sha256|sha384|sha512|coalesce|if|strlang|strdt|isnumeric|regex|exists|isblank|isliteral|a|bind)\b'
+      scope: support.function.sparql
+    - match: '(?i)\b(?:base|prefix|select|distinct|reduced|construct|describe|ask|from|named|where|order|limit|offset|filter|optional|graph|by|asc|desc|as|having|undef|values|group|minus|in|not|service|silent|using|insert|delete|union|true|false|with|data|copy|to|move|add|create|drop|clear|load|into)\b'
+      scope: keyword.control.sparql
+  dq-string:
+    - meta_scope: string.quoted.double.sparql
+    - match: '\\.'
+      scope: constant.character.escape.sparql
+    - match: '"'
+      pop: true
+  sq-string:
+    - meta_scope: string.quoted.single.sparql
+    - match: '\\.'
+      scope: constant.character.escape.sparql
+    - match: "'"
+      pop: true

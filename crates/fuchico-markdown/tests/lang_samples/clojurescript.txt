@@ -1,0 +1,2 @@
+; c
+(defn f [x] (js/console.log "s" 42))

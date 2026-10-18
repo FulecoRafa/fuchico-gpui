@@ -1,0 +1,6 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. HELLO.
+      * a comment line
+       PROCEDURE DIVISION.
+           DISPLAY "Hello, world" 42.
+           STOP RUN.

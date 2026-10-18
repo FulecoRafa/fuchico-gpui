@@ -1,0 +1,53 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/vbscript.js (MIT).
+name: VBScript
+scope: source.vbscript
+contexts:
+  main:
+    - match: "'.*$"
+      scope: comment.line.vbscript
+    - match: '(?i)\brem\b.*$'
+      scope: comment.line.vbscript
+    # numbers (skipped when glued to letters/underscore, as in the legacy mode)
+    - match: '(?i)(?:&H|&O)?[0-9.]+[a-z_]'
+    - match: '(?i)(?:\d*\.\d+|\d+\.\d*)j?'
+      scope: constant.numeric.vbscript
+    - match: '(?i)&H[0-9a-f]+l?'
+      scope: constant.numeric.vbscript
+    - match: '(?i)&O[0-7]+l?'
+      scope: constant.numeric.vbscript
+    - match: '(?i)[1-9]\d*f?j?l?'
+      scope: constant.numeric.vbscript
+    - match: '(?i)0(?![\dx])l?'
+      scope: constant.numeric.vbscript
+    - match: '"'
+      scope: string.quoted.double.vbscript
+      push: string
+    - match: '<>|<=|>=|[+\-*/&\\^<>=]'
+      scope: keyword.operator.vbscript
+    - match: '(?i)\b(?:and|or|not|xor|is|mod|eqv|imp)\b'
+      scope: keyword.operator.vbscript
+    - match: '[.,]'
+    - match: '[()]'
+      scope: punctuation.section.vbscript
+    - match: '(?i)\b(?:on error resume next|exit|do|function|property|select|class|while|with|sub|for|if|elseif|else|case|end|next|loop|wend|on error resume next|on error goto 0|option explicit|randomize|property|private|public|redim|until|byval|byref|const|then|exit|stop|call|dim|new|get|set|let|in|me)\b'
+      scope: keyword.control.vbscript
+    - match: '(?i)\b(?:nothing|false|empty|true|null)\b'
+      scope: constant.language.vbscript
+    - match: '(?i)\b(?:createobject|description|helpcontext|firstindex|ignorecase|writeline|helpfile|execute|replace|pattern|update|addnew|global|length|number|source|clear|raise|write|close|state|value|count|test|open|quit|eof|end)\b'
+      scope: variable.other.property.vbscript
+    - match: '(?i)\b(?:scriptenginebuildversion|scriptenginemajorversion|scriptengineminorversion|formatcurrency|formatdatetime|formatpercent|formatnumber|scriptengine|loadpicture|weekdayname|dateserial|strreverse|timeserial|datevalue|getlocale|getobject|isnumeric|monthname|setlocale|timevalue|datediff|datepart|inputbox|instrrev|isobject|typename|unescape|dateadd|execute|isarray|isempty|replace|strcomp|vartype|weekday|escape|filter|getref|isdate|isnull|lbound|minute|msgbox|second|string|ubound|array|cbool|cbyte|cdate|instr|lcase|ltrim|rtrim|maths|month|right|round|space|split|timer|ucase|ccur|cdbl|cint|clng|csng|cstr|date|eval|hour|join|left|trim|time|year|abs|asc|atn|chr|cos|day|exp|hex|int|fix|len|log|mid|now|oct|rgb|rnd|sgn|sin|sqr|tan)\b'
+      scope: support.function.vbscript
+    - match: '(?i)\b(?:vbUseSystemDayOfWeek|vbAbortRetryIgnore|vbApplicationModal|vbDefaultButton1|vbDefaultButton2|vbDefaultButton3|vbDefaultButton4|vbBinaryCompare|vbFirstFourDays|vbFirstFullWeek|vbTextCompare|vbGeneralDate|vbObjectError|vbYesNoCancel|vbRetryCancel|vbExclamation|vbInformation|vbSystemModal|vbVerticalTab|vbNullString|vbUseDefault|vbDataObject|vbWednesday|vbFirstJan1|vbShortDate|vbShortTime|vbThursday|vbSaturday|vbLongDate|vbLongTime|vbOKCancel|vbCritical|vbQuestion|vbFormFeed|vbNullChar|vbCurrency|vbMagenta|vbTuesday|vbNewLine|vbInteger|vbBoolean|vbVariant|vbDecimal|vbYellow|vbSunday|vbMonday|vbFriday|vbOKOnly|vbCancel|vbIgnore|vbSingle|vbDouble|vbString|vbObject|WScript|vbBlack|vbGreen|vbWhite|vbYesNo|vbAbort|vbRetry|vbFalse|vbEmpty|vbError|vbArray|RegExp|vbBlue|vbCyan|VbCrLf|vbTrue|vbNull|vbLong|vbDate|vbByte|debug|vbRed|vbYes|vbTab|vbOK|vbNo|vbCr|vbLf|err)\b'
+      scope: support.function.vbscript
+    - match: '[A-Za-z][_A-Za-z0-9]*'
+      scope: variable.other.vbscript
+    - match: '[^\s]'
+      scope: invalid.illegal.vbscript
+  string:
+    - meta_scope: string.quoted.double.vbscript
+    - match: '"'
+      pop: true
+    - match: '$'
+      pop: true

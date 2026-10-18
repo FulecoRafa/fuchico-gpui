@@ -1,0 +1,18 @@
+doctype html
+html(lang="en")
+  head
+    title= pageTitle
+  body
+    //- a comment
+    h1#main.title Hello, #{name}
+    if user
+      p.welcome Welcome back
+    each item in items
+      li= item.name
+    script.
+      var x = 1;
+    :markdown
+      # Title
+    a(href="/x", class=cls, data-n=1 + 2) link
+    +card(user)
+    | piped #{text}

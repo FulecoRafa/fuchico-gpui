@@ -1,0 +1,6 @@
+# build config
+-cp src
+-main Main
+--js out/app.js
+-D debug
+-lib 'my lib'

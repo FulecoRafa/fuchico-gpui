@@ -1,0 +1,4 @@
+// c
+module m(input clk);
+  reg [7:0] x = 8'd42;
+endmodule

@@ -1,0 +1,4 @@
+# c
+[pkg]
+name = "x"
+version = 42

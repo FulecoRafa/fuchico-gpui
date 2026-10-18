@@ -1,0 +1,50 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/clike.js (squirrel export) (MIT).
+name: Squirrel
+scope: source.squirrel
+contexts:
+  main:
+    # "#" hook: preprocessor-style directive at the start of a line.
+    - match: '^\s*#.*$'
+      scope: meta.preprocessor.squirrel
+    - match: '"'
+      push: dq-string
+    - match: "'"
+      push: sq-string
+    - match: '//.*$'
+      scope: comment.line.double-slash.squirrel
+    - match: '/\*'
+      push: block-comment
+    - match: '\b(?:function|local|class)\b(?:\s+([A-Za-z_$][\w$]*))?'
+      captures:
+        0: keyword.control.squirrel
+        1: variable.other.definition.squirrel
+    - match: '\b(?:base|break|clone|continue|const|default|delete|enum|extends|function|in|class|foreach|local|resume|return|this|throw|typeof|yield|constructor|instanceof|static)\b'
+      scope: keyword.control.squirrel
+    - match: '\b(?:true|false|null)\b'
+      scope: constant.language.squirrel
+    - match: '(?i)(?<![\w$.])(?:0x[a-f\d]+|0b[01]+|(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(?:u|ll?|f)?(?![\w$])'
+      scope: constant.numeric.squirrel
+    - match: '\b(?:int|long|char|short|double|float|unsigned|signed|void|bool)\b|\b\w+_t\b'
+      scope: entity.name.type.squirrel
+    - match: '[+\-*&%=<>!?|/]+'
+      scope: keyword.operator.squirrel
+  dq-string:
+    - meta_scope: string.quoted.double.squirrel
+    - match: '\\$'
+    - match: '\\.'
+      scope: constant.character.escape.squirrel
+    - match: '"|$'
+      pop: true
+  sq-string:
+    - meta_scope: string.quoted.single.squirrel
+    - match: '\\$'
+    - match: '\\.'
+      scope: constant.character.escape.squirrel
+    - match: "'|$"
+      pop: true
+  block-comment:
+    - meta_scope: comment.block.squirrel
+    - match: '\*/'
+      pop: true

@@ -1,0 +1,7 @@
+-- load and group
+A = LOAD 'data.txt' USING PigStorage(',') AS (name:chararray, age:int);
+/* filter adults */
+B = FILTER A BY age >= 18;
+C = GROUP B BY name;
+D = FOREACH C GENERATE group, COUNT(B), 42;
+STORE D INTO 'out';

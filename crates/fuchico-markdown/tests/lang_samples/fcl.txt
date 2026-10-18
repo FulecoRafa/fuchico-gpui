@@ -1,0 +1,12 @@
+// fuzzy tipper
+FUNCTION_BLOCK tipper
+  VAR_INPUT
+    service : REAL;
+  END_VAR
+  (* membership functions *)
+  FUZZIFY service
+    TERM poor := (0, 1) (4, 0);
+  END_FUZZIFY
+  METHOD : COG;
+  RULE 1 : IF service IS poor THEN tip IS cheap;
+END_FUNCTION_BLOCK

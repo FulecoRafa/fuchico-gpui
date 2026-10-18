@@ -1,0 +1,49 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/sieve.js (MIT).
+name: Sieve
+scope: source.sieve
+contexts:
+  main:
+    - match: '/\*'
+      push: block-comment
+    - match: '#.*$'
+      scope: comment.line.number-sign.sieve
+    - match: '"'
+      push: string
+    - match: '\btext:'
+      scope: string.quoted.double.sieve
+      push: [multiline, multiline-first]
+    - match: '\d+[KkMmGg]?'
+      scope: constant.numeric.sieve
+    - match: ':[a-zA-Z_][a-zA-Z0-9_]*'
+      scope: keyword.operator.sieve
+    - match: '\b(?:if|elsif|else|stop|require)\b'
+      scope: keyword.control.sieve
+    - match: '\b(?:true|false|not)\b'
+      scope: constant.language.sieve
+    - match: '[{}(),;]'
+      scope: punctuation.section.sieve
+  block-comment:
+    - meta_scope: comment.block.sieve
+    - match: '\*/'
+      pop: true
+  string:
+    - meta_scope: string.quoted.double.sieve
+    - match: '\\.'
+      scope: constant.character.escape.sieve
+    - match: '"|$'
+      pop: true
+  multiline-first:
+    - match: '[ \t]*#.*$'
+      scope: comment.line.number-sign.sieve
+    - match: '.+'
+      scope: string.quoted.double.sieve
+    - match: '$'
+      pop: true
+  multiline:
+    - match: '^\.[ \t]*$'
+      scope: string.quoted.double.sieve
+      pop: true
+    - match: '.+'
+      scope: string.quoted.double.sieve

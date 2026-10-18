@@ -1,0 +1,4 @@
+# c
+function f(x)
+    return "s" * string(x + 42)
+end

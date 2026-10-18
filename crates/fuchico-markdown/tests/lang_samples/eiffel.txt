@@ -1,0 +1,10 @@
+-- greeting class
+class HELLO
+create make
+feature
+  make
+    do
+      print ("Hello%N")
+      count := 42
+    end
+end

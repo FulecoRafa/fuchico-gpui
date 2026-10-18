@@ -1,0 +1,5 @@
+From someone@example.com Mon Jan  1 00:00:00 2024
+From: A <a@example.com>
+Subject: Hello
+
+Body

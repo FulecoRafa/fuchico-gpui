@@ -1,0 +1,4 @@
+.\" c
+.TH TEST 1
+.SH NAME
+\fBbold\fR text

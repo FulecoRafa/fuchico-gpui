@@ -1,0 +1,55 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/rpm.js (MIT).
+name: RPM Spec
+scope: source.rpm-spec
+variables:
+  arch: '(?:i386|i586|i686|x86_64|ppc64le|ppc64|ppc|ia64|s390x|s390|sparc64|sparcv9|sparc|noarch|alphaev6|alpha|hppa|mipsel)'
+contexts:
+  main:
+    - match: '#.*$'
+      scope: comment.line.number-sign.rpm-spec
+    - match: '^[a-zA-Z0-9()]+:'
+      scope: markup.heading.rpm-spec
+    - match: '^%(?:debug_package|package|description|prep|build|install|files|clean|changelog|preinstall|preun|postinstall|postun|pretrans|posttrans|pre|post|triggerin|triggerun|verifyscript|check|triggerpostun|triggerprein|trigger)'
+      scope: constant.language.rpm-spec
+    - match: '\$\w+|\$\{\w+\}'
+      scope: variable.other.definition.rpm-spec
+    - match: '%(?:else|endif)'
+      scope: keyword.control.rpm-spec
+    - match: '%(?:ifnarch|ifarch|if)'
+      scope: keyword.control.rpm-spec
+      push: control-flow
+    - include: arch
+    - match: '%\w+\('
+      scope: keyword.control.rpm-spec
+      push: macro-params
+    - match: '%\w+'
+      scope: keyword.control.rpm-spec
+    - match: '%\{\??[\w \-:!]+\}'
+      scope: variable.other.definition.rpm-spec
+  arch:
+    - match: '(?<!\w){{arch}}'
+      scope: constant.numeric.rpm-spec
+  control-flow:
+    - match: '$'
+      pop: true
+    - match: '#.*$'
+      scope: comment.line.number-sign.rpm-spec
+    - match: '!|\?|<=|<|>=|>|==|&&|\|\|'
+      scope: keyword.operator.rpm-spec
+    - match: '\d+'
+      scope: constant.numeric.rpm-spec
+    - match: '%(?:else|endif)'
+      scope: keyword.control.rpm-spec
+    - include: arch
+    - match: '%\{\??[\w \-:!]+\}'
+      scope: variable.other.definition.rpm-spec
+  macro-params:
+    - match: '\d+'
+      scope: constant.numeric.rpm-spec
+    - match: '\)'
+      scope: keyword.control.rpm-spec
+      pop: true
+    - match: '$'
+      pop: true

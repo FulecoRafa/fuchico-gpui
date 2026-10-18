@@ -1,0 +1,11 @@
+## Velocity template
+#set($total = 0)
+#foreach($item in $items)
+  #if($item.price > 10)
+    <li>$item.name costs $item.price</li>
+  #else
+    <li>$!item.name is cheap</li>
+  #end
+#end
+#* block comment *#
+Total: $total ($foreach.count) "outside params"

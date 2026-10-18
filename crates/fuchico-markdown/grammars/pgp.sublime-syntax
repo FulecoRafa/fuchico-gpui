@@ -1,0 +1,26 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/asciiarmor.js (MIT).
+name: PGP
+scope: source.pgp
+contexts:
+  main:
+    - match: '^(-----BEGIN (.*)?-----)\s*$'
+      captures:
+        1: entity.name.tag.pgp
+      push: armor
+    - match: '\S.*$'
+      scope: invalid.illegal.pgp
+  armor:
+    - match: '^-----END \2-----\s*$'
+      scope: entity.name.tag.pgp
+      pop: true
+    - match: '^-----END .*-----\s*$'
+      scope: invalid.illegal.pgp
+    - match: '^(\w+:)(.*)$'
+      captures:
+        1: constant.language.pgp
+        2: string.unquoted.pgp
+    - match: '[A-Za-z0-9+/=]+'
+    - match: '[^\n]'
+      scope: invalid.illegal.pgp

@@ -1,0 +1,9 @@
+@smoke
+Feature: Login
+  # a comment
+  Scenario: Valid user
+    Given a user named "alice"
+    When she logs in with 42 attempts
+    Then she sees <greeting>
+    | name | role |
+    | bob  | admin |

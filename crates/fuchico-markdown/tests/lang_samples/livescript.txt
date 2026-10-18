@@ -1,0 +1,2 @@
+# c
+f = (x) -> if x > 1 then "s" else 42

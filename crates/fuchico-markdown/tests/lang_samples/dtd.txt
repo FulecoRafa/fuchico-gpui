@@ -1,0 +1,3 @@
+<!-- c -->
+<!ELEMENT note (to,from)>
+<!ATTLIST note id CDATA #REQUIRED>

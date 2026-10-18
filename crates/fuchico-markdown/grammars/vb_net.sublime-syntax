@@ -1,0 +1,41 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/vb.js (MIT).
+name: VB.NET
+scope: source.vbnet
+contexts:
+  main:
+    - match: "'.*$"
+      scope: comment.line.vbnet
+    # floats, then &H / &O / decimal integers (optional F, J, L suffixes)
+    - match: '(?i)(?:\d*\.\d+|\d+\.\d*)f?j?'
+      scope: constant.numeric.vbnet
+    - match: '(?i)&H[0-9a-f]+l?'
+      scope: constant.numeric.vbnet
+    - match: '(?i)&O[0-7]+l?'
+      scope: constant.numeric.vbnet
+    - match: '(?i)[1-9]\d*f?j?l?'
+      scope: constant.numeric.vbnet
+    - match: '(?i)0(?![\dx])l?'
+      scope: constant.numeric.vbnet
+    - match: '"'
+      scope: string.quoted.double.vbnet
+      push: string
+    - match: '(?://=|>>=|<<=|\*\*=|\+=|-=|\*=|%=|/=|&=|\|=|\^=)'
+    - match: '==|<>|<=|>=|<<|>>|//|\*\*|[+\-*/%&\\|^~<>!]'
+      scope: keyword.operator.vbnet
+    - match: '(?i)(?<![\w])(?:andalso|orelse|isnot|like|and|xor|not|or|in|is)\b'
+      scope: keyword.operator.vbnet
+    - match: '[(){}\[\]@,:`=;.]'
+    - match: '(?i)(?<![\w])(?:notoverridable|notinheritable|removehandler|mustoverride|overridable|mustinherit|addhandler|implements|raiseevent|withevents|directcast|paramarray|narrowing|addressof|writeonly|protected|structure|overrides|namespace|overloads|interface|uinteger|datetime|delegate|operator|continue|widening|readonly|property|function|explicit|optional|inherits|synclock|imports|#elseif|partial|trycast|myclass|compare|decimal|boolean|handles|#region|gettype|private|default|uintptr|integer|finally|isfalse|shadows|nothing|declare|cushort|single|double|cshort|uint64|return|uint16|#const|object|public|intptr|uint32|string|csbyte|elseif|shared|typeof|strict|static|friend|select|ushort|resume|istrue|module|mybase|option|const|sbyte|alias|until|short|int32|#else|infer|event|class|int64|byval|cbyte|error|byref|false|cbool|using|culng|int16|ulong|erase|redim|cdate|cchar|throw|while|catch|float|cuint|csng|true|case|#end|loop|exit|goto|then|cdbl|cobj|long|cdec|enum|step|each|when|stop|cint|date|cstr|char|byte|clng|next|with|else|lib|sub|end|get|mod|off|#if|for|set|out|new|try|dim|to|of|me|my|if|as|do|on)\b'
+      scope: keyword.control.vbnet
+    - match: '[_A-Za-z][_A-Za-z0-9]*'
+      scope: variable.other.vbnet
+    - match: '[^\s]'
+      scope: invalid.illegal.vbnet
+  string:
+    - meta_scope: string.quoted.double.vbnet
+    - match: '"'
+      pop: true
+    - match: '$'
+      pop: true

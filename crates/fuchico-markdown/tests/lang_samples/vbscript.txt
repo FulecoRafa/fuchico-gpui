@@ -1,0 +1,8 @@
+' VBScript sample
+Option Explicit
+Dim name, i
+name = InputBox("Your name?")
+For i = 1 To 3
+    WScript.Echo "Hello, " & name & " " & i
+Next
+If Len(name) > 0 Then MsgBox name Else MsgBox "empty"

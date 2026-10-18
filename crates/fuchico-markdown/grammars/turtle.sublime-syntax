@@ -1,0 +1,39 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/turtle.js (MIT).
+name: Turtle
+scope: source.turtle
+contexts:
+  main:
+    - match: '<(?![\s\x{a0}=])[^\s\x{a0}>]*>?'
+      scope: constant.language.turtle
+    - match: '"'
+      scope: string.quoted.double.turtle
+      push: string-double
+    - match: "'"
+      scope: string.quoted.single.turtle
+      push: string-single
+    - match: '[{}(),.;\[\]]'
+    - match: '#.*$'
+      scope: comment.line.turtle
+    - match: '[*+\-<>=&|]+'
+    - match: ':'
+      scope: keyword.operator.turtle
+    - match: '[^\s{}(),.;\[\]#"''*+\-=&|:<][_\w]*(?=:)'
+      scope: variable.other.special.turtle
+    - match: '(?i)(?:@prefix|@base|a)(?![_\w])'
+      scope: meta.directive.turtle
+    - match: '[A-Z][_\w]*'
+      scope: comment.line.turtle
+    - match: '[^\s{}(),.;\[\]#"''*+\-=&|:<][_\w]*'
+      scope: keyword.control.turtle
+  string-double:
+    - meta_scope: string.quoted.double.turtle
+    - match: '\\.'
+    - match: '"'
+      pop: true
+  string-single:
+    - meta_scope: string.quoted.single.turtle
+    - match: '\\.'
+    - match: "'"
+      pop: true

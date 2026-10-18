@@ -1,0 +1,66 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/webidl.js (MIT).
+name: Web IDL
+scope: source.webidl
+contexts:
+  main:
+    - match: '//.*$'
+      scope: comment.line.webidl
+    - match: '/\*'
+      scope: comment.block.webidl
+      push: block-comment
+    - match: '-?(?:(?:[0-9]+\.[0-9]*|[0-9]*\.[0-9]+)(?:[Ee][+-]?[0-9]+)?|[0-9]+[Ee][+-]?[0-9]+)'
+      scope: constant.numeric.webidl
+    - match: '-?(?:[1-9][0-9]*|0[Xx][0-9A-Fa-f]+|0[0-7]*)'
+      scope: constant.numeric.webidl
+    - match: '"[^"]*"'
+      scope: string.quoted.double.webidl
+    - match: '(?<![\w-])(?:callback|dictionary|enum|interface)\b(?![\w-])'
+      scope: keyword.control.webidl
+      push: expect-def
+    - match: '(?<![\w-])typedef\b(?![\w-])'
+      scope: keyword.control.webidl
+      push: typedef
+    - include: common
+  expect-def:
+    - match: '\s+'
+    - match: '_?[A-Za-z][0-9A-Z_a-z-]*'
+      scope: variable.other.definition.webidl
+      pop: true
+    - match: '(?=\S)'
+      pop: true
+  typedef:
+    - match: '_?[A-Za-z][0-9A-Z_a-z-]*(?=\s*;)'
+      scope: variable.other.definition.webidl
+    - match: ';'
+      pop: true
+    - include: main
+  common:
+    - match: '(?<![\w-])(?:attribute|callback|const|deleter|dictionary|enum|getter|implements|inherit|interface|iterable|legacycaller|maplike|partial|required|serializer|setlike|setter|static|stringifier|typedef|optional|readonly|or)(?![\w-])'
+      scope: keyword.control.webidl
+    # types used as identifiers (after ":" or "implements", or before "implements" / "=")
+    - match: '(:)(\s*)(Uint8ClampedArray|unrestricted|Float32Array|Float64Array|DOMException|ArrayBuffer|Uint16Array|Uint32Array|FrozenArray|Int16Array|Int32Array|Uint8Array|ByteString|Int8Array|DOMString|USVString|unsigned|DataView|sequence|boolean|Promise|double|object|RegExp|short|float|octet|Error|long|byte|void|any)\b'
+      captures:
+        1: keyword.operator.webidl
+        3: support.function.webidl
+    - match: '(implements)(\s+)(Uint8ClampedArray|unrestricted|Float32Array|Float64Array|DOMException|ArrayBuffer|Uint16Array|Uint32Array|FrozenArray|Int16Array|Int32Array|Uint8Array|ByteString|Int8Array|DOMString|USVString|unsigned|DataView|sequence|boolean|Promise|double|object|RegExp|short|float|octet|Error|long|byte|void|any)\b'
+      captures:
+        1: keyword.control.webidl
+        3: support.function.webidl
+    - match: '(?<![\w-])(?:Uint8ClampedArray|unrestricted|Float32Array|Float64Array|DOMException|ArrayBuffer|Uint16Array|Uint32Array|FrozenArray|Int16Array|Int32Array|Uint8Array|ByteString|Int8Array|DOMString|USVString|unsigned|DataView|sequence|boolean|Promise|double|object|RegExp|short|float|octet|Error|long|byte|void|any)\b(?=\s*(?:implements\b|=))'
+      scope: support.function.webidl
+    - match: '(?<![\w-])(?:Uint8ClampedArray|unrestricted|Float32Array|Float64Array|DOMException|ArrayBuffer|Uint16Array|Uint32Array|FrozenArray|Int16Array|Int32Array|Uint8Array|ByteString|Int8Array|DOMString|USVString|unsigned|DataView|sequence|boolean|Promise|double|object|RegExp|short|float|octet|Error|long|byte|void|any)\b'
+      scope: entity.name.type.webidl
+    - match: '(?<![\w-])(?:Clamp|Constructor|EnforceRange|Exposed|ImplicitThis|Global|PrimaryGlobal|LegacyArrayClass|LegacyUnenumerableNamedProperties|LenientThis|NamedConstructor|NewObject|NoInterfaceObject|OverrideBuiltins|PutForwards|Replaceable|SameObject|TreatNonObjectAsNull|TreatNullAs|EmptyString|Unforgeable|Unscopeable)\b'
+      scope: support.function.webidl
+    - match: '(?<![\w-])(?:true|false|Infinity|NaN|null)\b'
+      scope: constant.language.webidl
+    - match: '_?[A-Za-z][0-9A-Z_a-z-]*'
+      scope: variable.other.webidl
+    - match: '[:<=>?]'
+      scope: keyword.operator.webidl
+  block-comment:
+    - meta_scope: comment.block.webidl
+    - match: '\*/'
+      pop: true

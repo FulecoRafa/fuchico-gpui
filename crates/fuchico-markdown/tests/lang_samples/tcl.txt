@@ -1,0 +1,2 @@
+# c
+proc f {x} { return "s [expr {$x + 42}]" }

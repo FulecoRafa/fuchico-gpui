@@ -1,0 +1,3 @@
+// c
+interface A { n: number }
+function f(a: A): string { return "s" + a.n; }

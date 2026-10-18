@@ -1,0 +1,2 @@
+// c
+func f(x: Int) -> String { return "s\(x + 42)" }

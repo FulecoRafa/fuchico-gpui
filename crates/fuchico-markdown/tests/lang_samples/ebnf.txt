@@ -1,0 +1,4 @@
+(* digits *)
+digit = "0" | "1" | "2" ;
+number = digit , { digit } ;
+letter = 'a' | 'b' ;

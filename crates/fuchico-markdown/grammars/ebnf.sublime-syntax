@@ -1,0 +1,77 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/ebnf.js (MIT).
+name: EBNF
+scope: source.ebnf
+contexts:
+  main:
+    - match: '"'
+      scope: variable.other.property.ebnf
+      push: dq_string
+    - match: "'"
+      scope: variable.other.property.ebnf
+      push: sq_string
+    - match: '/\*'
+      scope: comment.block.ebnf
+      push: slash_comment
+    - match: '\(\*'
+      scope: comment.block.ebnf
+      push: paren_comment
+    - match: '\['
+      scope: punctuation.section.ebnf
+      push: char_class
+    - match: '[:|;]'
+      scope: keyword.operator.ebnf
+    - match: '%%'
+      scope: markup.heading.ebnf
+    - match: '%[A-Za-z]+'
+      scope: keyword.control.ebnf
+    - match: '%\}'
+      scope: punctuation.section.ebnf
+    - match: '/[A-Za-z]+'
+      scope: keyword.control.ebnf
+    - match: '//.*$'
+      scope: comment.line.ebnf
+    - match: '\\[a-z]+'
+      scope: string.other.ebnf
+    - match: '[./*\-+^\\]'
+      scope: constant.language.ebnf
+    - match: '\$\$'
+      scope: support.function.ebnf
+    - match: '\$[0-9]+'
+      scope: variable.other.ebnf
+    - match: '<<[a-zA-Z_]+>>'
+      scope: support.function.ebnf
+    - match: '\breturn\b'
+      scope: keyword.operator.ebnf
+    - match: '[a-zA-Z_]\w*(?=[(.])'
+      scope: variable.other.ebnf
+    - match: '[a-zA-Z_]\w*(?=\s*[:=])'
+      scope: variable.other.definition.ebnf
+    - match: '[a-zA-Z_]\w*'
+      scope: variable.other.ebnf
+    - match: '[\]()]'
+      scope: punctuation.section.ebnf
+  dq_string:
+    - meta_scope: variable.other.property.ebnf
+    - match: '\\.'
+    - match: '"'
+      pop: true
+  sq_string:
+    - meta_scope: variable.other.property.ebnf
+    - match: '\\.'
+    - match: "'"
+      pop: true
+  slash_comment:
+    - meta_scope: comment.block.ebnf
+    - match: '\*/'
+      pop: true
+  paren_comment:
+    - meta_scope: comment.block.ebnf
+    - match: '\*\)'
+      pop: true
+  char_class:
+    - meta_scope: keyword.operator.ebnf
+    - match: '[^\]\\]+|\.'
+    - match: '(?=[\]\\])'
+      pop: true

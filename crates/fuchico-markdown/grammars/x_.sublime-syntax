@@ -1,0 +1,50 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/mscgen.js (MIT).
+name: Xù
+scope: source.xu
+contexts:
+  main:
+    - include: base
+    - match: '\['
+      scope: punctuation.section.xu
+      push: attr-list
+  base:
+    - match: '[{}]'
+      scope: punctuation.section.xu
+    - match: '/\*'
+      scope: comment.block.xu
+      push: block-comment
+    - match: '(?://|#).*$'
+      scope: comment.line.xu
+    - match: '"'
+      scope: string.quoted.double.xu
+      push: string
+    - match: '(?i)\b(?:msc|xu)\b'
+      scope: keyword.control.xu
+    - match: '(?i)\b(?:wordwrapentities|wordwraparcs|arcgradient|watermark|hscale|width)\b'
+      scope: keyword.control.xu
+    - match: '(?i)\b(?:critical|consider|strict|ignore|assert|break|note|abox|rbox|else|loop|box|alt|opt|par|seq|neg|ref|exc)\b'
+      scope: keyword.control.xu
+    - match: '(?i)\|\|\||\.\.\.|---|--|<->|==|<<=>>|<=>|\.\.|<<>>|::|<:>|->|=>>|=>|>>|:>|<-|<<=|<=|<<|<:|x-|-x'
+      scope: keyword.control.xu
+    - match: '='
+      scope: keyword.operator.xu
+    - match: '(?i)\b(?:false|true|auto|off|on)\b'
+      scope: variable.other.xu
+  attr-list:
+    - match: '\]'
+      scope: punctuation.section.xu
+      pop: true
+    - include: base
+    - match: '(?i)\b(?:arctextbgcolour|arctextbgcolor|arclinecolour|arctextcolour|textbgcolour|arclinecolor|arctextcolor|textbgcolor|linecolour|textcolour|deactivate|activation|linecolor|textcolor|activate|arcskip|label|idurl|title|url|id)\b'
+      scope: entity.other.attribute-name.xu
+  block-comment:
+    - meta_scope: comment.block.xu
+    - match: '\*/'
+      pop: true
+  string:
+    - meta_scope: string.quoted.double.xu
+    - match: '\\.'
+    - match: '"'
+      pop: true

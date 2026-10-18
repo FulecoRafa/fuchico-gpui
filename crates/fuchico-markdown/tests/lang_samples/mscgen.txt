@@ -1,0 +1,8 @@
+# MscGen sequence chart
+msc {
+  hscale = "1.5";
+  a [label="Client"], b [label="Server"];
+  a => b [label="request"];
+  b >> a [label="response"];
+  a abox a [label="done"]; // trailing
+}

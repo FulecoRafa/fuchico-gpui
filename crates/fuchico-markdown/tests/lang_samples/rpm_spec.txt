@@ -1,0 +1,13 @@
+# Sample spec
+Name:           hello
+Version:        1.0
+%define _prefix /usr
+%description
+A hello package for %{name}.
+
+%build
+%ifarch x86_64
+make CFLAGS="$RPM_OPT_FLAGS" -j4
+%endif
+%files
+%attr(0755,root,root) /usr/bin/hello

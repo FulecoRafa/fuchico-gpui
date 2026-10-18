@@ -1,0 +1,42 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/yacas.js (MIT).
+name: Yacas
+scope: source.yacas
+variables:
+  ident: "[a-zA-Z$'][a-zA-Z0-9$']*"
+contexts:
+  main:
+    - match: '"'
+      scope: string.quoted.double.yacas
+      push: string
+    - match: '/\*'
+      scope: comment.block.yacas
+      push: block-comment
+    - match: '//.*$'
+      scope: comment.line.yacas
+    - match: '\d+ *#'
+      scope: meta.qualifier.yacas
+    - match: '(?:\.\d+|\d+\.\d*|\d+)(?:[eE][+-]?\d+)?'
+      scope: constant.numeric.yacas
+    - match: '(?:{{ident}})?_{{ident}}'
+      scope: variable.other.special.yacas
+    - match: '[\[\]{}()]'
+      scope: punctuation.section.yacas
+    - match: '{{ident}}(?=\s*\()'
+      scope: support.function.yacas
+    - match: '{{ident}}'
+      scope: variable.other.yacas
+    - match: '[\\+\-*/,;.:@~=><&|_`''^?!%#]'
+      scope: keyword.operator.yacas
+    - match: '[^\s]'
+      scope: invalid.illegal.yacas
+  string:
+    - meta_scope: string.quoted.double.yacas
+    - match: '\\.'
+    - match: '"'
+      pop: true
+  block-comment:
+    - meta_scope: comment.block.yacas
+    - match: '\*/'
+      pop: true

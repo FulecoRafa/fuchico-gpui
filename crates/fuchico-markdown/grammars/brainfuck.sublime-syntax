@@ -1,0 +1,18 @@
+%YAML 1.2
+---
+# Port of @codemirror/legacy-modes/mode/brainfuck.js (MIT).
+name: Brainfuck
+scope: source.brainfuck
+contexts:
+  main:
+    - match: '[+-]'
+      scope: keyword.control.brainfuck
+    - match: '[<>]'
+      scope: constant.language.brainfuck
+    - match: '[.,]'
+      scope: variable.other.definition.brainfuck
+    - match: '[\[\]]'
+      scope: punctuation.section.brackets.brainfuck
+    # Any other character turns the rest of the line into a comment.
+    - match: '[^\s+\-<>.,\[\]].*$'
+      scope: comment.line.brainfuck

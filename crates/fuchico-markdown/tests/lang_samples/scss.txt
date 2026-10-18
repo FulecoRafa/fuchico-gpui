@@ -1,0 +1,3 @@
+// c
+$c: #333;
+.a { color: $c; &:hover { margin: 2px; } }

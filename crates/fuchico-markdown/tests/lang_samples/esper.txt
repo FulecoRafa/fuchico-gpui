@@ -1,0 +1,5 @@
+-- average price per symbol
+select symbol, avg(price) as avgPrice
+from StockTick#time(30 sec)
+where volume > 1000 and symbol = 'IBM'
+group by symbol

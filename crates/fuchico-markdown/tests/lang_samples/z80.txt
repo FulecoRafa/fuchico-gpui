@@ -1,0 +1,9 @@
+; Z80 sample
+start:  ld a, $10
+        ld hl, 4000h
+loop:   dec b
+        jp nz, loop
+        call print
+        ld (hl), 'x'
+        ret
+msg:    .db "hello", 0

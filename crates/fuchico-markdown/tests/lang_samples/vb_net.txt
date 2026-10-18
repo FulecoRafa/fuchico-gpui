@@ -1,0 +1,9 @@
+' Simple VB.NET class
+Public Class Greeter
+    Private count As Integer = 42
+    Public Sub Hello(ByVal name As String)
+        If count > 0 Then
+            Console.WriteLine("Hello, " & name)
+        End If
+    End Sub
+End Class
