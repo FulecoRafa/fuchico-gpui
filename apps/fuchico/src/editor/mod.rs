@@ -728,9 +728,21 @@ impl EditorPane {
             let res = read.await;
             this.update(cx, |this, cx| {
                 this.reloading = false;
-                let Ok(ReadResult::Text { content, .. }) = res else { return };
                 let State::Ready(v) = &this.state else { return };
                 let v = v.clone();
+                // `useDocument.reload`: a dirty buffer is never replaced.
+                let content = match res {
+                    Ok(ReadResult::Text { content, .. }) => content,
+                    _ if v.read(cx).is_dirty() => {
+                        this.conflict = true;
+                        cx.notify();
+                        return;
+                    }
+                    other => {
+                        this.unmount(other, cx);
+                        return;
+                    }
+                };
                 let normalized = content.replace("\r\n", "\n");
                 if normalized == this.disk_text || normalized == v.read(cx).text() {
                     return;
@@ -749,14 +761,45 @@ impl EditorPane {
         .detach();
     }
 
+    /// The file is no longer text (or unreadable) on reload: swap the editor
+    /// for the binary / too-large / error screen, as `setDoc` does.
+    fn unmount(&mut self, res: Result<ReadResult, String>, cx: &mut Context<Self>) {
+        let state = match res {
+            Ok(ReadResult::Binary { size }) => State::NotText { size, too_large: false },
+            Ok(ReadResult::TooLarge { size, .. }) => State::NotText { size, too_large: true },
+            Err(e) => State::Failed(e),
+            Ok(ReadResult::Text { .. }) => return,
+        };
+        let view = self.view().cloned();
+        unregister_buffer(&self.path, view.as_ref(), cx);
+        for bk in std::mem::take(&mut self.mermaid).values() {
+            crate::mermaid::close_block(bk, cx);
+        }
+        self._view_subs.clear();
+        self.autosave = None;
+        self.conflict = false;
+        self.save_failed = false;
+        self.disk_text.clear();
+        self.state = state;
+        self.set_dirty(false, cx);
+        cx.notify();
+    }
+
     /// Conflict banner: "Reload from disk".
     pub fn resolve_conflict_reload(&mut self, cx: &mut Context<Self>) {
         self.conflict = false;
         let p = self.path.clone();
         let read = cx.background_spawn(async move { fs_read_file(p) });
         cx.spawn(async move |this, cx| {
-            let Ok(ReadResult::Text { content, .. }) = read.await else { return };
+            let res = read.await;
             this.update(cx, |this, cx| {
+                let content = match res {
+                    Ok(ReadResult::Text { content, .. }) => content,
+                    other => {
+                        this.unmount(other, cx);
+                        return;
+                    }
+                };
                 let State::Ready(v) = &this.state else { return };
                 let v = v.clone();
                 this.autosave = None;

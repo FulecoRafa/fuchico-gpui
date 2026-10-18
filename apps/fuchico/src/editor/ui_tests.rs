@@ -487,3 +487,28 @@ async fn removed_upload_placeholder_inserts_nothing(cx: &mut TestAppContext) {
     assert_eq!(ui.cx.read(|cx| view.read(cx).text()), "x\n");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[gpui_kit::test]
+async fn reload_to_binary_or_missing_file_switches_the_view(cx: &mut TestAppContext) {
+    cx.update(test_ui::init_shell);
+    let dir = test_ui::temp_dir("editor-reload-kind");
+    let path = dir.join("n.md").to_string_lossy().to_string();
+    std::fs::write(&path, "x\n").unwrap();
+    let (mut ui, pane, _) = open_pane(cx, &path, PaneContext::default()).await;
+    // Rewritten as binary: the status screen replaces the editor.
+    std::fs::write(&path, [0u8, 1, 2, 0, 255, 0]).unwrap();
+    let p = path.clone();
+    ui.cx.update(|_, cx| bus::emit(cx, AppEvent::Core(CoreEvent::FileWritten { path: p, source: Some("x".into()) })));
+    ui.wait("binary", |cx| matches!(pane.read(cx).state, State::NotText { too_large: false, .. })).await;
+    assert!(ui.cx.read(|cx| pane.read(cx).view().is_none()));
+
+    // A pane on a file that then disappears shows the error screen.
+    let other = dir.join("m.md").to_string_lossy().to_string();
+    std::fs::write(&other, "y\n").unwrap();
+    let (mut ui2, pane2, _) = open_pane(cx, &other, PaneContext::default()).await;
+    std::fs::remove_file(&other).unwrap();
+    let p = other.clone();
+    ui2.cx.update(|_, cx| bus::emit(cx, AppEvent::Core(CoreEvent::FileWritten { path: p, source: Some("x".into()) })));
+    ui2.wait("error", |cx| matches!(pane2.read(cx).state, State::Failed(_))).await;
+    let _ = std::fs::remove_dir_all(&dir);
+}
