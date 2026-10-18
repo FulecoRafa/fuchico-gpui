@@ -24,7 +24,7 @@ use gpui_kit::{
     App, ClipboardEntry, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable,
     InteractiveElement, IntoElement, KeyDownEvent, Keystroke, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point, Render, ScrollWheelEvent,
-    SharedString, Styled, Window, div, px,
+    SharedString, Styled, Subscription, Window, div, px,
 };
 
 use crate::actions::*;
@@ -202,6 +202,8 @@ pub(crate) struct PromptState {
     pub selected: Option<usize>,
     /// Text before Tab-cycling started (cycling restarts from it).
     pub typed: String,
+    /// `Ctrl-r` was pressed: the next char names a register to insert.
+    pub reading_register: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -275,6 +277,7 @@ pub struct EditorView {
     pub(crate) image_natural: HashMap<std::path::PathBuf, (f32, f32)>,
     pub(crate) viewport: (f32, f32),
     pub(crate) frame: Option<Rc<Frame>>,
+    _blur: Subscription,
 
     // overlays
     pub(crate) overlay: Overlay,
@@ -319,9 +322,17 @@ impl EditorView {
         text: &str,
         options: EditorOptions,
         style: EditorStyle,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let focus = cx.focus_handle();
+        // cm-helix closes the `:` / search input (uncommitted) on blur.
+        let blur = cx.on_blur(&focus, window, |v, _, cx| {
+            if matches!(v.overlay, Overlay::Prompt(_)) {
+                v.prompt_finish(false, cx);
+                cx.notify();
+            }
+        });
         let shared = Rc::new(RefCell::new(SharedLayout {
             path: options.path.clone(),
             half_page: 10,
@@ -349,7 +360,8 @@ impl EditorView {
             folds: FoldState::new(),
             style,
             options,
-            focus: cx.focus_handle(),
+            focus,
+            _blur: blur,
             scroll_y: 0.,
             pending_scroll: None,
             prompt_scroll_start: 0.,
@@ -1078,6 +1090,7 @@ impl EditorView {
             completions,
             selected: None,
             typed: String::new(),
+            reading_register: false,
         });
         self.completion = None;
     }
@@ -1094,6 +1107,12 @@ impl EditorView {
         self.apply_effects(fx, cx);
     }
 
+    fn set_reading_register(&mut self, on: bool) {
+        if let Overlay::Prompt(p) = &mut self.overlay {
+            p.reading_register = on;
+        }
+    }
+
     fn prompt_finish(&mut self, accept: bool, cx: &mut Context<Self>) {
         self.overlay = Overlay::None;
         let fx = self.engine.prompt_close(accept);
@@ -1106,6 +1125,31 @@ impl EditorView {
         };
         let p = p.clone();
         let m = ks.modifiers;
+        // cm-helix `commandInput`: `Ctrl-r <reg>` appends the register's
+        // first value; Escape only cancels the pending read.
+        if p.kind == PromptKind::Command {
+            if ks.key == "r" && m.control && !m.alt && !m.platform {
+                self.set_reading_register(true);
+                cx.notify();
+                return;
+            }
+            if p.reading_register {
+                if ks.key == "escape" {
+                    self.set_reading_register(false);
+                } else if let Some(s) = typed_char(ks)
+                    && let Some(reg) = s.chars().next()
+                    && s.chars().count() == 1
+                {
+                    self.set_reading_register(false);
+                    let text = self.engine.prompt_read_register(reg).unwrap_or_default();
+                    let mut v = p.value.clone();
+                    v.push_str(&text);
+                    self.prompt_set(v, cx);
+                }
+                cx.notify();
+                return;
+            }
+        }
         match ks.key.as_str() {
             "escape" => self.prompt_finish(false, cx),
             "enter" => self.prompt_finish(true, cx),
@@ -2130,6 +2174,20 @@ impl EditorView {
     }
 }
 
+/// Columns and rows of the `:` completion grid (`repeat(auto-fill,
+/// minmax(10em, 1fr))`, filled column by column).
+#[doc(hidden)]
+pub fn prompt_grid(n: usize, width: Pixels, em: Pixels) -> (usize, usize) {
+    if n == 0 {
+        return (0, 0);
+    }
+    let usable = f32::from(width) - 16.;
+    let cols = ((usable / (f32::from(em) * 10.)).floor() as usize).clamp(1, n);
+    let rows = n.div_ceil(cols);
+    // Fill every column the rows need (no trailing empty columns).
+    (n.div_ceil(rows), rows)
+}
+
 pub(crate) fn prompt_label(kind: PromptKind) -> &'static str {
     match kind {
         PromptKind::Command => ":",
@@ -2423,19 +2481,28 @@ impl Render for EditorView {
                     p.value.clone()
                 };
                 let ghost = p.value.is_empty();
-                let mut list = div()
-                    .flex()
-                    .flex_col()
-                    .max_h(px(8. * f32::from(lh)))
-                    .overflow_hidden();
-                for (i, o) in p.completions.options.iter().take(8).enumerate() {
-                    let sel = p.selected == Some(i);
-                    list = list.child(
-                        div()
-                            .px(px(8.))
-                            .when_sel(sel, st.accent, st.accent_foreground)
-                            .child(o.clone()),
-                    );
+                // `.cm-hx-command-autocomplete`: every option, in a grid of
+                // `minmax(10em, 1fr)` columns filled column by column
+                // (`positionPopup` reorders them), no row cap.
+                let width = self
+                    .frame
+                    .as_ref()
+                    .map_or(px(600.), |f| f.bounds.size.width);
+                let options = &p.completions.options;
+                let (cols, rows) = prompt_grid(options.len(), width, st.font_size);
+                let mut list = div().flex().flex_row().px(px(8.));
+                for c in 0..cols {
+                    let mut col = div().flex().flex_col().flex_1().min_w(st.font_size * 10.);
+                    for i in (c * rows..(c + 1) * rows).take_while(|&i| i < options.len()) {
+                        let sel = p.selected == Some(i);
+                        col = col.child(
+                            div()
+                                .mb(px(1.))
+                                .when_sel(sel, st.accent, st.accent_foreground)
+                                .child(options[i].clone()),
+                        );
+                    }
+                    list = list.child(col);
                 }
                 let mut bar = div()
                     .id("fuchico-editor-prompt")
@@ -2449,9 +2516,7 @@ impl Render for EditorView {
                     .border_t_1()
                     .border_color(st.border)
                     .on_mouse_down(MouseButton::Left, stop);
-                if !p.completions.options.is_empty() {
-                    bar = bar.child(list);
-                }
+                // `.cm-hx-command-popup`: help above the options.
                 if let Some(h) = &p.completions.help {
                     bar = bar.child(
                         div()
@@ -2460,6 +2525,9 @@ impl Render for EditorView {
                             .text_color(st.muted_foreground)
                             .child(h.clone()),
                     );
+                }
+                if !p.completions.options.is_empty() {
+                    bar = bar.child(list);
                 }
                 bar = bar.child(
                     div()

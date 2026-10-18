@@ -27,6 +27,7 @@ pub use commands::{CommandEdit, TokenKind};
 pub use style::EditorStyle;
 pub use view::{
     EditorEvent, EditorOptions, EditorView, EngineKind, InsertCursor, LineNumbers, MermaidBlock, ZoomDirection,
+    prompt_grid,
 };
 
 /// Key context of the editor (`key_context("FuchicoEditor")`).
