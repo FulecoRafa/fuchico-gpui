@@ -5,6 +5,8 @@
 //! (and emits `AppEvent::MermaidRequest` when it has no text), and raises
 //! [`DockEvent::Close`]. Rendering will come from `fuchico-mermaid`.
 
+pub mod theme;
+
 use gpui_kit::prelude::*;
 use gpui_kit::{Context, EventEmitter, Subscription, Window, div};
 
