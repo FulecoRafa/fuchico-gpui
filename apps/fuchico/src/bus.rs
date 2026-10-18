@@ -21,10 +21,10 @@ pub enum AppEvent {
     Core(CoreEvent),
     /// `mermaid:update {blockKey, text|null}` — editor → diagram dock.
     MermaidUpdate { block_key: String, text: Option<String> },
-    /// `mermaid:request` — diagram window asks editors to re-send.
-    MermaidRequest,
-    /// `mermaid:closed` — the detached diagram window went away.
-    MermaidClosed,
+    /// `mermaid:request {blockKey}` — a diagram view asks the editor to re-send.
+    MermaidRequest { block_key: String },
+    /// `mermaid:closed {blockKey}` — the diagram dock/window went away.
+    MermaidClosed { block_key: String },
     /// `mermaid:dock-request {blockKey, label}` — detached diagram → dock.
     MermaidDockRequest { block_key: String, label: String },
     /// `export:request {key}`.
@@ -39,8 +39,8 @@ impl AppEvent {
         match self {
             AppEvent::Core(e) => e.name(),
             AppEvent::MermaidUpdate { .. } => "mermaid:update",
-            AppEvent::MermaidRequest => "mermaid:request",
-            AppEvent::MermaidClosed => "mermaid:closed",
+            AppEvent::MermaidRequest { .. } => "mermaid:request",
+            AppEvent::MermaidClosed { .. } => "mermaid:closed",
             AppEvent::MermaidDockRequest { .. } => "mermaid:dock-request",
             AppEvent::ExportRequest { .. } => "export:request",
             AppEvent::ExportHtml { .. } => "export:html",
