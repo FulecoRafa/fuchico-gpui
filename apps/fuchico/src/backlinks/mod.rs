@@ -20,16 +20,17 @@ use fuchico_core::backlinks::{BacklinkGroup, backlinks_for};
 use fuchico_core::events::CoreEvent;
 use fuchico_core::fs::tree::fs_list_markdown_files;
 use fuchico_core::links::{LinkRef, links_scan};
-use gpui_kit::component::menu::{ContextMenuExt, PopupMenu};
+use gpui_kit::component::menu::PopupMenu;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Icon, IconName};
+use gpui_kit::TestSupportExt;
 use gpui_kit::prelude::*;
 use gpui_kit::{AnyElement, Context, EventEmitter, FontWeight, SharedString, Subscription, WeakEntity, Window, div};
 
 use crate::assets::AppIcon;
 use crate::bus::{self, AppEvent};
 use crate::theme::{AppTheme, alpha};
-use crate::ui::{build_menu, file_row_menu, u};
+use crate::ui::{build_menu, file_row_menu, u, with_context_menu};
 use crate::workspace::view::{DockEvent, ViewEvent};
 
 /// `useLinkIndex` state (plus the vault file list `backlinksFor` needs).
@@ -202,7 +203,8 @@ impl BacklinksPane {
                     .hover(move |s| s.bg(hover_bg).text_color(hover_fg))
                     .child(Icon::new(AppIcon::X).size(u(14.)))
                     .tooltip(move |w, cx| Tooltip::new(close_tip.clone()).build(w, cx))
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(DockEvent::Close))),
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(DockEvent::Close)))
+                    .test_support(),
             )
     }
 
@@ -275,10 +277,11 @@ fn render_group(view: &WeakEntity<BacklinksPane>, gi: usize, g: &BacklinkGroup, 
         .on_click(move |_, _, cx| {
             v.update(cx, |this, cx| this.open(&p, None, cx)).ok();
         })
-        .context_menu(menu(view.clone(), g.path.clone()));
+        .test_support();
+    let file_row = with_context_menu(("backlinks-file-menu", gi), file_row, menu(view.clone(), g.path.clone()));
     let rows = g.refs.iter().enumerate().map(|(ri, r)| {
         let (p, v, line) = (g.path.clone(), view.clone(), r.line);
-        div()
+        let row = div()
             .id(SharedString::from(format!("backlinks-row-{gi}-{ri}")))
             .flex()
             .items_center()
@@ -303,7 +306,8 @@ fn render_group(view: &WeakEntity<BacklinksPane>, gi: usize, g: &BacklinkGroup, 
             .on_click(move |_, _, cx| {
                 v.update(cx, |this, cx| this.open(&p, Some(line), cx)).ok();
             })
-            .context_menu(menu(view.clone(), g.path.clone()))
+            .test_support();
+        with_context_menu(SharedString::from(format!("backlinks-row-menu-{gi}-{ri}")), row, menu(view.clone(), g.path.clone()))
     });
     div().py(u(4.)).child(file_row).children(rows).into_any_element()
 }
@@ -350,5 +354,86 @@ mod tests {
         assert_eq!(note_name("/v/Note.txt"), "Note.txt");
         assert_eq!(note_name("Note"), "Note");
         assert_eq!(note_name("/v/a.md.md"), "a.md");
+    }
+}
+
+#[cfg(test)]
+mod ui_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use fuchico_core::events::CoreEvent;
+    use gpui_kit as gpui;
+    use gpui_kit::{AppContext, TestAppContext};
+
+    use super::{BacklinksPane, LinkIndex};
+    use crate::bus::{self, AppEvent};
+    use crate::ui::test_harness::{self as h, click, render, try_find};
+    use crate::workspace::view::{DockEvent, ViewEvent};
+
+    #[gpui::test]
+    async fn groups_open_rows_follow_target_and_rescan(cx: &mut TestAppContext) {
+        h::init(cx);
+        let dir = tempfile::tempdir().unwrap();
+        let root = std::fs::canonicalize(dir.path()).unwrap();
+        std::fs::write(root.join("target.md"), "# Target\n").unwrap();
+        std::fs::write(root.join("a.md"), "intro\nsee [[target]]\nand [[Target|again]]\n").unwrap();
+        std::fs::write(root.join("b.md"), "[link](target.md)\n").unwrap();
+        std::fs::write(root.join("c.md"), "no links\n").unwrap();
+        let p = |n: &str| root.join(n).to_string_lossy().into_owned();
+        let (root_s, target) = (root.to_string_lossy().into_owned(), p("target.md"));
+        let t2 = target.clone();
+        let (win, pane) =
+            h::open(cx, move |window, cx| cx.new(|cx| BacklinksPane::new(Some(root_s), Some(t2), window, cx)));
+        let opens: Rc<RefCell<Vec<ViewEvent>>> = Rc::default();
+        let closed = Rc::new(RefCell::new(false));
+        let (o, c) = (opens.clone(), closed.clone());
+        cx.update(|cx| {
+            cx.subscribe(&pane, move |_, e: &ViewEvent, _| o.borrow_mut().push(e.clone())).detach();
+            cx.subscribe(&pane, move |_, _: &DockEvent, _| *c.borrow_mut() = true).detach();
+        });
+
+        let pv = pane.clone();
+        h::wait_for(cx, win, "link index", move |_, cx| matches!(pv.read(cx).index, LinkIndex::Loaded { .. })).await;
+        let groups = cx.update(|cx| pane.read(cx).groups().to_vec());
+        assert_eq!(groups.len(), 2, "{groups:?}");
+        assert_eq!(groups[0].path, p("a.md"));
+        assert_eq!(groups[0].refs.iter().map(|r| r.line).collect::<Vec<_>>(), vec![2, 3]);
+        assert_eq!(groups[1].path, p("b.md"));
+
+        cx.update_window(win, |_, window, cx| {
+            render(window, cx);
+            click(window, "backlinks-row-0-1", cx);
+            click(window, ("backlinks-file", 1usize), cx);
+            click(window, "backlinks-close", cx);
+        })
+        .unwrap();
+        assert_eq!(
+            *opens.borrow(),
+            vec![
+                ViewEvent::OpenFile { path: p("a.md"), line: Some(3) },
+                ViewEvent::OpenFile { path: p("b.md"), line: None },
+            ]
+        );
+        assert!(*closed.borrow());
+
+        // Following the active tab: none, then a note nobody links to.
+        cx.update_window(win, |_, window, cx| {
+            pane.update(cx, |b, cx| b.set_target(None, cx));
+            render(window, cx);
+            assert!(try_find(window, ("backlinks-file", 0usize)).is_none());
+            pane.update(cx, |b, cx| b.set_target(Some(p("c.md")), cx));
+            assert!(pane.read(cx).groups().is_empty());
+            pane.update(cx, |b, cx| b.set_target(Some(target.clone()), cx));
+            assert_eq!(pane.read(cx).groups().len(), 2);
+        })
+        .unwrap();
+
+        // A new linking note shows up after fs:changed.
+        std::fs::write(root.join("d.md"), "[[target]]\n").unwrap();
+        let d = root.to_string_lossy().into_owned();
+        cx.update(|cx| bus::emit(cx, AppEvent::Core(CoreEvent::FsChanged { dir: d, from: None })));
+        let pv = pane.clone();
+        h::wait_for(cx, win, "rescan", move |_, cx| pv.read(cx).groups().len() == 3).await;
     }
 }
