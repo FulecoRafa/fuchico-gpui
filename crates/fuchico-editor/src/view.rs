@@ -24,7 +24,7 @@ use gpui_kit::{
     App, ClipboardEntry, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable,
     InteractiveElement, IntoElement, KeyDownEvent, Keystroke, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point, Render, ScrollWheelEvent,
-    SharedString, Styled, Window, div, px,
+    SharedString, Styled, Subscription, Window, div, px,
 };
 
 use crate::actions::*;
@@ -45,11 +45,16 @@ pub enum LineNumbers {
     Off,
 }
 
+/// Reads a vault note's text by path (`None` when it is not text).
+pub type NoteReader = Rc<dyn Fn(&str) -> Option<String>>;
+
 /// Cursor shape in insert mode (normal/select always draw a block).
+/// cm-helix draws a block in insert mode too unless configured otherwise
+/// (the original does not override it).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InsertCursor {
-    #[default]
     Bar,
+    #[default]
     Block,
 }
 
@@ -109,7 +114,7 @@ impl Default for EditorOptions {
             line_numbers: LineNumbers::Absolute,
             soft_wrap: false,
             rulers: Vec::new(),
-            insert_cursor: InsertCursor::Bar,
+            insert_cursor: InsertCursor::Block,
             vault_files: Vec::new(),
             all_tags: Vec::new(),
             path: None,
@@ -200,6 +205,8 @@ pub(crate) struct PromptState {
     pub selected: Option<usize>,
     /// Text before Tab-cycling started (cycling restarts from it).
     pub typed: String,
+    /// `Ctrl-r` was pressed: the next char names a register to insert.
+    pub reading_register: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -273,6 +280,9 @@ pub struct EditorView {
     pub(crate) image_natural: HashMap<std::path::PathBuf, (f32, f32)>,
     pub(crate) viewport: (f32, f32),
     pub(crate) frame: Option<Rc<Frame>>,
+    _blur: Subscription,
+    /// Host reader of other vault notes (`[[Note#heading` completion).
+    note_reader: Option<NoteReader>,
 
     // overlays
     pub(crate) overlay: Overlay,
@@ -317,9 +327,17 @@ impl EditorView {
         text: &str,
         options: EditorOptions,
         style: EditorStyle,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let focus = cx.focus_handle();
+        // cm-helix closes the `:` / search input (uncommitted) on blur.
+        let blur = cx.on_blur(&focus, window, |v, _, cx| {
+            if matches!(v.overlay, Overlay::Prompt(_)) {
+                v.prompt_finish(false, cx);
+                cx.notify();
+            }
+        });
         let shared = Rc::new(RefCell::new(SharedLayout {
             path: options.path.clone(),
             half_page: 10,
@@ -334,12 +352,10 @@ impl EditorView {
         let engine = Editor::with_host(
             text,
             config,
-            Box::new(ViewHost {
-                shared: shared.clone(),
-            }),
+            Box::new(ViewHost::new(shared.clone())),
         );
         let normalized = engine.text();
-        let model = MarkdownModel::new(&normalized, md_settings(&options));
+        let model = MarkdownModel::with_path(&normalized, md_settings(&options), options.path.as_deref());
         let mut view = EditorView {
             engine,
             shared,
@@ -347,7 +363,9 @@ impl EditorView {
             folds: FoldState::new(),
             style,
             options,
-            focus: cx.focus_handle(),
+            focus,
+            _blur: blur,
+            note_reader: None,
             scroll_y: 0.,
             pending_scroll: None,
             prompt_scroll_start: 0.,
@@ -531,6 +549,9 @@ impl EditorView {
         if settings != *self.model.settings() {
             self.model.set_settings(settings);
         }
+        if options.path != self.options.path {
+            self.model.set_path(options.path.as_deref());
+        }
         self.shared.borrow_mut().path = options.path.clone();
         let cfg = self.engine.config_mut();
         cfg.externals = options.externals.clone();
@@ -617,9 +638,40 @@ impl EditorView {
         self.insert_at_main(&text, cx);
     }
 
+    /// Sets how the view reads another vault note (by its `vault_files`
+    /// path) for `[[Note#heading` completion; `None` = no such completions.
+    pub fn set_note_reader(&mut self, reader: Option<NoteReader>) {
+        self.note_reader = reader;
+    }
+
     /// Inserts a (pasted image) markdown link at the main cursor.
     pub fn insert_image_link(&mut self, link: &str, cx: &mut Context<Self>) {
         self.insert_at_main(link, cx);
+    }
+
+    /// Replaces the first occurrence of `placeholder` (e.g. the
+    /// `![uploading image…]()` of a pending paste) with `insert`, leaving
+    /// the cursor after it. Returns `false` (and does nothing) when the
+    /// placeholder is gone.
+    pub fn replace_placeholder(
+        &mut self,
+        placeholder: &str,
+        insert: &str,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(idx) = self.model.text().find(placeholder) else {
+            return false;
+        };
+        let from = self.char_of(idx);
+        let to = self.char_of(idx + placeholder.len());
+        let fx = self
+            .engine
+            .apply_host_edit(vec![Change::new(from, to, insert)], None);
+        self.apply_effects(fx, cx);
+        let end = from + insert.chars().count();
+        let fx = self.engine.set_selection(Selection::single(end, end));
+        self.apply_effects(fx, cx);
+        true
     }
 
     fn insert_at_main(&mut self, text: &str, cx: &mut Context<Self>) {
@@ -630,7 +682,9 @@ impl EditorView {
             (r.to(), r.to())
         };
         let end = from + text.chars().count();
-        let fx = self.engine.apply_changes(vec![Change::new(from, to, text)]);
+        let fx = self
+            .engine
+            .apply_host_edit(vec![Change::new(from, to, text)], None);
         self.apply_effects(fx, cx);
         let fx = self.engine.set_selection(Selection::single(end, end));
         self.apply_effects(fx, cx);
@@ -711,7 +765,7 @@ impl EditorView {
             .collect()
     }
 
-    /// Applies a byte-offset command edit (not undoable: engine host edit).
+    /// Applies a byte-offset command edit as one undo step.
     fn apply_command_edit(&mut self, e: CommandEdit, cx: &mut Context<Self>) {
         let changes: Vec<Change> = e
             .changes
@@ -719,7 +773,7 @@ impl EditorView {
             .map(|(r, s)| Change::new(self.char_of(r.start), self.char_of(r.end), s.clone()))
             .collect();
         if !changes.is_empty() {
-            let fx = self.engine.apply_changes(changes);
+            let fx = self.engine.apply_host_edit(changes, None);
             self.apply_effects(fx, cx);
         }
         if !e.selection.is_empty() {
@@ -733,14 +787,28 @@ impl EditorView {
         }
     }
 
-    fn apply_md_edit(&mut self, e: &MdEdit, cx: &mut Context<Self>) {
-        let ch = Change::new(
+    /// Applies a markdown edit as an undo step (`group` coalesces runs of
+    /// edits, e.g. typing in one table cell).
+    fn apply_md_edit(&mut self, e: &MdEdit, group: Option<&str>, cx: &mut Context<Self>) {
+        let ch = self.md_change(e);
+        let fx = self.engine.apply_host_edit(vec![ch], group);
+        self.apply_effects(fx, cx);
+    }
+
+    /// Applies a markdown edit inside the running insert session (completion
+    /// accept), without an undo step of its own.
+    fn apply_md_edit_unrecorded(&mut self, e: &MdEdit, cx: &mut Context<Self>) {
+        let ch = self.md_change(e);
+        let fx = self.engine.apply_changes(vec![ch]);
+        self.apply_effects(fx, cx);
+    }
+
+    fn md_change(&self, e: &MdEdit) -> Change {
+        Change::new(
             self.char_of(e.range.start),
             self.char_of(e.range.end),
             e.insert.clone(),
-        );
-        let fx = self.engine.apply_changes(vec![ch]);
-        self.apply_effects(fx, cx);
+        )
     }
 
     // ---- effects --------------------------------------------------------------
@@ -1060,6 +1128,7 @@ impl EditorView {
             completions,
             selected: None,
             typed: String::new(),
+            reading_register: false,
         });
         self.completion = None;
     }
@@ -1076,6 +1145,12 @@ impl EditorView {
         self.apply_effects(fx, cx);
     }
 
+    fn set_reading_register(&mut self, on: bool) {
+        if let Overlay::Prompt(p) = &mut self.overlay {
+            p.reading_register = on;
+        }
+    }
+
     fn prompt_finish(&mut self, accept: bool, cx: &mut Context<Self>) {
         self.overlay = Overlay::None;
         let fx = self.engine.prompt_close(accept);
@@ -1088,6 +1163,31 @@ impl EditorView {
         };
         let p = p.clone();
         let m = ks.modifiers;
+        // cm-helix `commandInput`: `Ctrl-r <reg>` appends the register's
+        // first value; Escape only cancels the pending read.
+        if p.kind == PromptKind::Command {
+            if ks.key == "r" && m.control && !m.alt && !m.platform {
+                self.set_reading_register(true);
+                cx.notify();
+                return;
+            }
+            if p.reading_register {
+                if ks.key == "escape" {
+                    self.set_reading_register(false);
+                } else if let Some(s) = typed_char(ks)
+                    && let Some(reg) = s.chars().next()
+                    && s.chars().count() == 1
+                {
+                    self.set_reading_register(false);
+                    let text = self.engine.prompt_read_register(reg).unwrap_or_default();
+                    let mut v = p.value.clone();
+                    v.push_str(&text);
+                    self.prompt_set(v, cx);
+                }
+                cx.notify();
+                return;
+            }
+        }
         match ks.key.as_str() {
             "escape" => self.prompt_finish(false, cx),
             "enter" => self.prompt_finish(true, cx),
@@ -1331,7 +1431,8 @@ impl EditorView {
         if trigger && self.completion.is_none() && !should_open_completion(before, false) {
             return;
         }
-        let read = |_: &str| -> Option<String> { None };
+        let reader = self.note_reader.clone();
+        let read = move |p: &str| reader.as_ref().and_then(|r| r(p));
         let ctx = CompletionContext {
             pos: head,
             vault_files: &self.options.vault_files,
@@ -1354,7 +1455,7 @@ impl EditorView {
             return;
         };
         self.suppress_completion = opt.picked;
-        self.apply_md_edit(&opt.edit, cx);
+        self.apply_md_edit_unrecorded(&opt.edit, cx);
         let cur = self.char_of(opt.cursor);
         let fx = self.engine.set_selection(Selection::single(cur, cur));
         self.apply_effects(fx, cx);
@@ -1402,7 +1503,7 @@ impl EditorView {
     fn apply_table_outcome(&mut self, out: TableOutcome, cx: &mut Context<Self>) {
         self.suppress_completion = true;
         if let Some(e) = &out.edit {
-            self.apply_md_edit(e, cx);
+            self.apply_md_edit(e, None, cx);
         }
         let sel = self.char_of(out.selection);
         let fx = self.engine.set_selection(Selection::single(sel, sel));
@@ -1523,7 +1624,8 @@ impl EditorView {
         self.suppress_completion = true;
         self.table = Some(t.clone());
         if let Some(e) = edit {
-            self.apply_md_edit(&e, cx);
+            let group = format!("table:{}:{}:{}", t.state.anchor, t.state.row, t.state.col);
+            self.apply_md_edit(&e, Some(&group), cx);
         }
         self.table = Some(t);
         self.suppress_completion = false;
@@ -1571,7 +1673,7 @@ impl EditorView {
         };
         if let Some(lang) = menu.toolbar.options.get(ix) {
             let e = menu.toolbar.set_language(lang);
-            self.apply_md_edit(&e, cx);
+            self.apply_md_edit(&e, None, cx);
         }
         cx.notify();
     }
@@ -1799,7 +1901,7 @@ impl EditorView {
             .iter()
             .map(|r| Change::new(r.from(), r.to(), ""))
             .collect();
-        let fx = self.engine.apply_changes(changes);
+        let fx = self.engine.apply_host_edit(changes, None);
         self.apply_effects(fx, cx);
     }
     fn act_paste(&mut self, _: &Paste, _: &mut Window, cx: &mut Context<Self>) {
@@ -1827,7 +1929,7 @@ impl EditorView {
                 .iter()
                 .map(|r| Change::new(r.from(), r.to(), text.clone()))
                 .collect();
-            let fx = self.engine.apply_changes(changes);
+            let fx = self.engine.apply_host_edit(changes, None);
             self.apply_effects(fx, cx);
         }
     }
@@ -1914,7 +2016,7 @@ impl EditorView {
 
     fn on_hit(&mut self, hit: Hit, at: Point<Pixels>, cx: &mut Context<Self>) {
         match hit {
-            Hit::Checkbox(edit) => self.apply_md_edit(&edit, cx),
+            Hit::Checkbox(edit) => self.apply_md_edit(&edit, None, cx),
             Hit::Link(url) => cx.emit(EditorEvent::OpenLink(url)),
             Hit::Wikilink { target, resolved } => {
                 cx.emit(EditorEvent::OpenWikilink { target, resolved })
@@ -1935,7 +2037,7 @@ impl EditorView {
                 self.copied_fence = Some(fence);
                 cx.spawn(async move |this, cx| {
                     cx.background_executor()
-                        .timer(std::time::Duration::from_millis(1500))
+                        .timer(std::time::Duration::from_millis(2000))
                         .await;
                     let _ = this.update(cx, |v, cx| {
                         v.copied_fence = None;
@@ -2111,6 +2213,20 @@ impl EditorView {
     }
 }
 
+/// Columns and rows of the `:` completion grid (`repeat(auto-fill,
+/// minmax(10em, 1fr))`, filled column by column).
+#[doc(hidden)]
+pub fn prompt_grid(n: usize, width: Pixels, em: Pixels) -> (usize, usize) {
+    if n == 0 {
+        return (0, 0);
+    }
+    let usable = f32::from(width) - 16.;
+    let cols = ((usable / (f32::from(em) * 10.)).floor() as usize).clamp(1, n);
+    let rows = n.div_ceil(cols);
+    // Fill every column the rows need (no trailing empty columns).
+    (n.div_ceil(rows), rows)
+}
+
 pub(crate) fn prompt_label(kind: PromptKind) -> &'static str {
     match kind {
         PromptKind::Command => ":",
@@ -2224,11 +2340,44 @@ pub(crate) fn to_helix(ks: &Keystroke) -> Option<KeyEvent> {
                 if cs.next().is_some() {
                     return Some(KeyEvent::new(Key::Other(k.to_string()), mods));
                 }
-                Key::Char(if m.shift { c.to_ascii_uppercase() } else { c })
+                Key::Char(if m.shift { shifted(c) } else { c })
             }
         }
     };
     Some(KeyEvent::new(key, mods))
+}
+
+/// The character Shift produces for `c` on a US layout (`;` -> `:`, `1` ->
+/// `!`, `a` -> `A`), for modified keys whose `key_char` is not reported.
+fn shifted(c: char) -> char {
+    const PAIRS: &[(char, char)] = &[
+        ('`', '~'),
+        ('1', '!'),
+        ('2', '@'),
+        ('3', '#'),
+        ('4', '$'),
+        ('5', '%'),
+        ('6', '^'),
+        ('7', '&'),
+        ('8', '*'),
+        ('9', '('),
+        ('0', ')'),
+        ('-', '_'),
+        ('=', '+'),
+        ('[', '{'),
+        (']', '}'),
+        ('\\', '|'),
+        (';', ':'),
+        ('\'', '"'),
+        (',', '<'),
+        ('.', '>'),
+        ('/', '?'),
+    ];
+    PAIRS
+        .iter()
+        .find(|(k, _)| *k == c)
+        .map(|(_, s)| *s)
+        .unwrap_or_else(|| c.to_ascii_uppercase())
 }
 
 impl Render for EditorView {
@@ -2352,19 +2501,28 @@ impl Render for EditorView {
                     p.value.clone()
                 };
                 let ghost = p.value.is_empty();
-                let mut list = div()
-                    .flex()
-                    .flex_col()
-                    .max_h(px(8. * f32::from(lh)))
-                    .overflow_hidden();
-                for (i, o) in p.completions.options.iter().take(8).enumerate() {
-                    let sel = p.selected == Some(i);
-                    list = list.child(
-                        div()
-                            .px(px(8.))
-                            .when_sel(sel, st.accent, st.accent_foreground)
-                            .child(o.clone()),
-                    );
+                // `.cm-hx-command-autocomplete`: every option, in a grid of
+                // `minmax(10em, 1fr)` columns filled column by column
+                // (`positionPopup` reorders them), no row cap.
+                let width = self
+                    .frame
+                    .as_ref()
+                    .map_or(px(600.), |f| f.bounds.size.width);
+                let options = &p.completions.options;
+                let (cols, rows) = prompt_grid(options.len(), width, st.font_size);
+                let mut list = div().flex().flex_row().px(px(8.));
+                for c in 0..cols {
+                    let mut col = div().flex().flex_col().flex_1().min_w(st.font_size * 10.);
+                    for i in (c * rows..(c + 1) * rows).take_while(|&i| i < options.len()) {
+                        let sel = p.selected == Some(i);
+                        col = col.child(
+                            div()
+                                .mb(px(1.))
+                                .when_sel(sel, st.accent, st.accent_foreground)
+                                .child(options[i].clone()),
+                        );
+                    }
+                    list = list.child(col);
                 }
                 let mut bar = div()
                     .id("fuchico-editor-prompt")
@@ -2378,9 +2536,7 @@ impl Render for EditorView {
                     .border_t_1()
                     .border_color(st.border)
                     .on_mouse_down(MouseButton::Left, stop);
-                if !p.completions.options.is_empty() {
-                    bar = bar.child(list);
-                }
+                // `.cm-hx-command-popup`: help above the options.
                 if let Some(h) = &p.completions.help {
                     bar = bar.child(
                         div()
@@ -2389,6 +2545,9 @@ impl Render for EditorView {
                             .text_color(st.muted_foreground)
                             .child(h.clone()),
                     );
+                }
+                if !p.completions.options.is_empty() {
+                    bar = bar.child(list);
                 }
                 bar = bar.child(
                     div()
@@ -2657,3 +2816,22 @@ trait WhenSel: Styled + Sized {
     }
 }
 impl<T: Styled> WhenSel for T {}
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+
+    fn ev(s: &str) -> KeyEvent {
+        to_helix(&Keystroke::parse(s).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn alt_shift_punctuation_maps_to_the_shifted_char() {
+        assert_eq!(ev("alt-shift-;").key, Key::Char(':'));
+        assert!(ev("alt-shift-;").modifiers.alt);
+        assert_eq!(ev("alt-;").key, Key::Char(';'));
+        assert_eq!(ev("alt-shift-1").key, Key::Char('!'));
+        assert_eq!(ev("ctrl-shift-a").key, Key::Char('A'));
+        assert_eq!(ev("alt-shift-,").key, Key::Char('<'));
+    }
+}

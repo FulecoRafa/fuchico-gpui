@@ -38,7 +38,7 @@ async fn typing_modes_and_pending(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-async fn block_cursor_in_normal_bar_in_insert(cx: &mut TestAppContext) {
+async fn block_cursor_in_normal_and_insert(cx: &mut TestAppContext) {
     let mut ui = open(cx, "hello\n", EditorOptions::default());
     let c = ui.read(|v, _| v.debug_cursors());
     assert_eq!(c.len(), 1);
@@ -49,17 +49,17 @@ async fn block_cursor_in_normal_bar_in_insert(cx: &mut TestAppContext) {
     ui.press("i");
     let c = ui.read(|v, _| v.debug_cursors());
     assert!(
-        c[0].0.size.width <= px(2.),
-        "bar cursor in insert mode: {c:?}"
+        c[0].0.size.width > px(4.),
+        "block cursor in insert mode (cm-helix default): {c:?}"
     );
-    // Option: block in insert mode too.
+    // Option: bar in insert mode.
     ui.update(|v, _, cx| {
         let mut o = v.options().clone();
-        o.insert_cursor = InsertCursor::Block;
+        o.insert_cursor = InsertCursor::Bar;
         v.set_options(o, cx);
     });
     let c = ui.read(|v, _| v.debug_cursors());
-    assert!(c[0].0.size.width > px(4.));
+    assert!(c[0].0.size.width <= px(2.));
 }
 
 #[gpui_kit::test]
@@ -193,15 +193,27 @@ async fn cursor_shapes_and_colours_match_helix(cx: &mut TestAppContext) {
     for c in &c {
         assert!(c.0.size.width > px(4.), "block: {c:?}");
     }
-    // Insert mode: thin `.cm-cursor` bars in the foreground colour, both.
+    // Insert mode: cm-helix keeps `.cm-hx-block-cursor` (cursor-shape
+    // `block` by default, which the original does not override).
     ui.press("i");
     let c = ui.read(|v, _| v.debug_cursors());
     assert_eq!(c.len(), 2);
     for c in &c {
+        assert!(c.0.size.width > px(4.), "block: {c:?}");
+        assert_eq!(c.2, block);
+    }
+    assert_eq!(c.iter().filter(|c| c.1).count(), 1);
+    // The `bar` option: thin `.cm-cursor` bars in the foreground colour.
+    ui.update(|v, _, cx| {
+        let mut o = v.options().clone();
+        o.insert_cursor = InsertCursor::Bar;
+        v.set_options(o, cx);
+    });
+    let c = ui.read(|v, _| v.debug_cursors());
+    for c in &c {
         assert!(c.0.size.width <= px(1.5), "bar: {c:?}");
         assert_eq!(c.2, fg);
     }
-    assert_eq!(c.iter().filter(|c| c.1).count(), 1);
 }
 
 #[gpui_kit::test]
@@ -299,4 +311,35 @@ async fn tab_size_option_sets_indent(cx: &mut TestAppContext) {
     let mut ui = open(cx, "x\n", opts);
     ui.press("i tab");
     assert_eq!(ui.text(), "    x\n");
+}
+
+#[gpui_kit::test]
+async fn alt_o_i_n_p_walk_the_markdown_tree(cx: &mut TestAppContext) {
+    let text = "é *bold* end\n\n- x\n";
+    let mut ui = open(cx, text, EditorOptions::default());
+    let span = |ui: &mut common::Ui| {
+        let (a, h) = ui.sel();
+        (a.min(h), a.max(h))
+    };
+    ui.press("l l l"); // on `b` (char offsets: `é` is one char)
+    ui.press("alt-o");
+    assert_eq!(span(&mut ui), (2, 8), "Emphasis");
+    ui.press("alt-o");
+    assert_eq!(span(&mut ui), (0, 12), "Paragraph");
+    ui.press("alt-i");
+    assert_eq!(span(&mut ui), (2, 8));
+    ui.press("alt-o alt-n");
+    assert_eq!(span(&mut ui), (14, 17), "next sibling: the list");
+    ui.press("alt-p");
+    assert_eq!(span(&mut ui), (0, 12));
+
+    // Non-Markdown files have no Markdown tree: Alt-o is a no-op, Alt-n
+    // selects the whole document (cm-helix fallback).
+    let options = EditorOptions { path: Some("a.py".into()), ..EditorOptions::default() };
+    let mut ui = open(cx, "x = 1\ny = 2\n", options);
+    ui.press("l");
+    ui.press("alt-o");
+    assert_eq!(span(&mut ui), (1, 2));
+    ui.press("alt-n");
+    assert_eq!(span(&mut ui), (0, 12));
 }

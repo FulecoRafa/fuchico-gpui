@@ -145,3 +145,43 @@ fn paste_and_replace_are_undoable() {
     e.handle_keys("u");
     assert_eq!(e.text(), "a");
 }
+
+#[test]
+fn host_edit_is_one_undo_step() {
+    let mut e = ed("|a^bc");
+    e.apply_host_edit(vec![crate::Change::insert(3, "!")], None);
+    assert_eq!(e.text(), "abc!");
+    assert!(e.history().can_undo());
+    e.handle_keys("u");
+    assert_eq!(e.text(), "abc");
+    e.handle_keys("U");
+    assert_eq!(e.text(), "abc!");
+}
+
+#[test]
+fn host_edits_in_a_group_coalesce() {
+    let mut e = ed("|a^bc");
+    e.apply_host_edit(vec![crate::Change::insert(3, "1")], Some("cell"));
+    e.apply_host_edit(vec![crate::Change::insert(4, "2")], Some("cell"));
+    e.apply_host_edit(vec![crate::Change::insert(5, "3")], Some("other"));
+    assert_eq!(e.text(), "abc123");
+    e.handle_keys("u");
+    assert_eq!(e.text(), "abc12");
+    e.handle_keys("u");
+    assert_eq!(e.text(), "abc");
+}
+
+#[test]
+fn host_edit_splits_an_insert_session() {
+    let mut e = ed("|a^bc");
+    e.handle_keys("ix");
+    e.apply_host_edit(vec![crate::Change::insert(0, "#")], None);
+    e.handle_keys("y<esc>");
+    assert_eq!(e.text(), "#xyabc");
+    e.handle_keys("u");
+    assert_eq!(e.text(), "#xabc");
+    e.handle_keys("u");
+    assert_eq!(e.text(), "xabc");
+    e.handle_keys("u");
+    assert_eq!(e.text(), "abc");
+}

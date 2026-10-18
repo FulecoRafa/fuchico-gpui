@@ -313,7 +313,10 @@ async fn paste_and_drop_images_into_attachments(cx: &mut TestAppContext) {
     ui.cx.update(|_, cx| {
         view.update(cx, |_, cx| cx.emit(EditorEvent::PasteImage { mime: "image/png".into(), bytes: vec![1, 2, 3] }))
     });
+    // The placeholder goes in at once, then becomes the link.
+    assert!(ui.cx.read(|cx| view.read(cx).text()).contains("![uploading image…]()"));
     ui.wait("pasted link", |cx| view.read(cx).text().contains("](../attachments/pasted-")).await;
+    assert!(!ui.cx.read(|cx| view.read(cx).text()).contains("uploading"));
     let saved: Vec<_> = std::fs::read_dir(dir.join("attachments")).unwrap().flatten().collect();
     assert_eq!(saved.len(), 1);
     assert_eq!(std::fs::read(saved[0].path()).unwrap(), vec![1, 2, 3]);
@@ -438,5 +441,92 @@ async fn workspace_navigation_mermaid_export_and_tab_flush(cx: &mut TestAppConte
     ui.cx.update(|_, cx| view_b.update(cx, |v, cx| v.execute_command("q", cx)));
     ui.frame();
     assert!(!ui.cx.read(|cx| ws.read(cx).tabs().tabs.iter().any(|t| t.path == b)), "`:q` closed b");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn image_upload_placeholder_and_failure_comment() {
+    use super::{ImageSource, save_all, upload_placeholder};
+    assert_eq!(upload_placeholder(1), "![uploading image…]()");
+    assert_eq!(upload_placeholder(3), "![uploading 3 images…]()");
+    let dir = test_ui::temp_dir("editor-images-fail");
+    // `attachments` is a file: saving fails; the rest is skipped.
+    let blocker = dir.join("attachments");
+    std::fs::write(&blocker, "x").unwrap();
+    let now = chrono::Local::now().naive_local();
+    let links = save_all(
+        vec![
+            ImageSource::Bytes(String::new(), "image/png".into(), vec![1]),
+            ImageSource::Bytes(String::new(), "image/png".into(), vec![2]),
+        ],
+        &blocker.to_string_lossy(),
+        &dir.join("n.md").to_string_lossy(),
+        &now,
+    );
+    assert_eq!(links.len(), 1, "{links:?}");
+    assert!(links[0].starts_with("<!-- image upload failed: ") && links[0].ends_with(" -->"), "{links:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[gpui_kit::test]
+async fn removed_upload_placeholder_inserts_nothing(cx: &mut TestAppContext) {
+    cx.update(test_ui::init_shell);
+    let dir = test_ui::temp_dir("editor-images-removed");
+    let root = dir.to_string_lossy().to_string();
+    let path = dir.join("n.md").to_string_lossy().to_string();
+    std::fs::write(&path, "x\n").unwrap();
+    let (mut ui, pane, _) = open_pane(cx, &path, PaneContext { root: Some(root), ..Default::default() }).await;
+    let view = ui.cx.read(|cx| pane.read(cx).view().unwrap().clone());
+    ui.cx.update(|_, cx| {
+        view.update(cx, |_, cx| cx.emit(EditorEvent::PasteImage { mime: "image/png".into(), bytes: vec![1] }))
+    });
+    assert!(ui.cx.read(|cx| view.read(cx).text()).contains("uploading"));
+    // The user deletes the placeholder before the save finishes.
+    ui.cx.update(|_, cx| view.update(cx, |v, cx| v.set_text("x\n", cx)));
+    ui.sleep(50).await;
+    assert_eq!(ui.cx.read(|cx| view.read(cx).text()), "x\n");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[gpui_kit::test]
+async fn reload_to_binary_or_missing_file_switches_the_view(cx: &mut TestAppContext) {
+    cx.update(test_ui::init_shell);
+    let dir = test_ui::temp_dir("editor-reload-kind");
+    let path = dir.join("n.md").to_string_lossy().to_string();
+    std::fs::write(&path, "x\n").unwrap();
+    let (mut ui, pane, _) = open_pane(cx, &path, PaneContext::default()).await;
+    // Rewritten as binary: the status screen replaces the editor.
+    std::fs::write(&path, [0u8, 1, 2, 0, 255, 0]).unwrap();
+    let p = path.clone();
+    ui.cx.update(|_, cx| bus::emit(cx, AppEvent::Core(CoreEvent::FileWritten { path: p, source: Some("x".into()) })));
+    ui.wait("binary", |cx| matches!(pane.read(cx).state, State::NotText { too_large: false, .. })).await;
+    assert!(ui.cx.read(|cx| pane.read(cx).view().is_none()));
+
+    // A pane on a file that then disappears shows the error screen.
+    let other = dir.join("m.md").to_string_lossy().to_string();
+    std::fs::write(&other, "y\n").unwrap();
+    let (mut ui2, pane2, _) = open_pane(cx, &other, PaneContext::default()).await;
+    std::fs::remove_file(&other).unwrap();
+    let p = other.clone();
+    ui2.cx.update(|_, cx| bus::emit(cx, AppEvent::Core(CoreEvent::FileWritten { path: p, source: Some("x".into()) })));
+    ui2.wait("error", |cx| matches!(pane2.read(cx).state, State::Failed(_))).await;
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[gpui_kit::test]
+async fn wikilink_heading_completion_reads_the_other_note(cx: &mut TestAppContext) {
+    cx.update(test_ui::init_shell);
+    let dir = test_ui::temp_dir("editor-heading-complete");
+    let root = dir.to_string_lossy().to_string();
+    std::fs::write(dir.join("Other.md"), "# Alpha\n\ntext\n\n## Beta\n").unwrap();
+    let path = dir.join("n.md").to_string_lossy().to_string();
+    std::fs::write(&path, "\n").unwrap();
+    let (mut ui, pane, _) = open_pane(cx, &path, PaneContext { root: Some(root), ..Default::default() }).await;
+    ui.wait("vault scanned", |cx| pane.read(cx).vault.0.iter().any(|f| f.ends_with("Other.md"))).await;
+    ui.press("i");
+    ui.type_text("[[Other#");
+    let labels = ui.cx.read(|cx| pane.read(cx).view().unwrap().read(cx).completion_labels()).unwrap_or_default();
+    assert!(labels.iter().any(|l| l.contains("Alpha")), "{labels:?}");
+    assert!(labels.iter().any(|l| l.contains("Beta")), "{labels:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use fuchico_helix::{Host, Text, VisualLines, logical_move_vertically};
+use fuchico_markdown::{SyntaxTree, is_markdown_path};
 
 /// Layout facts published by the view after every frame.
 #[derive(Debug, Default)]
@@ -55,6 +56,50 @@ impl SharedLayout {
 
 pub(crate) struct ViewHost {
     pub shared: Rc<RefCell<SharedLayout>>,
+    /// Markdown syntax tree of the last queried document.
+    pub tree: Option<TreeCache>,
+}
+
+/// A parsed document with its char -> byte offset table.
+pub(crate) struct TreeCache {
+    text: String,
+    tree: SyntaxTree,
+    /// `bytes[c]` = byte offset of char `c` (plus one past the end).
+    bytes: Vec<usize>,
+}
+
+impl TreeCache {
+    fn byte(&self, c: usize) -> usize {
+        self.bytes.get(c).copied().unwrap_or(self.text.len())
+    }
+    fn char(&self, b: usize) -> usize {
+        self.bytes.partition_point(|&x| x < b)
+    }
+    fn chars(&self, r: std::ops::Range<usize>) -> (usize, usize) {
+        (self.char(r.start), self.char(r.end))
+    }
+}
+
+impl ViewHost {
+    pub fn new(shared: Rc<RefCell<SharedLayout>>) -> Self {
+        Self { shared, tree: None }
+    }
+
+    /// The Markdown tree of `doc`; `None` for non-Markdown files (the
+    /// original only has a Markdown language there or no tree at all).
+    fn tree(&mut self, doc: &Text) -> Option<&TreeCache> {
+        if !is_markdown_path(self.shared.borrow().path.as_deref()) {
+            return None;
+        }
+        let text = doc.to_string();
+        if self.tree.as_ref().is_none_or(|t| t.text != text) {
+            let mut bytes: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
+            bytes.push(text.len());
+            let tree = SyntaxTree::parse(&text);
+            self.tree = Some(TreeCache { text, tree, bytes });
+        }
+        self.tree.as_ref()
+    }
 }
 
 impl VisualLines for ViewHost {
@@ -151,6 +196,14 @@ impl Host for ViewHost {
     fn path(&mut self) -> Option<String> {
         self.shared.borrow().path.clone()
     }
+    fn syntax_parent(&mut self, doc: &Text, from: usize, to: usize) -> Option<(usize, usize)> {
+        let t = self.tree(doc)?;
+        t.tree.select_parent(t.byte(from), t.byte(to)).map(|r| t.chars(r))
+    }
+    fn syntax_sibling(&mut self, doc: &Text, from: usize, to: usize, forward: bool) -> Option<(usize, usize)> {
+        let t = self.tree(doc)?;
+        t.tree.sibling(t.byte(from), t.byte(to), forward).map(|r| t.chars(r))
+    }
 }
 
 #[cfg(test)]
@@ -164,7 +217,7 @@ mod tests {
         // line 1 wraps after 5 chars; line 3 is folded away
         shared.borrow_mut().rows.insert(1, vec![0, 5]);
         shared.borrow_mut().hidden = vec![false, false, true, false];
-        let mut h = ViewHost { shared };
+        let mut h = ViewHost::new(shared);
         let (p, g) = h.move_vertically(&doc, 2, None, true, 1, 4);
         assert_eq!((p, g), (7, Some(2)));
         let (p, _) = h.move_vertically(&doc, p, g, true, 1, 4);

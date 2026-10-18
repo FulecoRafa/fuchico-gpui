@@ -26,7 +26,7 @@ use crate::images::{IMAGE_PAD, ImageContext, fit};
 
 use crate::display::{DisplayLine, SpanStyle, WidgetKind};
 use crate::style::{EditorStyle, mix};
-use crate::view::{EditorView, InsertCursor, LineNumbers, Overlay};
+use crate::view::{EditorView, EngineKind, InsertCursor, LineNumbers, Overlay};
 
 /// Something clickable in the last frame.
 #[derive(Debug, Clone)]
@@ -1144,26 +1144,30 @@ impl EditorView {
                         ex = lb.origin.x - px(6.);
                     }
                     LineEndWidget::MermaidButton { anchor, .. } => {
+                        // `.cm-mermaid-preview-btn`: inline after the
+                        // opening line (margin-left 12px), 11px/600 sans in
+                        // --syntax-function on a 14% tint, 40% border.
                         let label = shape(
                             window,
                             "▶ Preview diagram",
                             &sans,
                             px(11.),
-                            st.primary,
-                            false,
+                            st.syntax_function,
+                            true,
                         );
-                        let y = fl.top + (fl.row_h - px(16.)) / 2.;
+                        let end = fl.pos(fl.len());
+                        let y = fl.top + end.y + (fl.row_h - px(16.)) / 2.;
                         let w = label.width() + px(12.);
                         let b = Bounds {
-                            origin: point(ex - w, y),
+                            origin: point(fl.x + end.x + px(12.), y),
                             size: size(w, px(16.)),
                         };
                         prims.push(Prim::Quad(quad(
                             b,
-                            px(3.),
-                            mix(st.primary, 0.1),
+                            px(6.),
+                            mix(st.syntax_function, 0.14),
                             px(1.),
-                            mix(st.primary, 0.4),
+                            mix(st.syntax_function, 0.4),
                             BorderStyle::Solid,
                         )));
                         prims.push(Prim::Shaped {
@@ -1172,7 +1176,6 @@ impl EditorView {
                             lh: px(16.),
                         });
                         hits.push((b, Hit::Mermaid { anchor: *anchor }));
-                        ex = b.origin.x - px(6.);
                     }
                 }
             }
@@ -1310,7 +1313,9 @@ impl EditorView {
 
         // ---- cursors -------------------------------------------------------------
         let heads = self.engine.block_cursors();
-        let block = mode != ModeType::Insert || self.options.insert_cursor == InsertCursor::Block;
+        // Plain (non-modal) editing keeps CodeMirror's native bar.
+        let block = self.options.engine != EngineKind::Normal
+            && (mode != ModeType::Insert || self.options.insert_cursor == InsertCursor::Block);
         let mut cursor_anchor = None;
         if self.table.is_none() {
             for (i, &h) in heads.iter().enumerate() {

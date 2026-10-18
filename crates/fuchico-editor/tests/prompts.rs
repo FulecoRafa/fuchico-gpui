@@ -175,3 +175,55 @@ async fn pending_status_and_messages(cx: &mut TestAppContext) {
     let m = ui.read(|v, _| v.message());
     assert!(matches!(m, Some((_, true))), "error message: {m:?}");
 }
+
+#[gpui_kit::test]
+async fn command_line_ctrl_r_inserts_a_register(cx: &mut TestAppContext) {
+    let mut ui = open(cx, "hello world\n", EditorOptions::default());
+    ui.press("w");
+    ui.press("y");
+    ui.press(":");
+    ui.type_text("echo ");
+    ui.press("ctrl-r");
+    // Escape cancels only the pending register read.
+    ui.press("escape");
+    assert_eq!(ui.read(|v, _| v.prompt()).unwrap().1, "echo ");
+    ui.press("ctrl-r");
+    ui.press("\"");
+    let v = ui.read(|v, _| v.prompt()).unwrap().1;
+    assert!(v.starts_with("echo hello"), "{v:?}");
+    ui.press("escape");
+    assert_eq!(ui.read(|v, _| v.prompt()), None);
+}
+
+#[gpui_kit::test]
+async fn prompt_closes_on_blur(cx: &mut TestAppContext) {
+    let mut ui = open(cx, "hello\n", EditorOptions::default());
+    ui.press(":");
+    ui.type_text("w");
+    assert!(ui.read(|v, _| v.prompt()).is_some());
+    ui.clear_events();
+    // The test window starts inactive; focus events need an active one
+    // (in-process test platform, no OS focus involved).
+    ui.update(|_, window, _| window.activate_window());
+    ui.frame();
+    let active = ui.update(|_, window, _| window.is_window_active());
+    assert!(active);
+    ui.update(|_, window, cx| window.blur(cx));
+    ui.frame();
+    ui.cx.run_until_parked();
+    assert_eq!(ui.read(|v, _| v.prompt()), None);
+    assert!(!ui.events().iter().any(|e| matches!(e, EditorEvent::Save)));
+}
+
+#[test]
+fn command_completion_grid_has_no_row_cap() {
+    use fuchico_editor::prompt_grid;
+    use gpui_kit::px;
+    // 1000px wide, 14px font: 140px columns -> 7 columns.
+    let (cols, rows) = prompt_grid(60, px(1000.), px(14.));
+    assert_eq!((cols, rows), (7, 9));
+    assert!(cols * rows >= 60);
+    assert_eq!(prompt_grid(3, px(1000.), px(14.)), (3, 1));
+    assert_eq!(prompt_grid(0, px(1000.), px(14.)), (0, 0));
+    assert_eq!(prompt_grid(5, px(100.), px(14.)), (1, 5));
+}

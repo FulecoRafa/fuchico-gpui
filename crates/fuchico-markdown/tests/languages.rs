@@ -49,3 +49,34 @@ fn every_language_highlights_a_sample() {
     println!("{ok} languages highlight with >= 2 styles");
     assert!(failures.is_empty(), "{} failing:\n{}", failures.len(), failures.join("\n"));
 }
+
+#[test]
+fn non_markdown_files_get_file_highlighting_without_live_preview() {
+    use fuchico_markdown::{DecorationContext, FoldState, LineClass, MarkdownModel, Settings, StyleId};
+    let src = "# heading?\nx = \"**s**\"\n";
+    let folds = FoldState::default();
+    let ctx = DecorationContext::new(None, &folds);
+
+    let mut py = MarkdownModel::with_path(src, Settings::default(), Some("notes/a.py"));
+    assert!(!py.is_markdown());
+    let d = py.decorations(0..2, &ctx);
+    assert!(d.lines[0].styles.iter().any(|r| r.styles.contains(StyleId::Comment)));
+    assert!(!d.lines[0].classes.iter().any(|c| matches!(c, LineClass::Heading(_))));
+    assert!(d.lines[1].styles.iter().any(|r| r.styles.contains(StyleId::String)));
+    assert!(d.lines[1].replacements.is_empty());
+    assert!(py.foldable(0).is_none());
+    // Edits keep the highlighter in sync.
+    py.update("x = 1  # c\n", &[]);
+    let d = py.decorations(0..1, &ctx);
+    assert!(d.lines[0].styles.iter().any(|r| r.styles.contains(StyleId::Comment)));
+
+    // Unknown extensions are plain text; Markdown keeps the live preview.
+    let txt = MarkdownModel::with_path(src, Settings::default(), Some("a.txt"));
+    assert!(!txt.is_markdown());
+    assert!(txt.decorations(0..2, &ctx).lines.iter().all(|l| l.styles.iter().all(|r| r.styles.is_empty())));
+    let mut md = MarkdownModel::with_path(src, Settings::default(), Some("a.md"));
+    assert!(md.is_markdown());
+    assert!(md.decorations(0..1, &ctx).lines[0].classes.iter().any(|c| matches!(c, LineClass::Heading(_))));
+    md.set_path(Some("a.rs"));
+    assert!(!md.is_markdown());
+}

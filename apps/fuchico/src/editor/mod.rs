@@ -29,6 +29,7 @@ mod ui_tests;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
 
 use fuchico_core::attachments::{image_link, save_image};
@@ -281,6 +282,19 @@ fn same_dir(a: &str, b: &str) -> bool {
 
 /// Markdown files and tags of the vault (wikilink resolution and
 /// completion). Blocking.
+/// `[[Note#heading` completion reads the target note from disk (the
+/// original's `fs_read_file`); relative vault paths resolve against `root`.
+fn read_note(root: Option<&str>, path: &str) -> Option<String> {
+    let full = match root {
+        Some(r) if !Path::new(path).is_absolute() => format!("{r}/{path}"),
+        _ => path.to_string(),
+    };
+    match fs_read_file(full) {
+        Ok(ReadResult::Text { content, .. }) => Some(content),
+        _ => None,
+    }
+}
+
 fn scan_vault(root: &str) -> (Vec<String>, Vec<String>) {
     let files = fuchico_core::fs::tree::fs_list_markdown_files(root.to_string()).unwrap_or_default();
     let tags = fuchico_core::tags::tags_scan(root.to_string())
@@ -412,6 +426,8 @@ impl EditorPane {
         let style = style_for(AppTheme::get(cx));
         let had_focus = self.focus.is_focused(window);
         let view = cx.new(|cx| EditorView::new(&content, options, style, window, cx));
+        let root = self.pcx.root.clone();
+        view.update(cx, |v, _| v.set_note_reader(Some(Rc::new(move |p: &str| read_note(root.as_deref(), p)))));
         self.disk_text = view.read(cx).text();
         self.stats = compute_doc_stats(&self.disk_text);
         self._view_subs = vec![cx.subscribe_in(&view, window, |this, _, ev, window, cx| this.on_editor(ev, window, cx))];
@@ -728,9 +744,21 @@ impl EditorPane {
             let res = read.await;
             this.update(cx, |this, cx| {
                 this.reloading = false;
-                let Ok(ReadResult::Text { content, .. }) = res else { return };
                 let State::Ready(v) = &this.state else { return };
                 let v = v.clone();
+                // `useDocument.reload`: a dirty buffer is never replaced.
+                let content = match res {
+                    Ok(ReadResult::Text { content, .. }) => content,
+                    _ if v.read(cx).is_dirty() => {
+                        this.conflict = true;
+                        cx.notify();
+                        return;
+                    }
+                    other => {
+                        this.unmount(other, cx);
+                        return;
+                    }
+                };
                 let normalized = content.replace("\r\n", "\n");
                 if normalized == this.disk_text || normalized == v.read(cx).text() {
                     return;
@@ -749,14 +777,45 @@ impl EditorPane {
         .detach();
     }
 
+    /// The file is no longer text (or unreadable) on reload: swap the editor
+    /// for the binary / too-large / error screen, as `setDoc` does.
+    fn unmount(&mut self, res: Result<ReadResult, String>, cx: &mut Context<Self>) {
+        let state = match res {
+            Ok(ReadResult::Binary { size }) => State::NotText { size, too_large: false },
+            Ok(ReadResult::TooLarge { size, .. }) => State::NotText { size, too_large: true },
+            Err(e) => State::Failed(e),
+            Ok(ReadResult::Text { .. }) => return,
+        };
+        let view = self.view().cloned();
+        unregister_buffer(&self.path, view.as_ref(), cx);
+        for bk in std::mem::take(&mut self.mermaid).values() {
+            crate::mermaid::close_block(bk, cx);
+        }
+        self._view_subs.clear();
+        self.autosave = None;
+        self.conflict = false;
+        self.save_failed = false;
+        self.disk_text.clear();
+        self.state = state;
+        self.set_dirty(false, cx);
+        cx.notify();
+    }
+
     /// Conflict banner: "Reload from disk".
     pub fn resolve_conflict_reload(&mut self, cx: &mut Context<Self>) {
         self.conflict = false;
         let p = self.path.clone();
         let read = cx.background_spawn(async move { fs_read_file(p) });
         cx.spawn(async move |this, cx| {
-            let Ok(ReadResult::Text { content, .. }) = read.await else { return };
+            let res = read.await;
             this.update(cx, |this, cx| {
+                let content = match res {
+                    Ok(ReadResult::Text { content, .. }) => content,
+                    other => {
+                        this.unmount(other, cx);
+                        return;
+                    }
+                };
                 let State::Ready(v) = &this.state else { return };
                 let v = v.clone();
                 this.autosave = None;
@@ -786,33 +845,38 @@ impl EditorPane {
     // ---- images -------------------------------------------------------------
 
     /// Saves `(file_name, mime, bytes)` images into `<root>/attachments`
-    /// and inserts their links. Nothing without a vault.
+    /// and links them. Nothing without a vault.
     fn save_images(&mut self, images: Vec<(String, String, Vec<u8>)>, cx: &mut Context<Self>) {
+        let sources = images.into_iter().map(|(n, m, b)| ImageSource::Bytes(n, m, b)).collect();
+        self.upload_images(sources, cx);
+    }
+
+    /// `imageAttachmentsExtension`: inserts `![uploading image…]()` (or `…N
+    /// images…`) at the cursor right away, saves the images one by one,
+    /// then swaps the placeholder for the links (joined by `\n`, cursor
+    /// after them). The first failure appends `<!-- image upload failed:
+    /// {e} -->` and stops; a placeholder the user removed meanwhile means
+    /// nothing is inserted.
+    fn upload_images(&mut self, images: Vec<ImageSource>, cx: &mut Context<Self>) {
         let Some(root) = self.pcx.root.clone() else { return };
+        let State::Ready(view) = &self.state else { return };
+        if images.is_empty() {
+            return;
+        }
+        let view = view.clone();
+        let placeholder = upload_placeholder(images.len());
+        view.update(cx, |v, cx| v.insert_image_link(&placeholder, cx));
         let current = self.path.clone();
+        let view = view.downgrade();
         let task = cx.background_spawn(async move {
             let dir = format!("{root}/attachments");
             let now = chrono::Local::now().naive_local();
-            images
-                .into_iter()
-                .filter_map(|(name, mime, bytes)| match save_image(&bytes, &name, &mime, &dir, &now) {
-                    Ok(saved) => Some(image_link(&saved, &current)),
-                    Err(e) => {
-                        log::warn!("editor: image save failed: {e}");
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
+            save_all(images, &dir, &current, &now)
         });
-        cx.spawn(async move |this, cx| {
+        cx.spawn(async move |_, cx| {
             let links = task.await;
-            if links.is_empty() {
-                return;
-            }
-            this.update(cx, |this, cx| {
-                if let State::Ready(v) = &this.state {
-                    v.update(cx, |v, cx| v.insert_image_link(&links.join("\n"), cx));
-                }
+            view.update(cx, |v, cx| {
+                v.replace_placeholder(&placeholder, &links.join("\n"), cx);
             })
             .ok();
         })
@@ -822,26 +886,44 @@ impl EditorPane {
     /// Finder files dropped on the editor: images are copied into the
     /// attachments folder and linked.
     pub fn drop_external(&mut self, paths: &[PathBuf], cx: &mut Context<Self>) {
-        let files: Vec<PathBuf> = paths.iter().filter(|p| is_image_path(&p.to_string_lossy())).cloned().collect();
-        if files.is_empty() || self.pcx.root.is_none() {
-            return;
-        }
-        let read = cx.background_spawn(async move {
-            files
-                .into_iter()
-                .filter_map(|p| {
-                    let bytes = std::fs::read(&p).ok()?;
-                    let name = p.file_name()?.to_string_lossy().into_owned();
-                    Some((name, image_mime(&p.to_string_lossy()).to_string(), bytes))
-                })
-                .collect::<Vec<_>>()
-        });
-        cx.spawn(async move |this, cx| {
-            let images = read.await;
-            this.update(cx, |this, cx| this.save_images(images, cx)).ok();
-        })
-        .detach();
+        let files: Vec<ImageSource> =
+            paths.iter().filter(|p| is_image_path(&p.to_string_lossy())).cloned().map(ImageSource::File).collect();
+        self.upload_images(files, cx);
     }
+}
+
+/// An image to attach: pasted bytes `(file_name, mime, bytes)` or a file.
+enum ImageSource {
+    Bytes(String, String, Vec<u8>),
+    File(PathBuf),
+}
+
+fn upload_placeholder(n: usize) -> String {
+    if n > 1 { format!("![uploading {n} images…]()") } else { "![uploading image…]()".to_string() }
+}
+
+/// Saves the images in order; the first failure becomes an
+/// `<!-- image upload failed: … -->` line and stops the rest.
+fn save_all(images: Vec<ImageSource>, dir: &str, current: &str, now: &chrono::NaiveDateTime) -> Vec<String> {
+    let mut links = Vec::new();
+    for img in images {
+        let saved = match img {
+            ImageSource::Bytes(name, mime, bytes) => save_image(&bytes, &name, &mime, dir, now),
+            ImageSource::File(p) => std::fs::read(&p).map_err(|e| e.to_string()).and_then(|bytes| {
+                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                save_image(&bytes, &name, image_mime(&p.to_string_lossy()), dir, now)
+            }),
+        };
+        match saved {
+            Ok(saved) => links.push(image_link(&saved, current)),
+            Err(e) => {
+                log::warn!("editor: image save failed: {e}");
+                links.push(format!("<!-- image upload failed: {e} -->"));
+                break;
+            }
+        }
+    }
+    links
 }
 
 impl EventEmitter<PaneEvent> for EditorPane {}
