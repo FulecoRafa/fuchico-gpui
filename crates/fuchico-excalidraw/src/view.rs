@@ -96,6 +96,19 @@ impl Tool {
     }
 }
 
+/// Chrome [`ExcalidrawView::debug_open`] can open.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DebugUi {
+    Menu,
+    Library,
+    Help,
+    Export,
+    /// Context menu at a pane-local point.
+    ContextMenu(f32, f32),
+    StrokePicker,
+}
+
 /// Selection-box handles.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Handle {
@@ -373,6 +386,38 @@ impl ExcalidrawView {
     /// The scene being edited (read-only).
     pub fn scene(&self) -> &Scene {
         &self.scene
+    }
+
+    /// Replaces the selection (unknown ids are ignored).
+    pub fn select_ids(&mut self, ids: &[&str], cx: &mut Context<Self>) {
+        self.selected = ids
+            .iter()
+            .filter(|id| self.scene.get(id).is_some())
+            .map(|s| s.to_string())
+            .collect();
+        cx.notify();
+    }
+
+    /// Opens a piece of editor chrome, as clicking its button would
+    /// (offscreen snapshots and tests).
+    #[doc(hidden)]
+    pub fn debug_open(&mut self, ui: DebugUi, cx: &mut Context<Self>) {
+        use crate::actions::{Dialog, PickerTarget};
+        match ui {
+            DebugUi::Menu => self.menu_open = true,
+            DebugUi::Library => self.library_open = true,
+            DebugUi::Help => self.open_dialog(Dialog::Help),
+            DebugUi::Export => self.open_dialog(Dialog::Export),
+            DebugUi::ContextMenu(x, y) => {
+                let o = self.bounds.get().origin;
+                self.context_menu = Some(Point {
+                    x: o.x + px(x),
+                    y: o.y + px(y),
+                });
+            }
+            DebugUi::StrokePicker => self.toggle_picker(PickerTarget::Stroke),
+        }
+        cx.notify();
     }
 
     /// The active tool.

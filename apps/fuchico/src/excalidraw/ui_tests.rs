@@ -242,3 +242,60 @@ const SAMPLE: &str = r##"{"type":"excalidraw","version":2,"source":"test","eleme
 {"id":"e1","type":"ellipse","x":440,"y":160,"width":160,"height":100,"angle":0,"strokeColor":"#e03131","backgroundColor":"transparent","fillStyle":"solid","strokeWidth":2,"strokeStyle":"solid","roughness":1,"opacity":100,"groupIds":[],"frameId":null,"roundness":null,"seed":22,"version":1,"versionNonce":2,"isDeleted":false,"boundElements":null,"updated":1,"link":null,"locked":false},
 {"id":"t1","type":"text","x":150,"y":300,"width":200,"height":25,"angle":0,"strokeColor":"#1e1e1e","backgroundColor":"transparent","fillStyle":"solid","strokeWidth":2,"strokeStyle":"solid","roughness":1,"opacity":100,"groupIds":[],"frameId":null,"roundness":null,"seed":33,"version":1,"versionNonce":3,"isDeleted":false,"boundElements":null,"updated":1,"link":null,"locked":false,"text":"Hello drawing","fontSize":20,"fontFamily":1,"textAlign":"left","verticalAlign":"top","containerId":null,"originalText":"Hello drawing","lineHeight":1.25,"baseline":18}
 ],"appState":{"viewBackgroundColor":"#ffffff","gridSize":null},"files":{}}"##;
+
+/// Side-by-side material for the parity round: the editor in the states
+/// the original's stock Excalidraw was captured in (same scene, same
+/// 1280×800 viewport). Writes `target/snapshots/excal-*.png`.
+#[test]
+fn snapshots_compare_with_stock() {
+    use fuchico_excalidraw::{DebugUi, ExcalidrawStyle, ExcalidrawView, Tool};
+    let lib = test_ui::temp_dir("excal-cmp-lib").join("library.excalidrawlib");
+    // SAFETY: test-only; read once when each view is created.
+    unsafe { std::env::set_var(fuchico_excalidraw::library::LIBRARY_ENV, &lib) };
+    type Prep = fn(&mut ExcalidrawView, &mut gpui_kit::Window, &mut gpui_kit::Context<ExcalidrawView>);
+    let cases: &[(&str, bool, Prep)] = &[
+        ("default", false, |_, _, _| {}),
+        ("default-dark", true, |_, _, _| {}),
+        ("menu", false, |v, _, cx| v.debug_open(DebugUi::Menu, cx)),
+        ("selected-rect", false, |v, _, cx| v.select_ids(&["el1"], cx)),
+        ("selected-arrow", false, |v, _, cx| v.select_ids(&["el4"], cx)),
+        ("selected-text", false, |v, _, cx| v.select_ids(&["el5"], cx)),
+        ("tool-rect", false, |v, w, cx| v.set_tool(Tool::Rectangle, w, cx)),
+        ("help", false, |v, _, cx| v.debug_open(DebugUi::Help, cx)),
+        ("library", false, |v, _, cx| v.debug_open(DebugUi::Library, cx)),
+        ("ctx-canvas", false, |v, _, cx| v.debug_open(DebugUi::ContextMenu(900., 600.), cx)),
+        ("ctx-element", false, |v, _, cx| {
+            v.select_ids(&["el1"], cx);
+            v.debug_open(DebugUi::ContextMenu(200., 175.), cx)
+        }),
+        ("export", false, |v, _, cx| v.debug_open(DebugUi::Export, cx)),
+        ("picker", false, |v, _, cx| {
+            v.select_ids(&["el1"], cx);
+            v.debug_open(DebugUi::StrokePicker, cx)
+        }),
+    ];
+    for (name, dark, prep) in cases {
+        let prep = *prep;
+        let dark = *dark;
+        crate::snapshot::snapshot_with(
+            &format!("excal-{name}"),
+            gpui_kit::size(px(1280.), px(800.)),
+            SnapTheme::default_mode(dark),
+            move |window, cx| {
+                let style: fuchico_excalidraw::StyleFn = Rc::new(move |_| {
+                    if dark {
+                        ExcalidrawStyle::dark()
+                    } else {
+                        ExcalidrawStyle::light()
+                    }
+                });
+                cx.new(|cx| {
+                    ExcalidrawView::new(COMPARE, style, Rc::new(|_, _| Ok(())), window, cx)
+                })
+            },
+            move |view, window, cx| view.update(cx, |v, cx| prep(v, window, cx)),
+        );
+    }
+}
+
+const COMPARE: &str = include_str!("../../../../crates/fuchico-excalidraw/tests/fixtures/compare.excalidraw");

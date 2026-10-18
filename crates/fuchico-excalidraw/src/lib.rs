@@ -24,5 +24,5 @@ pub use model::{ExcalidrawFile, LoadError};
 pub use scene::Scene;
 pub use style::ExcalidrawStyle;
 pub use view::{
-    DrawingSource, ExcalidrawEvent, ExcalidrawView, OnChange, SAVE_DEBOUNCE, StyleFn, Tool,
+    DebugUi, DrawingSource, ExcalidrawEvent, ExcalidrawView, OnChange, SAVE_DEBOUNCE, StyleFn, Tool,
 };
