@@ -171,8 +171,8 @@ mod tests {
         let keys: HashSet<_> = Msg::ALL.iter().map(|m| m.key()).collect();
         assert_eq!(keys.len(), Msg::ALL.len());
         // 300 keys ported from the original catalog plus the native-only ones
-        // (CalDAV UI, shortcut reset, …) appended after them.
-        assert!(Msg::ALL.len() >= 300);
+        // (CalDAV UI, shortcut reset, explorer, media, …) appended after them.
+        assert_eq!(Msg::ALL.len(), 356);
     }
 
     #[test]

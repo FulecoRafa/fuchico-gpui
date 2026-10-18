@@ -716,6 +716,10 @@ pub enum Msg {
     ExportExporting,
     /// `export.printFailed`
     ExportPrintFailed,
+    /// `explorer.openWithFailed` (native port; the original hardcoded it)
+    ExplorerOpenWithFailed,
+    /// `explorer.theDefaultApp` (native port; the original hardcoded it)
+    ExplorerTheDefaultApp,
 }
 
 impl Msg {
@@ -1075,6 +1079,8 @@ impl Msg {
         Msg::ExportNotMarkdown,
         Msg::ExportExporting,
         Msg::ExportPrintFailed,
+        Msg::ExplorerOpenWithFailed,
+        Msg::ExplorerTheDefaultApp,
     ];
 
     /// The original dotted key, e.g. `"common.loading"`.
@@ -1434,6 +1440,8 @@ impl Msg {
             Msg::ExportNotMarkdown => "export.notMarkdown",
             Msg::ExportExporting => "export.exporting",
             Msg::ExportPrintFailed => "export.printFailed",
+            Msg::ExplorerOpenWithFailed => "explorer.openWithFailed",
+            Msg::ExplorerTheDefaultApp => "explorer.theDefaultApp",
         }
     }
 }
@@ -1795,6 +1803,8 @@ pub fn en(m: Msg) -> &'static str {
         Msg::ExportNotMarkdown => "Open a Markdown note to export it.",
         Msg::ExportExporting => "Exporting…",
         Msg::ExportPrintFailed => "Could not open the PDF for printing: {message}",
+        Msg::ExplorerOpenWithFailed => "Could not open with {app}: {error}",
+        Msg::ExplorerTheDefaultApp => "the default app",
     }
 }
 
@@ -2155,5 +2165,7 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ExportNotMarkdown => "Abra uma nota Markdown para exportá-la.",
         Msg::ExportExporting => "Exportando…",
         Msg::ExportPrintFailed => "Não foi possível abrir o PDF para impressão: {message}",
+        Msg::ExplorerOpenWithFailed => "Não foi possível abrir com {app}: {error}",
+        Msg::ExplorerTheDefaultApp => "o app padrão",
     }
 }
