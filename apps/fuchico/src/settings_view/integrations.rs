@@ -484,9 +484,8 @@ impl SettingsView {
             });
         }
         let mut head = Section::new(crate::t!(CaldavTitle), crate::t!(CaldavDesc));
-        if self.caldav.ctx.is_none() {
-            head = head.other(status("CalDAV: no data directory", false, cx));
-        } else if let Some(e) = self.caldav.load_error.clone() {
+        // Without a data dir (no CalDavCtx) the actions stay disabled.
+        if let Some(e) = self.caldav.load_error.clone() {
             head = head.other(status(e, false, cx));
         }
         vec![head, self.accounts_section(cx), self.links_section(cx), self.sync_section(cx)]
