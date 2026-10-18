@@ -608,6 +608,34 @@ pub enum Msg {
     ShortcutActionPickRecurrenceLabel,
     /// `shortcutAction.pickRecurrence.desc`
     ShortcutActionPickRecurrenceDesc,
+    /// `excalidraw.notValid`
+    ExcalidrawNotValid,
+    /// `excalidraw.malformed`
+    ExcalidrawMalformed,
+    /// `excalidraw.saveFailed`
+    ExcalidrawSaveFailed,
+    /// `mermaid.removed`
+    MermaidRemoved,
+    /// `mermaid.zoomOut`
+    MermaidZoomOut,
+    /// `mermaid.zoomIn`
+    MermaidZoomIn,
+    /// `mermaid.resetView`
+    MermaidResetView,
+    /// `mermaid.openInWindow`
+    MermaidOpenInWindow,
+    /// `mermaid.closePreview`
+    MermaidClosePreview,
+    /// `mermaid.dockTooltip`
+    MermaidDockTooltip,
+    /// `mermaid.dock`
+    MermaidDock,
+    /// `export.notMarkdown`
+    ExportNotMarkdown,
+    /// `export.exporting`
+    ExportExporting,
+    /// `export.printFailed`
+    ExportPrintFailed,
 }
 
 impl Msg {
@@ -913,6 +941,20 @@ impl Msg {
         Msg::ShortcutActionPickDueDateDesc,
         Msg::ShortcutActionPickRecurrenceLabel,
         Msg::ShortcutActionPickRecurrenceDesc,
+        Msg::ExcalidrawNotValid,
+        Msg::ExcalidrawMalformed,
+        Msg::ExcalidrawSaveFailed,
+        Msg::MermaidRemoved,
+        Msg::MermaidZoomOut,
+        Msg::MermaidZoomIn,
+        Msg::MermaidResetView,
+        Msg::MermaidOpenInWindow,
+        Msg::MermaidClosePreview,
+        Msg::MermaidDockTooltip,
+        Msg::MermaidDock,
+        Msg::ExportNotMarkdown,
+        Msg::ExportExporting,
+        Msg::ExportPrintFailed,
     ];
 
     /// The original dotted key, e.g. `"common.loading"`.
@@ -1218,6 +1260,20 @@ impl Msg {
             Msg::ShortcutActionPickDueDateDesc => "shortcutAction.pickDueDate.desc",
             Msg::ShortcutActionPickRecurrenceLabel => "shortcutAction.pickRecurrence.label",
             Msg::ShortcutActionPickRecurrenceDesc => "shortcutAction.pickRecurrence.desc",
+            Msg::ExcalidrawNotValid => "excalidraw.notValid",
+            Msg::ExcalidrawMalformed => "excalidraw.malformed",
+            Msg::ExcalidrawSaveFailed => "excalidraw.saveFailed",
+            Msg::MermaidRemoved => "mermaid.removed",
+            Msg::MermaidZoomOut => "mermaid.zoomOut",
+            Msg::MermaidZoomIn => "mermaid.zoomIn",
+            Msg::MermaidResetView => "mermaid.resetView",
+            Msg::MermaidOpenInWindow => "mermaid.openInWindow",
+            Msg::MermaidClosePreview => "mermaid.closePreview",
+            Msg::MermaidDockTooltip => "mermaid.dockTooltip",
+            Msg::MermaidDock => "mermaid.dock",
+            Msg::ExportNotMarkdown => "export.notMarkdown",
+            Msg::ExportExporting => "export.exporting",
+            Msg::ExportPrintFailed => "export.printFailed",
         }
     }
 }
@@ -1525,6 +1581,20 @@ pub fn en(m: Msg) -> &'static str {
         Msg::ShortcutActionPickDueDateDesc => "Add or change the 📅 due date on the current line via a quick-pick list.",
         Msg::ShortcutActionPickRecurrenceLabel => "Set recurrence…",
         Msg::ShortcutActionPickRecurrenceDesc => "Add or change the 🔁 repeat rule on the current line via a quick-pick list.",
+        Msg::ExcalidrawNotValid => "Not a valid drawing file",
+        Msg::ExcalidrawMalformed => "Malformed drawing file",
+        Msg::ExcalidrawSaveFailed => "Could not save drawing: {message}",
+        Msg::MermaidRemoved => "Source block no longer available",
+        Msg::MermaidZoomOut => "Zoom out",
+        Msg::MermaidZoomIn => "Zoom in",
+        Msg::MermaidResetView => "Reset view",
+        Msg::MermaidOpenInWindow => "Open in new window",
+        Msg::MermaidClosePreview => "Close preview",
+        Msg::MermaidDockTooltip => "Dock back into main window",
+        Msg::MermaidDock => "Dock",
+        Msg::ExportNotMarkdown => "Open a Markdown note to export it.",
+        Msg::ExportExporting => "Exporting…",
+        Msg::ExportPrintFailed => "Could not open the PDF for printing: {message}",
     }
 }
 
@@ -1831,5 +1901,19 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ShortcutActionPickDueDateDesc => "Adiciona ou altera a data 📅 de prazo na linha atual por uma lista de escolha rápida.",
         Msg::ShortcutActionPickRecurrenceLabel => "Definir recorrência…",
         Msg::ShortcutActionPickRecurrenceDesc => "Adiciona ou altera a regra 🔁 de repetição na linha atual por uma lista de escolha rápida.",
+        Msg::ExcalidrawNotValid => "Não é um arquivo de desenho válido",
+        Msg::ExcalidrawMalformed => "Arquivo de desenho malformado",
+        Msg::ExcalidrawSaveFailed => "Não foi possível salvar o desenho: {message}",
+        Msg::MermaidRemoved => "O bloco de origem não está mais disponível",
+        Msg::MermaidZoomOut => "Diminuir zoom",
+        Msg::MermaidZoomIn => "Aumentar zoom",
+        Msg::MermaidResetView => "Redefinir visualização",
+        Msg::MermaidOpenInWindow => "Abrir em nova janela",
+        Msg::MermaidClosePreview => "Fechar pré-visualização",
+        Msg::MermaidDockTooltip => "Encaixar de volta na janela principal",
+        Msg::MermaidDock => "Encaixar",
+        Msg::ExportNotMarkdown => "Abra uma nota Markdown para exportá-la.",
+        Msg::ExportExporting => "Exportando…",
+        Msg::ExportPrintFailed => "Não foi possível abrir o PDF para impressão: {message}",
     }
 }
