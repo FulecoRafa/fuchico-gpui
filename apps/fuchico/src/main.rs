@@ -16,6 +16,7 @@ mod assets;
 mod backlinks;
 mod bus;
 mod caldav;
+mod dev_marks;
 mod editor;
 mod excalidraw;
 mod explorer;
@@ -74,6 +75,7 @@ fn main() {
         theme::init(cx);
         keymap::bind_global_keys(cx);
         crate::editor::init(cx);
+        dev_marks::init(cx);
         windows::register_global_actions(cx);
         windows::menu::install(cx);
         if let Some(l) = listener {
