@@ -3,5 +3,9 @@ name = "fuchico-helix"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
+description = "UI-agnostic Helix modal editing engine (port of codemirror-helix 0.5.7 as used by Fuchico)"
 
 [dependencies]
+ropey.workspace = true
+regex.workspace = true
+unicode-segmentation.workspace = true
