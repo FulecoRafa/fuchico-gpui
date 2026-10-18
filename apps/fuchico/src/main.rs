@@ -27,6 +27,8 @@ mod persist;
 mod search;
 mod settings;
 mod settings_view;
+#[cfg(test)]
+mod snapshot;
 mod tags;
 mod theme;
 mod ui;
