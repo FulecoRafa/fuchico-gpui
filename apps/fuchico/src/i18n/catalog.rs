@@ -608,6 +608,86 @@ pub enum Msg {
     ShortcutActionPickRecurrenceLabel,
     /// `shortcutAction.pickRecurrence.desc`
     ShortcutActionPickRecurrenceDesc,
+    /// `caldav.title`
+    CaldavTitle,
+    /// `caldav.desc`
+    CaldavDesc,
+    /// `caldav.accounts`
+    CaldavAccounts,
+    /// `caldav.removeAccount`
+    CaldavRemoveAccount,
+    /// `caldav.serverUrl`
+    CaldavServerUrl,
+    /// `caldav.username`
+    CaldavUsername,
+    /// `caldav.usernamePlaceholder`
+    CaldavUsernamePlaceholder,
+    /// `caldav.password`
+    CaldavPassword,
+    /// `caldav.icloudHint`
+    CaldavIcloudHint,
+    /// `caldav.icloudLink`
+    CaldavIcloudLink,
+    /// `caldav.testConnection`
+    CaldavTestConnection,
+    /// `caldav.testing`
+    CaldavTesting,
+    /// `caldav.saveAccount`
+    CaldavSaveAccount,
+    /// `caldav.saving`
+    CaldavSaving,
+    /// `caldav.connected`
+    CaldavConnected,
+    /// `caldav.linkedFolders`
+    CaldavLinkedFolders,
+    /// `caldav.saveAccountFirst`
+    CaldavSaveAccountFirst,
+    /// `caldav.account`
+    CaldavAccount,
+    /// `caldav.discoverCalendars`
+    CaldavDiscoverCalendars,
+    /// `caldav.discovering`
+    CaldavDiscovering,
+    /// `caldav.calendar`
+    CaldavCalendar,
+    /// `caldav.folder`
+    CaldavFolder,
+    /// `caldav.noFolder`
+    CaldavNoFolder,
+    /// `caldav.chooseFolder`
+    CaldavChooseFolder,
+    /// `caldav.linkFolder`
+    CaldavLinkFolder,
+    /// `caldav.noLinks`
+    CaldavNoLinks,
+    /// `caldav.taskCount`
+    CaldavTaskCount,
+    /// `caldav.pendingDelete`
+    CaldavPendingDelete,
+    /// `caldav.syncedAt`
+    CaldavSyncedAt,
+    /// `caldav.neverSynced`
+    CaldavNeverSynced,
+    /// `caldav.syncFolder`
+    CaldavSyncFolder,
+    /// `caldav.unlinkFolder`
+    CaldavUnlinkFolder,
+    /// `caldav.sync`
+    CaldavSync,
+    /// `caldav.syncNow`
+    CaldavSyncNow,
+    /// `caldav.syncing`
+    CaldavSyncing,
+    /// `caldav.reportSummary`
+    CaldavReportSummary,
+    /// `caldav.reportErrors`
+    CaldavReportErrors,
+    /// `shortcuts.reset`
+    ShortcutsReset,
+    /// `shortcuts.resetTitle`
+    ShortcutsResetTitle,
+    /// `settings.theme.ignoredCss`
+    SettingsThemeIgnoredCss,
 }
 
 impl Msg {
@@ -913,6 +993,46 @@ impl Msg {
         Msg::ShortcutActionPickDueDateDesc,
         Msg::ShortcutActionPickRecurrenceLabel,
         Msg::ShortcutActionPickRecurrenceDesc,
+        Msg::CaldavTitle,
+        Msg::CaldavDesc,
+        Msg::CaldavAccounts,
+        Msg::CaldavRemoveAccount,
+        Msg::CaldavServerUrl,
+        Msg::CaldavUsername,
+        Msg::CaldavUsernamePlaceholder,
+        Msg::CaldavPassword,
+        Msg::CaldavIcloudHint,
+        Msg::CaldavIcloudLink,
+        Msg::CaldavTestConnection,
+        Msg::CaldavTesting,
+        Msg::CaldavSaveAccount,
+        Msg::CaldavSaving,
+        Msg::CaldavConnected,
+        Msg::CaldavLinkedFolders,
+        Msg::CaldavSaveAccountFirst,
+        Msg::CaldavAccount,
+        Msg::CaldavDiscoverCalendars,
+        Msg::CaldavDiscovering,
+        Msg::CaldavCalendar,
+        Msg::CaldavFolder,
+        Msg::CaldavNoFolder,
+        Msg::CaldavChooseFolder,
+        Msg::CaldavLinkFolder,
+        Msg::CaldavNoLinks,
+        Msg::CaldavTaskCount,
+        Msg::CaldavPendingDelete,
+        Msg::CaldavSyncedAt,
+        Msg::CaldavNeverSynced,
+        Msg::CaldavSyncFolder,
+        Msg::CaldavUnlinkFolder,
+        Msg::CaldavSync,
+        Msg::CaldavSyncNow,
+        Msg::CaldavSyncing,
+        Msg::CaldavReportSummary,
+        Msg::CaldavReportErrors,
+        Msg::ShortcutsReset,
+        Msg::ShortcutsResetTitle,
+        Msg::SettingsThemeIgnoredCss,
     ];
 
     /// The original dotted key, e.g. `"common.loading"`.
@@ -1218,6 +1338,46 @@ impl Msg {
             Msg::ShortcutActionPickDueDateDesc => "shortcutAction.pickDueDate.desc",
             Msg::ShortcutActionPickRecurrenceLabel => "shortcutAction.pickRecurrence.label",
             Msg::ShortcutActionPickRecurrenceDesc => "shortcutAction.pickRecurrence.desc",
+            Msg::CaldavTitle => "caldav.title",
+            Msg::CaldavDesc => "caldav.desc",
+            Msg::CaldavAccounts => "caldav.accounts",
+            Msg::CaldavRemoveAccount => "caldav.removeAccount",
+            Msg::CaldavServerUrl => "caldav.serverUrl",
+            Msg::CaldavUsername => "caldav.username",
+            Msg::CaldavUsernamePlaceholder => "caldav.usernamePlaceholder",
+            Msg::CaldavPassword => "caldav.password",
+            Msg::CaldavIcloudHint => "caldav.icloudHint",
+            Msg::CaldavIcloudLink => "caldav.icloudLink",
+            Msg::CaldavTestConnection => "caldav.testConnection",
+            Msg::CaldavTesting => "caldav.testing",
+            Msg::CaldavSaveAccount => "caldav.saveAccount",
+            Msg::CaldavSaving => "caldav.saving",
+            Msg::CaldavConnected => "caldav.connected",
+            Msg::CaldavLinkedFolders => "caldav.linkedFolders",
+            Msg::CaldavSaveAccountFirst => "caldav.saveAccountFirst",
+            Msg::CaldavAccount => "caldav.account",
+            Msg::CaldavDiscoverCalendars => "caldav.discoverCalendars",
+            Msg::CaldavDiscovering => "caldav.discovering",
+            Msg::CaldavCalendar => "caldav.calendar",
+            Msg::CaldavFolder => "caldav.folder",
+            Msg::CaldavNoFolder => "caldav.noFolder",
+            Msg::CaldavChooseFolder => "caldav.chooseFolder",
+            Msg::CaldavLinkFolder => "caldav.linkFolder",
+            Msg::CaldavNoLinks => "caldav.noLinks",
+            Msg::CaldavTaskCount => "caldav.taskCount",
+            Msg::CaldavPendingDelete => "caldav.pendingDelete",
+            Msg::CaldavSyncedAt => "caldav.syncedAt",
+            Msg::CaldavNeverSynced => "caldav.neverSynced",
+            Msg::CaldavSyncFolder => "caldav.syncFolder",
+            Msg::CaldavUnlinkFolder => "caldav.unlinkFolder",
+            Msg::CaldavSync => "caldav.sync",
+            Msg::CaldavSyncNow => "caldav.syncNow",
+            Msg::CaldavSyncing => "caldav.syncing",
+            Msg::CaldavReportSummary => "caldav.reportSummary",
+            Msg::CaldavReportErrors => "caldav.reportErrors",
+            Msg::ShortcutsReset => "shortcuts.reset",
+            Msg::ShortcutsResetTitle => "shortcuts.resetTitle",
+            Msg::SettingsThemeIgnoredCss => "settings.theme.ignoredCss",
         }
     }
 }
@@ -1525,6 +1685,46 @@ pub fn en(m: Msg) -> &'static str {
         Msg::ShortcutActionPickDueDateDesc => "Add or change the 📅 due date on the current line via a quick-pick list.",
         Msg::ShortcutActionPickRecurrenceLabel => "Set recurrence…",
         Msg::ShortcutActionPickRecurrenceDesc => "Add or change the 🔁 repeat rule on the current line via a quick-pick list.",
+        Msg::CaldavTitle => "CalDAV Sync",
+        Msg::CaldavDesc => "Link folders to a CalDAV calendar (e.g. iCloud Reminders) so checkbox tasks in your notes sync to your phone and back.",
+        Msg::CaldavAccounts => "Accounts",
+        Msg::CaldavRemoveAccount => "Remove account",
+        Msg::CaldavServerUrl => "Server URL",
+        Msg::CaldavUsername => "Username",
+        Msg::CaldavUsernamePlaceholder => "you@icloud.com",
+        Msg::CaldavPassword => "Password",
+        Msg::CaldavIcloudHint => "iCloud requires an app-specific password, not your Apple ID password.",
+        Msg::CaldavIcloudLink => "Generate one at appleid.apple.com",
+        Msg::CaldavTestConnection => "Test Connection",
+        Msg::CaldavTesting => "Testing…",
+        Msg::CaldavSaveAccount => "Save Account",
+        Msg::CaldavSaving => "Saving…",
+        Msg::CaldavConnected => "Connected. Calendar home: {url}",
+        Msg::CaldavLinkedFolders => "Linked Folders",
+        Msg::CaldavSaveAccountFirst => "Save an account above to link a folder.",
+        Msg::CaldavAccount => "Account",
+        Msg::CaldavDiscoverCalendars => "Discover Calendars",
+        Msg::CaldavDiscovering => "Discovering…",
+        Msg::CaldavCalendar => "Calendar",
+        Msg::CaldavFolder => "Folder",
+        Msg::CaldavNoFolder => "No folder selected",
+        Msg::CaldavChooseFolder => "Choose…",
+        Msg::CaldavLinkFolder => "Link Folder",
+        Msg::CaldavNoLinks => "No folders linked yet.",
+        Msg::CaldavTaskCount => "{n} tasks",
+        Msg::CaldavPendingDelete => ", {n} pending delete",
+        Msg::CaldavSyncedAt => " · synced {date}",
+        Msg::CaldavNeverSynced => "Never synced",
+        Msg::CaldavSyncFolder => "Sync this folder now",
+        Msg::CaldavUnlinkFolder => "Unlink folder",
+        Msg::CaldavSync => "Sync",
+        Msg::CaldavSyncNow => "Sync Now",
+        Msg::CaldavSyncing => "Syncing…",
+        Msg::CaldavReportSummary => "+{new} new, {pushed} pushed, {pulled} pulled, {fromServer} from server",
+        Msg::CaldavReportErrors => ", {n} error(s)",
+        Msg::ShortcutsReset => "Reset",
+        Msg::ShortcutsResetTitle => "Restore the default binding ({binding})",
+        Msg::SettingsThemeIgnoredCss => "Not understood (ignored): {items}",
     }
 }
 
@@ -1831,5 +2031,45 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ShortcutActionPickDueDateDesc => "Adiciona ou altera a data 📅 de prazo na linha atual por uma lista de escolha rápida.",
         Msg::ShortcutActionPickRecurrenceLabel => "Definir recorrência…",
         Msg::ShortcutActionPickRecurrenceDesc => "Adiciona ou altera a regra 🔁 de repetição na linha atual por uma lista de escolha rápida.",
+        Msg::CaldavTitle => "Sincronização CalDAV",
+        Msg::CaldavDesc => "Vincule pastas a um calendário CalDAV (ex.: Lembretes do iCloud) para que as tarefas com checkbox das suas notas sincronizem com o celular e vice-versa.",
+        Msg::CaldavAccounts => "Contas",
+        Msg::CaldavRemoveAccount => "Remover conta",
+        Msg::CaldavServerUrl => "URL do servidor",
+        Msg::CaldavUsername => "Usuário",
+        Msg::CaldavUsernamePlaceholder => "voce@icloud.com",
+        Msg::CaldavPassword => "Senha",
+        Msg::CaldavIcloudHint => "O iCloud exige uma senha específica de app, não a senha do seu Apple ID.",
+        Msg::CaldavIcloudLink => "Gere uma em appleid.apple.com",
+        Msg::CaldavTestConnection => "Testar conexão",
+        Msg::CaldavTesting => "Testando…",
+        Msg::CaldavSaveAccount => "Salvar conta",
+        Msg::CaldavSaving => "Salvando…",
+        Msg::CaldavConnected => "Conectado. Calendário principal: {url}",
+        Msg::CaldavLinkedFolders => "Pastas vinculadas",
+        Msg::CaldavSaveAccountFirst => "Salve uma conta acima para vincular uma pasta.",
+        Msg::CaldavAccount => "Conta",
+        Msg::CaldavDiscoverCalendars => "Descobrir calendários",
+        Msg::CaldavDiscovering => "Descobrindo…",
+        Msg::CaldavCalendar => "Calendário",
+        Msg::CaldavFolder => "Pasta",
+        Msg::CaldavNoFolder => "Nenhuma pasta selecionada",
+        Msg::CaldavChooseFolder => "Escolher…",
+        Msg::CaldavLinkFolder => "Vincular pasta",
+        Msg::CaldavNoLinks => "Nenhuma pasta vinculada ainda.",
+        Msg::CaldavTaskCount => "{n} tarefas",
+        Msg::CaldavPendingDelete => ", {n} exclusão(ões) pendente(s)",
+        Msg::CaldavSyncedAt => " · sincronizado em {date}",
+        Msg::CaldavNeverSynced => "Nunca sincronizado",
+        Msg::CaldavSyncFolder => "Sincronizar esta pasta agora",
+        Msg::CaldavUnlinkFolder => "Desvincular pasta",
+        Msg::CaldavSync => "Sincronização",
+        Msg::CaldavSyncNow => "Sincronizar agora",
+        Msg::CaldavSyncing => "Sincronizando…",
+        Msg::CaldavReportSummary => "+{new} novas, {pushed} enviadas, {pulled} recebidas, {fromServer} do servidor",
+        Msg::CaldavReportErrors => ", {n} erro(s)",
+        Msg::ShortcutsReset => "Restaurar",
+        Msg::ShortcutsResetTitle => "Restaurar o atalho padrão ({binding})",
+        Msg::SettingsThemeIgnoredCss => "Não reconhecido (ignorado): {items}",
     }
 }
