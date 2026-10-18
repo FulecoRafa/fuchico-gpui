@@ -13,7 +13,7 @@ gpui_kit::assets::icon_assets!(
     pub ExtraIcons,
     [
         AppWindow, CalendarClock, Files, FilePlus, FolderPlus, Hash, PenTool, Pencil, Scissors, Trash, X,
-        Link, Workflow, Download, Upload, Keyboard, Languages, Type, ListChecks, Clock, CircleDot,
+        Link, Link2, Workflow, Download, Upload, Keyboard, Languages, Type, ListChecks, Clock, CircleDot,
     ]
 );
 

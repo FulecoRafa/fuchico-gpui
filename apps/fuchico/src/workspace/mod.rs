@@ -382,6 +382,18 @@ impl Workspace {
         if self.view == view {
             return;
         }
+        fn hide<V: MainView>(v: &Option<Entity<V>>, window: &mut Window, cx: &mut App) {
+            if let Some(v) = v {
+                v.update(cx, |v, cx| v.on_hide(window, cx));
+            }
+        }
+        match self.view {
+            MainViewKind::Agenda => hide(&self.agenda, window, cx),
+            MainViewKind::Search => hide(&self.search, window, cx),
+            MainViewKind::Tags => hide(&self.tags, window, cx),
+            MainViewKind::Settings => hide(&self.settings, window, cx),
+            MainViewKind::Editor => {}
+        }
         self.view = view;
         let root = self.root.clone();
         let sub = match view {
