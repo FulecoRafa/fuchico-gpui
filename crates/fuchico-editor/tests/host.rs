@@ -5,7 +5,7 @@ mod common;
 
 use common::*;
 use fuchico_editor::{EditorEvent, EditorOptions, GoToLine, ZoomDirection};
-use gpui_kit::{ClipboardEntry, ClipboardItem, Image, ImageFormat, Modifiers, TestAppContext};
+use gpui_kit::{ClipboardEntry, ClipboardItem, Image, ImageFormat, Modifiers, TestAppContext, px};
 
 #[gpui_kit::test]
 async fn link_wikilink_and_tag_clicks(cx: &mut TestAppContext) {
@@ -148,6 +148,8 @@ async fn mermaid_open_update_close(cx: &mut TestAppContext) {
     let text = "intro\n```mermaid\ngraph TD\nA-->B\n```\nend\n";
     let mut ui = open(cx, text, EditorOptions::default());
     let p = ui.hit("Mermaid {");
+    // Inline after the opening line (margin-left 12px), not right-aligned.
+    assert!(p.x < px(400.), "{p:?}");
     ui.click(p, Modifiers::none());
     let key = ui
         .events()

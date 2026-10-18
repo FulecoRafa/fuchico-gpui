@@ -1954,7 +1954,7 @@ impl EditorView {
                 self.copied_fence = Some(fence);
                 cx.spawn(async move |this, cx| {
                     cx.background_executor()
-                        .timer(std::time::Duration::from_millis(1500))
+                        .timer(std::time::Duration::from_millis(2000))
                         .await;
                     let _ = this.update(cx, |v, cx| {
                         v.copied_fence = None;
