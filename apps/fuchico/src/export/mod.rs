@@ -77,6 +77,11 @@ pub fn stem(path: &str) -> String {
     base.to_string()
 }
 
+/// The save dialog's default file name: `<stem>.<ext>`.
+pub fn suggested_name(path: &str, ext: &str) -> String {
+    format!("{}.{ext}", stem(path))
+}
+
 fn note_dir(path: &str) -> PathBuf {
     Path::new(path).parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("/"))
 }
@@ -167,7 +172,7 @@ fn run_export(
     }
     let content = note_content(path, cx);
     let dir = note_dir(path);
-    let suggested = format!("{}.{ext}", stem(path));
+    let suggested = suggested_name(path, ext);
     let target = cx.prompt_for_new_path(&dir, Some(&suggested));
     window
         .spawn(cx, async move |cx| {
@@ -263,6 +268,9 @@ pub fn print_pdf(path: &str, window: &mut Window, cx: &mut App) {
 }
 
 #[cfg(test)]
+mod ui_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -274,6 +282,7 @@ mod tests {
         assert!(is_markdown("/v/A.Md"));
         assert!(!is_markdown("/v/a.excalidraw"));
         assert_eq!(note_dir("/v/a/n.md"), PathBuf::from("/v/a"));
+        assert_eq!(suggested_name("/v/a/My Note.md", "pdf"), "My Note.pdf");
     }
 
     #[test]
