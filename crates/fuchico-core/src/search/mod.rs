@@ -219,6 +219,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn search_caps_results_at_500_in_sorted_file_order() {
+        let dir = tempfile::tempdir().unwrap();
+        // 3 files x 200 matching lines = 600 hits; the cap stops at 500.
+        let body: String = (0..200).map(|i| format!("needle {i}\n")).collect();
+        for name in ["a.md", "b.md", "c.md"] {
+            std::fs::write(dir.path().join(name), &body).unwrap();
+        }
+        let root = dir.path().to_string_lossy().into_owned();
+        let hits = search_files(root, "NEEDLE".into()).unwrap();
+        assert_eq!(hits.len(), MAX_MATCHES);
+        assert_eq!(MAX_MATCHES, 500);
+        assert!(hits[..200].iter().all(|m| m.file.ends_with("a.md")));
+        assert!(hits[200..400].iter().all(|m| m.file.ends_with("b.md")));
+        assert!(hits[400..].iter().all(|m| m.file.ends_with("c.md")));
+        let last = hits.last().unwrap();
+        assert_eq!((last.line, last.text.as_str()), (100, "needle 99"));
+    }
+
+    #[test]
+    fn search_counts_one_hit_per_line_and_blank_query_is_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.md"), "aa aa aa\n").unwrap();
+        let root = dir.path().to_string_lossy().into_owned();
+        assert_eq!(search_files(root.clone(), "aa".into()).unwrap().len(), 1);
+        assert!(search_files(root, "   ".into()).unwrap().is_empty());
+    }
+
+    #[test]
     fn replaces_case_insensitively_and_reports_counts() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("a.md"), "Hello hello\nHELLO\n").unwrap();
