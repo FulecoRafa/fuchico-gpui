@@ -17,6 +17,7 @@ pub mod style;
 pub mod syntax;
 pub mod table;
 pub mod text;
+pub mod tree;
 
 use std::ops::Range;
 
@@ -31,6 +32,7 @@ pub use style::{CalloutKind, ColorToken, LineClass, LineHeight, ResolvedStyle, S
 pub use syntax::{BlockKind, Parsed};
 pub use table::{Align, TableData, TableEditState, TableKey, TableModel, TableOutcome};
 pub use text::{apply_edits, LineIndex, TextEdit};
+pub use tree::{SyntaxTree, TreeNode};
 
 use fuchico_core::outline::{extract_outline, OutlineHeader};
 use highlight::SnippetCache;
@@ -60,6 +62,12 @@ impl Default for Settings {
             inline_images: false,
         }
     }
+}
+
+/// Whether a file gets the Markdown language (live preview, syntax tree):
+/// no path, or a `.md` / `.markdown` file.
+pub fn is_markdown_path(path: Option<&str>) -> bool {
+    path.is_none_or(|p| languages::resolve_file_language(p).is_some_and(|l| l.is_markdown))
 }
 
 /// The live-preview model of one Markdown document.
@@ -106,7 +114,7 @@ impl MarkdownModel {
     }
 
     fn configure(&mut self, path: Option<&str>) {
-        self.markdown = path.is_none_or(|p| languages::resolve_file_language(p).is_some_and(|l| l.is_markdown));
+        self.markdown = is_markdown_path(path);
         self.code = if self.markdown {
             None
         } else {

@@ -352,9 +352,7 @@ impl EditorView {
         let engine = Editor::with_host(
             text,
             config,
-            Box::new(ViewHost {
-                shared: shared.clone(),
-            }),
+            Box::new(ViewHost::new(shared.clone())),
         );
         let normalized = engine.text();
         let model = MarkdownModel::with_path(&normalized, md_settings(&options), options.path.as_deref());
@@ -2382,25 +2380,6 @@ fn shifted(c: char) -> char {
         .unwrap_or_else(|| c.to_ascii_uppercase())
 }
 
-#[cfg(test)]
-mod key_tests {
-    use super::*;
-
-    fn ev(s: &str) -> KeyEvent {
-        to_helix(&Keystroke::parse(s).unwrap()).unwrap()
-    }
-
-    #[test]
-    fn alt_shift_punctuation_maps_to_the_shifted_char() {
-        assert_eq!(ev("alt-shift-;").key, Key::Char(':'));
-        assert!(ev("alt-shift-;").modifiers.alt);
-        assert_eq!(ev("alt-;").key, Key::Char(';'));
-        assert_eq!(ev("alt-shift-1").key, Key::Char('!'));
-        assert_eq!(ev("ctrl-shift-a").key, Key::Char('A'));
-        assert_eq!(ev("alt-shift-,").key, Key::Char('<'));
-    }
-}
-
 impl Render for EditorView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let st = self.style.clone();
@@ -2837,3 +2816,22 @@ trait WhenSel: Styled + Sized {
     }
 }
 impl<T: Styled> WhenSel for T {}
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+
+    fn ev(s: &str) -> KeyEvent {
+        to_helix(&Keystroke::parse(s).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn alt_shift_punctuation_maps_to_the_shifted_char() {
+        assert_eq!(ev("alt-shift-;").key, Key::Char(':'));
+        assert!(ev("alt-shift-;").modifiers.alt);
+        assert_eq!(ev("alt-;").key, Key::Char(';'));
+        assert_eq!(ev("alt-shift-1").key, Key::Char('!'));
+        assert_eq!(ev("ctrl-shift-a").key, Key::Char('A'));
+        assert_eq!(ev("alt-shift-,").key, Key::Char('<'));
+    }
+}

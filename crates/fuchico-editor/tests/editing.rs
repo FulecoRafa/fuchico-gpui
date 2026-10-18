@@ -312,3 +312,34 @@ async fn tab_size_option_sets_indent(cx: &mut TestAppContext) {
     ui.press("i tab");
     assert_eq!(ui.text(), "    x\n");
 }
+
+#[gpui_kit::test]
+async fn alt_o_i_n_p_walk_the_markdown_tree(cx: &mut TestAppContext) {
+    let text = "é *bold* end\n\n- x\n";
+    let mut ui = open(cx, text, EditorOptions::default());
+    let span = |ui: &mut common::Ui| {
+        let (a, h) = ui.sel();
+        (a.min(h), a.max(h))
+    };
+    ui.press("l l l"); // on `b` (char offsets: `é` is one char)
+    ui.press("alt-o");
+    assert_eq!(span(&mut ui), (2, 8), "Emphasis");
+    ui.press("alt-o");
+    assert_eq!(span(&mut ui), (0, 12), "Paragraph");
+    ui.press("alt-i");
+    assert_eq!(span(&mut ui), (2, 8));
+    ui.press("alt-o alt-n");
+    assert_eq!(span(&mut ui), (14, 17), "next sibling: the list");
+    ui.press("alt-p");
+    assert_eq!(span(&mut ui), (0, 12));
+
+    // Non-Markdown files have no Markdown tree: Alt-o is a no-op, Alt-n
+    // selects the whole document (cm-helix fallback).
+    let options = EditorOptions { path: Some("a.py".into()), ..EditorOptions::default() };
+    let mut ui = open(cx, "x = 1\ny = 2\n", options);
+    ui.press("l");
+    ui.press("alt-o");
+    assert_eq!(span(&mut ui), (1, 2));
+    ui.press("alt-n");
+    assert_eq!(span(&mut ui), (0, 12));
+}
