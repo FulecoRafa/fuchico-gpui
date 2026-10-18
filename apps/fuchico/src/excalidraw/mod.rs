@@ -341,6 +341,9 @@ pub fn create_drawing(dir: &str, name: &str) -> Result<String, String> {
 }
 
 #[cfg(test)]
+mod ui_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
