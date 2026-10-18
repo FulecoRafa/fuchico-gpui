@@ -357,7 +357,7 @@ impl EditorView {
             }),
         );
         let normalized = engine.text();
-        let model = MarkdownModel::new(&normalized, md_settings(&options));
+        let model = MarkdownModel::with_path(&normalized, md_settings(&options), options.path.as_deref());
         let mut view = EditorView {
             engine,
             shared,
@@ -550,6 +550,9 @@ impl EditorView {
         let settings = md_settings(&options);
         if settings != *self.model.settings() {
             self.model.set_settings(settings);
+        }
+        if options.path != self.options.path {
+            self.model.set_path(options.path.as_deref());
         }
         self.shared.borrow_mut().path = options.path.clone();
         let cfg = self.engine.config_mut();

@@ -405,7 +405,10 @@ impl MarkdownModel {
                     d.line_end = self.fence_widgets(fi as usize);
                 }
             }
-            d.styles = flatten_spans(&spans);
+            d.styles = match self.code_styles(l) {
+                Some(runs) => runs,
+                None => flatten_spans(&spans),
+            };
 
             // Replacements.
             let mut reps: Vec<Replacement> = Vec::new();

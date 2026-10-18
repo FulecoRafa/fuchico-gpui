@@ -287,6 +287,16 @@ enum Frame {
     Link,
 }
 
+/// The facts of a non-Markdown file: a bare document node, no blocks.
+pub fn plain(text: &str, idx: &LineIndex) -> Parsed {
+    Parsed {
+        lines: vec![LineInfo::default(); idx.len()],
+        line_nodes: vec![Vec::new(); idx.len()],
+        nodes: vec![Node { kind: NodeKind::Document, range: 0..text.len(), parent: None, children: Vec::new() }],
+        ..Default::default()
+    }
+}
+
 /// Parses `text` into the static decoration facts.
 pub fn parse(text: &str, idx: &LineIndex, inline_images: bool) -> Parsed {
     let mut b = Builder {

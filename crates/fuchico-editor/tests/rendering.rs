@@ -320,3 +320,19 @@ async fn table_block_has_no_line_numbers(cx: &mut TestAppContext) {
     let after = g.iter().find(|(l, _)| *l == 6).expect("line 7 numbered");
     assert_eq!(after.1, "7");
 }
+
+#[gpui_kit::test]
+async fn code_files_use_file_highlighting_not_markdown(cx: &mut TestAppContext) {
+    let options = EditorOptions { path: Some("src/main.py".into()), ..EditorOptions::default() };
+    let mut ui = open(cx, "# not a heading\nx = 1\n", options);
+    ui.frame();
+    assert!(!ui.read(|v, _| v.model().is_markdown()));
+    // Renaming to .md switches the live preview back on.
+    ui.update(|v, _, cx| {
+        let mut o = v.options().clone();
+        o.path = Some("src/main.md".into());
+        v.set_options(o, cx);
+    });
+    ui.frame();
+    assert!(ui.read(|v, _| v.model().is_markdown()));
+}

@@ -69,13 +69,61 @@ pub struct MarkdownModel {
     settings: Settings,
     parsed: Parsed,
     snippets: SnippetCache,
+    /// False for non-Markdown files: no live preview, only [`Self::code`].
+    markdown: bool,
+    /// Whole-file highlighter of a known non-Markdown language.
+    code: Option<std::sync::Mutex<FileHighlighter>>,
 }
 
 impl MarkdownModel {
     pub fn new(text: &str, settings: Settings) -> Self {
+        Self::with_path(text, settings, None)
+    }
+
+    /// Like [`Self::new`] for the file at `path`. As in the original (the
+    /// language compartment of `resolveLanguage(path)`), only `.md` /
+    /// `.markdown` files (or no path) get the Markdown live preview; other
+    /// known languages get whole-file syntax highlighting and unknown
+    /// extensions are plain text.
+    pub fn with_path(text: &str, settings: Settings, path: Option<&str>) -> Self {
         let lines = LineIndex::new(text);
-        let parsed = syntax::parse(text, &lines, settings.inline_images);
-        Self { text: text.to_string(), lines, settings, parsed, snippets: SnippetCache::default() }
+        let mut m = Self {
+            text: text.to_string(),
+            lines,
+            settings,
+            parsed: Parsed::default(),
+            snippets: SnippetCache::default(),
+            markdown: true,
+            code: None,
+        };
+        m.configure(path);
+        m
+    }
+
+    /// Re-targets the model at a new path (rename / language change).
+    pub fn set_path(&mut self, path: Option<&str>) {
+        self.configure(path);
+    }
+
+    fn configure(&mut self, path: Option<&str>) {
+        self.markdown = path.is_none_or(|p| languages::resolve_file_language(p).is_some_and(|l| l.is_markdown));
+        self.code = if self.markdown {
+            None
+        } else {
+            path.and_then(|p| FileHighlighter::for_path(p, &self.text)).map(std::sync::Mutex::new)
+        };
+        self.reparse();
+    }
+
+    /// True when the Markdown live preview applies (see [`Self::with_path`]).
+    pub fn is_markdown(&self) -> bool {
+        self.markdown
+    }
+
+    /// Syntax style runs of `line` for a non-Markdown file.
+    pub(crate) fn code_styles(&self, line: usize) -> Option<Vec<StyleRun>> {
+        let mut h = self.code.as_ref()?.lock().unwrap_or_else(|e| e.into_inner());
+        h.highlight(line..line + 1).pop()
     }
 
     /// Replaces the text. `edits` (old-document offsets) describe the change
@@ -83,16 +131,18 @@ impl MarkdownModel {
     /// itself is a full re-parse (fast enough, see the README), while fenced
     /// code highlighting is reused through a content-keyed cache.
     pub fn update(&mut self, text: &str, edits: &[TextEdit]) {
-        let _ = edits;
         self.text.clear();
         self.text.push_str(text);
+        if let Some(h) = &mut self.code {
+            h.get_mut().unwrap_or_else(|e| e.into_inner()).update(text, edits);
+        }
         self.reparse();
     }
 
     /// Applies `edits` (old-document offsets) to the current text.
     pub fn apply(&mut self, edits: &[TextEdit]) {
-        self.text = apply_edits(&self.text, edits);
-        self.reparse();
+        let text = apply_edits(&self.text, edits);
+        self.update(&text, edits);
     }
 
     /// [`Self::update`] from a rope.
@@ -103,7 +153,11 @@ impl MarkdownModel {
 
     fn reparse(&mut self) {
         self.lines = LineIndex::new(&self.text);
-        self.parsed = syntax::parse(&self.text, &self.lines, self.settings.inline_images);
+        self.parsed = if self.markdown {
+            syntax::parse(&self.text, &self.lines, self.settings.inline_images)
+        } else {
+            syntax::plain(&self.text, &self.lines)
+        };
     }
 
     pub fn set_settings(&mut self, settings: Settings) {
