@@ -67,5 +67,20 @@ impl Workspace {
                         .debug_selector(move || format!("activity:{i}"))
                     }),
             )
+            .when(crate::dev_marks::badge(cx), |d| {
+                d.child(div().flex_1()).child(
+                    div()
+                        .debug_selector(|| "gpui-badge".into())
+                        .mb(u(8.))
+                        .px(u(4.))
+                        .py(u(2.))
+                        .rounded(u(4.))
+                        .bg(th.colors.primary)
+                        .text_color(th.colors.primary_foreground)
+                        .text_size(u(9.))
+                        .font_weight(gpui_kit::FontWeight::BOLD)
+                        .child("GPUI"),
+                )
+            })
     }
 }

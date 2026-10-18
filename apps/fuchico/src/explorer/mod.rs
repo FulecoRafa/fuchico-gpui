@@ -1459,7 +1459,7 @@ impl Explorer {
             .when(is_drop, |d| d.border_1().border_color(th.colors.ring))
             .when(is_cut, |d| d.opacity(0.55))
             .child(chevron.text_color(muted))
-            .child(entry_icon(entry).size(u(14.)).flex_none().text_color(muted))
+            .child(entry_icon_el(entry, expanded, muted, cx))
             .child(
                 div()
                     .flex_1()
@@ -1508,6 +1508,29 @@ fn kind_icon(kind: PendingKind) -> Icon {
     match kind {
         PendingKind::Dir => IconName::Folder.into(),
         PendingKind::File => IconName::File.into(),
+    }
+}
+
+/// The row icon: the opt-in Zed icon theme's coloured SVG when one is set
+/// (`crate::dev_marks`), else [`entry_icon`].
+fn entry_icon_el(entry: &Entry, expanded: bool, muted: gpui_kit::Hsla, cx: &App) -> AnyElement {
+    let themed = crate::dev_marks::icon_theme(cx).and_then(|t| {
+        if entry.is_dir {
+            t.dir_icon(&entry.name, expanded)
+        } else {
+            t.file_icon(&entry.name)
+        }
+    });
+    match themed {
+        Some(path) => gpui_kit::img(path.to_path_buf())
+            .size(u(14.))
+            .flex_none()
+            .into_any_element(),
+        None => entry_icon(entry)
+            .size(u(14.))
+            .flex_none()
+            .text_color(muted)
+            .into_any_element(),
     }
 }
 
