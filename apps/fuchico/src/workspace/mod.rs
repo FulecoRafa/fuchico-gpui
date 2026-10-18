@@ -811,3 +811,6 @@ mod tests {
         assert_eq!(plan_open_requests(&paths, Some("/v")), vec![Step::Window("/vault/a.md".into())]);
     }
 }
+
+#[cfg(test)]
+mod snapshot_tests;

@@ -57,8 +57,10 @@ pub fn snapshot_dir() -> PathBuf {
 
 /// Points `persist` at a scratch config dir before anything reads it, so
 /// snapshots never touch (or depend on) the user's real settings.
-fn isolate_config() {
-    let dir = snapshot_dir().join(".config");
+fn isolate_config(name: &str) {
+    // Fresh per snapshot, so leftovers (custom themes, …) never leak in.
+    let dir = snapshot_dir().join(".config").join(name);
+    let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     crate::persist::set_test_dir(dir);
 }
@@ -93,7 +95,7 @@ pub fn snapshot_with<V: Render>(
     build: impl FnOnce(&mut Window, &mut App) -> Entity<V>,
     prepare: impl FnOnce(&Entity<V>, &mut Window, &mut App),
 ) -> PathBuf {
-    isolate_config();
+    isolate_config(name);
     let mut cx = HeadlessAppContext::with_platform(text_system(), Arc::new(crate::assets::Assets), || {
         gpui_platform::current_headless_renderer()
     });
@@ -109,9 +111,12 @@ pub fn snapshot_with<V: Render>(
     let view = content.expect("view built");
     cx.run_until_parked();
     cx.update_window(handle.into(), |_, window, cx| prepare(&view, window, cx)).expect("prepare");
-    // Background work (file scans) may hop threads; let it land.
+    // Background work (file scans, the 200ms search debounce) may hop
+    // threads or wait on timers; let it land.
     cx.allow_parking();
-    for _ in 0..20 {
+    for _ in 0..50 {
+        // The test clock is virtual: step it so debounce timers fire.
+        cx.advance_clock(std::time::Duration::from_millis(50));
         cx.run_until_parked();
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
