@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use fuchico_mermaid::{Chrome, MermaidEvent, MermaidView};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyWindowHandle, App, Bounds, Context, Entity, Global, Subscription, TitlebarOptions, WeakEntity, Window, WindowBounds,
+    AnyWindowHandle, App, Context, Entity, Global, Subscription, TitlebarOptions, WeakEntity, Window,
     WindowOptions, div, px, size,
 };
 
@@ -56,11 +56,8 @@ pub fn open_mermaid_window(block_key: String, label: String, text: Option<String
         registry(cx).remove(&wl);
     }
     let opts = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
-            None,
-            size(px(WINDOW_SIZE.0), px(WINDOW_SIZE.1)),
-            cx,
-        ))),
+        // Remembered per label, like the original's window-state plugin.
+        window_bounds: Some(crate::windows::geometry::initial_bounds(&wl, WINDOW_SIZE, cx)),
         titlebar: Some(TitlebarOptions { title: Some(label.clone().into()), ..Default::default() }),
         window_min_size: Some(size(px(320.), px(240.))),
         app_id: Some("fuchico".into()),
@@ -95,6 +92,7 @@ impl MermaidWindow {
     ) -> Self {
         let view = super::new_view(&label, Chrome::Window, text, cx);
         let subs = vec![
+            crate::windows::geometry::track(window_label(&block_key), window, cx),
             bus::subscribe(cx, |this: &mut MermaidWindow, ev, cx| {
                 super::apply_update(&this.block_key, ev, &this.view, cx);
             }),
@@ -141,8 +139,35 @@ impl Render for MermaidWindow {
 
 #[cfg(test)]
 mod tests {
+    use gpui_kit::{TestAppContext, VisualTestContext, px, size};
+
+    use crate::windows::geometry;
+
     #[test]
     fn labels() {
         assert_eq!(super::window_label("k-1"), "mermaid-k-1");
+    }
+
+    #[gpui_kit::test]
+    async fn window_geometry_is_remembered(cx: &mut TestAppContext) {
+        crate::persist::set_test_dir(crate::test_ui::temp_dir("mermaid-geom-cfg"));
+        cx.update(crate::test_ui::init_shell);
+        let open = |cx: &mut TestAppContext| {
+            cx.update(|cx| super::open_mermaid_window("k".into(), "Diagram".into(), Some("graph TD\nA-->B".into()), cx));
+            cx.run_until_parked();
+            cx.update(|cx| super::registry(cx).get("mermaid-k").unwrap().0)
+        };
+        let h = open(cx);
+        let vcx = VisualTestContext::from_window(h, cx);
+        vcx.simulate_resize(size(px(900.), px(650.)));
+        vcx.run_until_parked();
+        let saved = cx.read(|cx| geometry::initial_bounds("mermaid-k", super::WINDOW_SIZE, cx).get_bounds());
+        assert_eq!((saved.size.width, saved.size.height), (px(900.), px(650.)), "recorded under the window label");
+
+        cx.update(|cx| h.update(cx, |_, w, _| w.remove_window()).unwrap());
+        cx.run_until_parked();
+        let h = open(cx);
+        let b = cx.update(|cx| h.update(cx, |_, w, _| w.bounds()).unwrap());
+        assert_eq!((b.size.width, b.size.height), (px(900.), px(650.)));
     }
 }
