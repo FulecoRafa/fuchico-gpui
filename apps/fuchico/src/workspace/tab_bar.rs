@@ -6,7 +6,7 @@
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::prelude::*;
-use gpui_kit::{Context, SharedString, WeakEntity, div};
+use gpui_kit::{Context, KeyDownEvent, SharedString, WeakEntity, div};
 
 use super::Workspace;
 use super::tabs::basename;
@@ -18,7 +18,15 @@ pub const TAB_HEIGHT: f32 = 32.;
 pub const TAB_MAX_WIDTH: f32 = 200.;
 
 impl Workspace {
-    pub(super) fn render_tab_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    /// The tab's focus handle, created on first render.
+    fn tab_focus_handle(&mut self, path: &str, cx: &mut Context<Self>) -> gpui_kit::FocusHandle {
+        self.tab_focus.entry(path.to_string()).or_insert_with(|| cx.focus_handle().tab_stop(true)).clone()
+    }
+
+    pub(super) fn render_tab_bar(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let open: Vec<String> = self.tabs.tabs.iter().map(|t| t.path.clone()).collect();
+        self.tab_focus.retain(|p, _| open.contains(p));
+        let focus: Vec<_> = open.iter().map(|p| self.tab_focus_handle(p, cx)).collect();
         let th = AppTheme::get(cx).clone();
         let entity = cx.entity().downgrade();
         let count = self.tabs.len();
@@ -33,10 +41,34 @@ impl Workspace {
                 let is_active = active.as_deref() == Some(path.as_str());
                 let name: SharedString = basename(&path).to_string().into();
                 let tip: SharedString = path.clone().into();
-                let (e_click, e_close, e_menu) = (entity.clone(), entity.clone(), entity.clone());
-                let (p_click, p_close, p_menu) = (path.clone(), path.clone(), path.clone());
+                let (e_click, e_close, e_menu, e_key) = (entity.clone(), entity.clone(), entity.clone(), entity.clone());
+                let (p_click, p_close, p_menu, p_key) = (path.clone(), path.clone(), path.clone(), path.clone());
+                let focus_tint = th.fg_alpha(0.08);
                 div()
                     .id(("tab", i))
+                    .debug_selector(move || format!("tab-{i}"))
+                    .track_focus(&focus[i])
+                    .focus_visible(move |s| s.bg(focus_tint))
+                    .on_key_down(move |ev: &KeyDownEvent, w, cx| {
+                        let k = &ev.keystroke;
+                        let m = &k.modifiers;
+                        if m.platform || m.control || m.alt {
+                            return;
+                        }
+                        match k.key.as_str() {
+                            // The original: Enter / Space select the tab.
+                            "enter" | "space" if !m.shift => {
+                                cx.stop_propagation();
+                                e_key.update(cx, |this, cx| this.activate_tab(&p_key, w, cx)).ok();
+                            }
+                            // Browser tab order between tab stops.
+                            "tab" => {
+                                cx.stop_propagation();
+                                if m.shift { w.focus_prev(cx) } else { w.focus_next(cx) }
+                            }
+                            _ => {}
+                        }
+                    })
                     .flex()
                     .flex_none()
                     .items_center()
@@ -70,7 +102,8 @@ impl Workspace {
                             cx.stop_propagation();
                             e_close.update(cx, |this, cx| this.close_tab(&p_close, w, cx)).ok();
                         }
-                    }))
+                    })
+                    .debug_selector(move || format!("tab-close-{i}")))
                     .context_menu(move |menu, _, _| tab_menu(menu, e_menu.clone(), p_menu.clone(), count))
             })
             .collect();
