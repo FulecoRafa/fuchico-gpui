@@ -16,3 +16,17 @@ chrono.workspace = true
 futures = "0.3"
 sys-locale = "0.3"
 rand = "0.9"
+
+[dev-dependencies]
+# Headless UI tests (`#[gpui_kit::test]`): enables gpui's TestAppContext.
+# Not gpui-kit/test-support: its weak `gpui-fast?/…` features drag the
+# conflicting gpui-fast tree into the lockfile.
+gpui-pre = { version = "=0.3.9", features = ["test-support"] }
+# Offscreen snapshots (src/snapshot.rs): headless Metal renderer + PNG output.
+gpui-pre-platform = { version = "=0.3.9", features = ["test-support"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+# Snapshot text system off the main thread (MacPlatform::new requires the
+# main thread; libtest runs tests on worker threads).
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+gpui-pre-apple = { version = "=0.3.9", features = ["font-kit"] }

@@ -31,6 +31,10 @@ pub enum AppEvent {
     ExportRequest { key: String },
     /// `export:html {key, html}`.
     ExportHtml { key: String, html: String },
+    /// `pane:goto-line {path, line}` — ask the pane hosting `path` (in any
+    /// window) to reveal 1-based `line` (agenda row click). A pane that is
+    /// still loading keeps it pending; panes for other paths ignore it.
+    GotoLine { path: String, line: u32 },
 }
 
 impl AppEvent {
@@ -44,6 +48,7 @@ impl AppEvent {
             AppEvent::MermaidDockRequest { .. } => "mermaid:dock-request",
             AppEvent::ExportRequest { .. } => "export:request",
             AppEvent::ExportHtml { .. } => "export:html",
+            AppEvent::GotoLine { .. } => "pane:goto-line",
         }
     }
 }
