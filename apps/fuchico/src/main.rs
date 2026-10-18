@@ -69,7 +69,7 @@ fn main() {
         caldav::init(cx);
         theme::init(cx);
         keymap::bind_global_keys(cx);
-        fuchico_editor::init(cx);
+        crate::editor::init(cx);
         windows::register_global_actions(cx);
         windows::menu::install(cx);
         if let Some(l) = listener {

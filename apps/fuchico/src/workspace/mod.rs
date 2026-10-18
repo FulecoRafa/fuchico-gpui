@@ -150,6 +150,12 @@ impl Workspace {
         self.view
     }
 
+    /// The active tab's editor pane, if it is one.
+    #[cfg(test)]
+    pub fn active_editor(&self) -> Option<Entity<crate::editor::EditorPane>> {
+        self.pane.as_ref().and_then(|p| p.handle.view().downcast::<crate::editor::EditorPane>().ok())
+    }
+
     #[cfg(test)]
     pub fn explorer(&self) -> &Entity<Explorer> {
         &self.explorer

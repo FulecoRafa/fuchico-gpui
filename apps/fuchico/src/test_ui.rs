@@ -36,7 +36,7 @@ pub fn init_shell(cx: &mut App) {
     bus::init(cx);
     crate::theme::init(cx);
     crate::keymap::bind_global_keys(cx);
-    fuchico_editor::init(cx);
+    crate::editor::init(cx);
 }
 
 /// Opens a 1200×800 test window holding a fresh [`crate::workspace::Workspace`].
