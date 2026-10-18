@@ -41,7 +41,7 @@ fn snapshot(
     let mut cx = HeadlessAppContext::with_platform(
         text_system(),
         Arc::new(gpui_kit::assets::Assets),
-        || gpui_platform::current_headless_renderer(),
+        gpui_platform::current_headless_renderer,
     );
     cx.update(|cx| {
         gpui_kit::init(cx);
