@@ -216,6 +216,14 @@ impl SettingsView {
             let Ok(Ok(Some(paths))) = picked.await else { return };
             let Some(path) = paths.into_iter().next() else { return };
             let p = path.to_string_lossy().to_string();
+            if !files::is_css_path(&p) {
+                this.update(cx, |this, cx| {
+                    this.appearance.theme_status = Some((crate::t!(SettingsThemeImportFailed), false));
+                    cx.notify();
+                })
+                .ok();
+                return;
+            }
             let read = cx.background_spawn({
                 let p = p.clone();
                 async move { fuchico_core::fs::file::fs_read_file(p) }
@@ -250,7 +258,7 @@ impl SettingsView {
         let target = cx.prompt_for_new_path(&dir, Some(&file_name));
         cx.spawn_in(window, async move |this, cx| {
             let Ok(Ok(Some(path))) = target.await else { return };
-            let p = path.to_string_lossy().to_string();
+            let p = files::with_css_extension(path).to_string_lossy().to_string();
             let write = cx.background_spawn(async move {
                 fuchico_core::fs::file::fs_write_file(
                     p,
