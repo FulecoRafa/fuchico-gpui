@@ -37,10 +37,11 @@ fn fontdb() -> Arc<usvg::fontdb::Database> {
 }
 
 fn options() -> usvg::Options<'static> {
-    let mut o = usvg::Options::default();
-    o.fontdb = fontdb();
-    o.font_family = "Helvetica Neue".into();
-    o
+    usvg::Options {
+        fontdb: fontdb(),
+        font_family: "Helvetica Neue".into(),
+        ..Default::default()
+    }
 }
 
 /// Quantize a wanted render scale so zooming does not re-rasterize on every
@@ -62,7 +63,7 @@ pub fn rasterize(svg: &str, scale: f32) -> Result<Raster, MermaidError> {
         .ok_or_else(|| MermaidError { message: "Diagram too large to rasterize".into(), line: None })?;
     resvg::render(&tree, tiny_skia::Transform::from_scale(scale, scale), &mut pixmap.as_mut());
     let mut data = pixmap.take();
-    for px in data.chunks_exact_mut(4) {
+    for px in data.as_chunks_mut::<4>().0 {
         px.swap(0, 2);
     }
     let buf = RgbaImage::from_raw(pw.max(1), ph.max(1), data).expect("pixmap size matches");

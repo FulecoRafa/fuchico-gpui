@@ -6,7 +6,9 @@
 //! * Main thread: [`emit`] delivers synchronously.
 //! * Views in every window subscribe with [`subscribe`] / [`subscribe_in`].
 
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
+#[cfg(not(test))]
+use std::sync::OnceLock;
 
 use futures::StreamExt;
 use futures::channel::mpsc::{UnboundedSender, unbounded};
@@ -21,16 +23,20 @@ pub enum AppEvent {
     Core(CoreEvent),
     /// `mermaid:update {blockKey, text|null}` — editor → diagram dock.
     MermaidUpdate { block_key: String, text: Option<String> },
-    /// `mermaid:request` — diagram window asks editors to re-send.
-    MermaidRequest,
-    /// `mermaid:closed` — the detached diagram window went away.
-    MermaidClosed,
+    /// `mermaid:request {blockKey}` — a diagram view asks the editor to re-send.
+    MermaidRequest { block_key: String },
+    /// `mermaid:closed {blockKey}` — the diagram dock/window went away.
+    MermaidClosed { block_key: String },
     /// `mermaid:dock-request {blockKey, label}` — detached diagram → dock.
     MermaidDockRequest { block_key: String, label: String },
     /// `export:request {key}`.
     ExportRequest { key: String },
     /// `export:html {key, html}`.
     ExportHtml { key: String, html: String },
+    /// `pane:goto-line {path, line}` — ask the pane hosting `path` (in any
+    /// window) to reveal 1-based `line` (agenda row click). A pane that is
+    /// still loading keeps it pending; panes for other paths ignore it.
+    GotoLine { path: String, line: u32 },
 }
 
 impl AppEvent {
@@ -39,11 +45,12 @@ impl AppEvent {
         match self {
             AppEvent::Core(e) => e.name(),
             AppEvent::MermaidUpdate { .. } => "mermaid:update",
-            AppEvent::MermaidRequest => "mermaid:request",
-            AppEvent::MermaidClosed => "mermaid:closed",
+            AppEvent::MermaidRequest { .. } => "mermaid:request",
+            AppEvent::MermaidClosed { .. } => "mermaid:closed",
             AppEvent::MermaidDockRequest { .. } => "mermaid:dock-request",
             AppEvent::ExportRequest { .. } => "export:request",
             AppEvent::ExportHtml { .. } => "export:html",
+            AppEvent::GotoLine { .. } => "pane:goto-line",
         }
     }
 }
@@ -57,14 +64,44 @@ struct BusGlobal(Entity<EventBus>);
 
 impl Global for BusGlobal {}
 
+#[cfg(not(test))]
 static TX: OnceLock<UnboundedSender<AppEvent>> = OnceLock::new();
+
+#[cfg(not(test))]
+fn bind_sender(tx: UnboundedSender<AppEvent>) -> bool {
+    TX.set(tx).is_ok()
+}
+
+#[cfg(not(test))]
+fn sender() -> Option<UnboundedSender<AppEvent>> {
+    TX.get().cloned()
+}
+
+// Tests: one sender per test thread, so every `#[gpui_kit::test]` (whose
+// executor runs foreground and background tasks on its own thread) gets
+// its own bus instead of the first test's.
+#[cfg(test)]
+thread_local! {
+    static TX: std::cell::RefCell<Option<UnboundedSender<AppEvent>>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn bind_sender(tx: UnboundedSender<AppEvent>) -> bool {
+    TX.with(|t| *t.borrow_mut() = Some(tx));
+    true
+}
+
+#[cfg(test)]
+fn sender() -> Option<UnboundedSender<AppEvent>> {
+    TX.with(|t| t.borrow().clone())
+}
 
 /// Creates the bus and starts the main-thread pump. Call once at startup.
 pub fn init(cx: &mut App) {
     let bus = cx.new(|_| EventBus);
     cx.set_global(BusGlobal(bus));
     let (tx, mut rx) = unbounded::<AppEvent>();
-    if TX.set(tx).is_err() {
+    if !bind_sender(tx) {
         log::warn!("bus::init called twice");
         return;
     }
@@ -85,7 +122,7 @@ pub fn emit(cx: &mut App, ev: AppEvent) {
 
 /// Queues `ev` from any thread.
 pub fn send(ev: AppEvent) {
-    match TX.get() {
+    match sender() {
         Some(tx) => {
             let _ = tx.unbounded_send(ev);
         }
@@ -115,4 +152,10 @@ pub fn subscribe_in<V: 'static>(
 ) -> Subscription {
     let bus = cx.global::<BusGlobal>().0.clone();
     cx.subscribe_in(&bus, window, move |this, _, ev, window, cx| f(this, ev, window, cx))
+}
+
+/// App-level subscription (no view), e.g. background services.
+pub fn subscribe_app(cx: &mut App, mut f: impl FnMut(&AppEvent, &mut App) + 'static) -> Subscription {
+    let bus = cx.global::<BusGlobal>().0.clone();
+    cx.subscribe(&bus, move |_, ev, cx| f(ev, cx))
 }

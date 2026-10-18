@@ -16,3 +16,28 @@ chrono.workspace = true
 futures = "0.3"
 sys-locale = "0.3"
 rand = "0.9"
+lsp-types = "0.97"
+fuchico-excalidraw.workspace = true
+fuchico-mermaid.workspace = true
+fuchico-markdown.workspace = true
+pulldown-cmark.workspace = true
+typst = "0.15"
+typst-pdf = "0.15"
+typst-kit = { version = "0.15", default-features = false, features = ["scan-fonts", "embedded-fonts"] }
+base64.workspace = true
+typst-layout = "0.15"
+
+[dev-dependencies]
+# Headless UI tests (`#[gpui_kit::test]`): enables gpui's TestAppContext.
+# Not gpui-kit/test-support: its weak `gpui-fast?/…` features drag the
+# conflicting gpui-fast tree into the lockfile.
+gpui-pre = { version = "=0.3.9", features = ["test-support"] }
+# Offscreen snapshots (src/snapshot.rs): headless Metal renderer + PNG output.
+gpui-pre-platform = { version = "=0.3.9", features = ["test-support"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+tempfile = "3"
+
+# Snapshot text system off the main thread (MacPlatform::new requires the
+# main thread; libtest runs tests on worker threads).
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+gpui-pre-apple = { version = "=0.3.9", features = ["font-kit"] }

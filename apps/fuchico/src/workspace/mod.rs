@@ -86,6 +86,8 @@ pub struct Workspace {
     watcher: Option<VaultWatcher>,
     focus: FocusHandle,
     _subs: Vec<Subscription>,
+    /// Command palette / quick switcher overlays.
+    pub palette: palette::PaletteHost,
 }
 
 impl Focusable for Workspace {
@@ -125,6 +127,7 @@ impl Workspace {
             watcher: None,
             focus,
             _subs: subs,
+            palette: Default::default(),
         };
         this.restore_vault(window, cx);
         this
@@ -145,6 +148,11 @@ impl Workspace {
 
     pub fn main_view(&self) -> MainViewKind {
         self.view
+    }
+
+    #[cfg(test)]
+    pub fn explorer(&self) -> &Entity<Explorer> {
+        &self.explorer
     }
 
     // ----- vault lifecycle -------------------------------------------------
@@ -188,7 +196,9 @@ impl Workspace {
         }
         self.root = root.clone();
         self.watcher = None;
-        if let Some(dir) = root.clone() {
+        // No watcher under `cargo test`: its thread would trip gpui's
+        // deterministic test scheduler (tests emit fs:changed themselves).
+        if let Some(dir) = root.clone().filter(|_| !cfg!(test)) {
             let start = cx.background_spawn(async move {
                 let res = VaultWatcher::start(&dir, bus::sink());
                 (dir, res)
@@ -214,6 +224,9 @@ impl Workspace {
         push(&self.search, &root, cx);
         push(&self.tags, &root, cx);
         push(&self.settings, &root, cx);
+        if let Some(Dock::Backlinks(b)) = &self.dock {
+            b.update(cx, |b, cx| b.set_root(root.clone(), cx));
+        }
         cx.notify();
     }
 
@@ -293,6 +306,18 @@ impl Workspace {
         cx.notify();
     }
 
+    /// Focuses the mounted pane (editor-targeted palette commands dispatch
+    /// from there). False without one.
+    pub fn focus_active_pane(&self, window: &mut Window, cx: &mut App) -> bool {
+        match &self.pane {
+            Some(p) => {
+                p.handle.focus(window, cx);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Mounts the active tab's pane (remounting when the active path
     /// changed) and pushes the active file to the explorer and backlinks.
     fn sync_pane(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -332,7 +357,7 @@ impl Workspace {
             PaneEvent::OpenMermaid { block_key, initial_text } => {
                 self.open_mermaid(block_key.clone(), crate::t!(AppDiagram), Some(initial_text.clone()), window, cx)
             }
-            PaneEvent::OpenCommandPalette(q) => palette::open(PaletteKind::Commands { query: q.clone() }, window, cx),
+            PaneEvent::OpenCommandPalette(q) => palette::open(self, PaletteKind::Commands { query: q.clone() }, window, cx),
             PaneEvent::Close => self.close_tab(&path, window, cx),
         }
     }
@@ -382,7 +407,26 @@ impl Workspace {
         if self.view == view {
             return;
         }
+        fn hide<V: MainView>(v: &Option<Entity<V>>, window: &mut Window, cx: &mut App) {
+            if let Some(v) = v {
+                v.update(cx, |v, cx| v.on_hide(window, cx));
+            }
+        }
+        match self.view {
+            MainViewKind::Agenda => hide(&self.agenda, window, cx),
+            MainViewKind::Search => hide(&self.search, window, cx),
+            MainViewKind::Tags => hide(&self.tags, window, cx),
+            MainViewKind::Settings => hide(&self.settings, window, cx),
+            MainViewKind::Editor => {}
+        }
         self.view = view;
+        // Focus may sit in the editor pane, which unmounts now; a focus
+        // outside the rendered tree drops the `Workspace` key context (and
+        // with it Mod-P / Mod-Shift-P). Park it on the workspace root, which
+        // every main view renders inside.
+        if view != MainViewKind::Editor {
+            window.focus(&self.focus, cx);
+        }
         let root = self.root.clone();
         let sub = match view {
             MainViewKind::Editor => {
@@ -398,6 +442,10 @@ impl Workspace {
             MainViewKind::Settings => ensure(&mut self.settings, root, window, cx, SettingsView::new),
         };
         self._subs.extend(sub);
+        // The search panel autofocuses its query input on mount.
+        if let (MainViewKind::Search, Some(search)) = (view, self.search.clone()) {
+            search.update(cx, |s, cx| s.focus_input(window, cx));
+        }
         cx.notify();
     }
 
@@ -449,7 +497,7 @@ impl Workspace {
             self.dock_subs.clear();
         } else {
             let target = backlinks_target(self.tabs.active.as_deref());
-            let pane = cx.new(|cx| BacklinksPane::new(target, window, cx));
+            let pane = cx.new(|cx| BacklinksPane::new(self.root.clone(), target, window, cx));
             let open = cx.subscribe_in(&pane, window, |this, _, ev: &ViewEvent, window, cx| {
                 this.on_view_event(ev, window, cx)
             });
@@ -528,10 +576,10 @@ impl Workspace {
                     p.handle.save(w, cx);
                 }
             }))
-            .on_action(cx.listener(|_, _: &CommandPalette, w, cx| {
-                palette::open(PaletteKind::Commands { query: String::new() }, w, cx)
+            .on_action(cx.listener(|this, _: &CommandPalette, w, cx| {
+                palette::open(this, PaletteKind::Commands { query: String::new() }, w, cx)
             }))
-            .on_action(cx.listener(|_, _: &QuickOpen, w, cx| palette::open(PaletteKind::QuickOpen, w, cx)))
+            .on_action(cx.listener(|this, _: &QuickOpen, w, cx| palette::open(this, PaletteKind::QuickOpen, w, cx)))
     }
 
     // ----- rendering -------------------------------------------------------
@@ -589,7 +637,22 @@ impl Workspace {
             None => area.child(crate::ui::empty_state(crate::t!(AppNoFileOpen), cx)),
             Some(p) => {
                 let view = p.handle.view();
-                area.child(self.render_tab_bar(cx)).child(div().flex_1().min_h_0().child(view))
+                // Explorer rows dropped on the editor insert links.
+                let drop_bg = crate::theme::alpha(AppTheme::get(cx).colors.accent, 0.25);
+                let drop = cx.listener(|this, paths: &crate::explorer::DraggedPaths, window, cx| {
+                    if let Some(p) = &this.pane {
+                        p.handle.insert_dropped_paths(&paths.0, window, cx);
+                    }
+                });
+                area.child(self.render_tab_bar(cx)).child(
+                    div()
+                        .id("editor-drop")
+                        .flex_1()
+                        .min_h_0()
+                        .drag_over::<crate::explorer::DraggedPaths>(move |s, _, _, _| s.bg(drop_bg))
+                        .on_drop(drop)
+                        .child(view),
+                )
             }
         }
     }
@@ -654,6 +717,7 @@ impl Render for Workspace {
             .id("workspace")
             .key_context("Workspace")
             .track_focus(&self.focus)
+            .relative()
             .size_full()
             .flex()
             .bg(th.colors.background)
@@ -686,6 +750,7 @@ impl Render for Workspace {
                 .child(div().flex_1().min_w_0().h_full().overflow_hidden().child(main))
                 .children(self.render_dock(cx)),
         )
+        .children(palette::render_overlays(self))
     }
 }
 
@@ -746,3 +811,6 @@ mod tests {
         assert_eq!(plan_open_requests(&paths, Some("/v")), vec![Step::Window("/vault/a.md".into())]);
     }
 }
+
+#[cfg(test)]
+mod snapshot_tests;

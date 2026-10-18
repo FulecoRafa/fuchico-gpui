@@ -25,6 +25,12 @@ impl SettingsStore {
         SettingsStore { settings: Arc::new(Settings::from_json(raw.as_deref())) }
     }
 
+    /// A store holding `settings`, not backed by the persisted file (tests).
+    #[cfg(test)]
+    pub fn with(settings: Settings) -> SettingsStore {
+        SettingsStore { settings: Arc::new(settings) }
+    }
+
     pub fn init(store: SettingsStore, cx: &mut App) {
         crate::i18n::set_language(store.settings.language);
         cx.set_global(store);

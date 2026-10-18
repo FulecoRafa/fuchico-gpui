@@ -110,6 +110,27 @@ pub fn fs_write_file(
     Ok(())
 }
 
+/// [`fs_write_file`] for binary content (e.g. an exported PDF): same
+/// atomic write, permission keeping and `fs:file-written` event.
+pub fn fs_write_bytes(
+    path: String,
+    content: &[u8],
+    source: Option<String>,
+    sink: &dyn EventSink,
+) -> Result<(), String> {
+    let target = PathBuf::from(&path);
+    let original_permissions = fs::metadata(&target).ok().map(|m| m.permissions());
+    write_atomic(&target, content).map_err(|e| {
+        log::warn!("fs_write_bytes({}) failed: {e}", target.display());
+        e.to_string()
+    })?;
+    if let Some(perms) = original_permissions {
+        let _ = fs::set_permissions(&target, perms);
+    }
+    sink.emit(CoreEvent::FileWritten { path, source });
+    Ok(())
+}
+
 pub fn fs_canonicalize(path: String) -> Result<String, String> {
     let p = PathBuf::from(&path);
     let canon = std::fs::canonicalize(&p).map_err(|e| e.to_string())?;
@@ -136,6 +157,35 @@ pub fn fs_stat(path: String) -> Result<FileStat, String> {
         size: meta.len(),
         mtime,
         kind,
+    })
+}
+
+
+/// Writes raw bytes (base64-encoded over IPC) — used for pasted/dropped
+/// image attachments. Creates the parent directory as needed and refuses to
+/// overwrite an existing file so attachments are never clobbered.
+pub fn fs_write_binary(path: String, data_base64: String) -> Result<(), String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_base64.as_bytes())
+        .map_err(|e| format!("invalid base64: {e}"))?;
+    fs_write_binary_bytes(&path, &bytes)
+}
+
+/// Native-API variant of [`fs_write_binary`] taking raw bytes (no base64 hop).
+/// Note the original validated existence before decoding; both orders fail
+/// the same way for valid input.
+pub fn fs_write_binary_bytes(path: &str, bytes: &[u8]) -> Result<(), String> {
+    let target = PathBuf::from(&path);
+    if target.exists() {
+        return Err(format!("already exists: {}", target.display()));
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    write_atomic(&target, bytes).map_err(|e| {
+        log::warn!("fs_write_binary({}) failed: {e}", target.display());
+        e.to_string()
     })
 }
 
@@ -208,32 +258,4 @@ mod tests {
         // The pre-staged symlink target must not have been written through.
         assert_eq!(std::fs::read(&outside).unwrap(), b"untouched");
     }
-}
-
-/// Writes raw bytes (base64-encoded over IPC) — used for pasted/dropped
-/// image attachments. Creates the parent directory as needed and refuses to
-/// overwrite an existing file so attachments are never clobbered.
-pub fn fs_write_binary(path: String, data_base64: String) -> Result<(), String> {
-    use base64::Engine;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(data_base64.as_bytes())
-        .map_err(|e| format!("invalid base64: {e}"))?;
-    fs_write_binary_bytes(&path, &bytes)
-}
-
-/// Native-API variant of [`fs_write_binary`] taking raw bytes (no base64 hop).
-/// Note the original validated existence before decoding; both orders fail
-/// the same way for valid input.
-pub fn fs_write_binary_bytes(path: &str, bytes: &[u8]) -> Result<(), String> {
-    let target = PathBuf::from(&path);
-    if target.exists() {
-        return Err(format!("already exists: {}", target.display()));
-    }
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    write_atomic(&target, bytes).map_err(|e| {
-        log::warn!("fs_write_binary({}) failed: {e}", target.display());
-        e.to_string()
-    })
 }

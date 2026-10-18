@@ -5,7 +5,7 @@
 //! the vault root through [`MainView::set_root`] and talk back with
 //! [`ViewEvent`]s / [`DockEvent`]s.
 
-use gpui_kit::{Context, EventEmitter, Render};
+use gpui_kit::{Context, EventEmitter, Render, Window};
 
 /// Requests from a main view or the explorer to the shell.
 #[derive(Clone, Debug, PartialEq)]
@@ -26,6 +26,10 @@ pub enum ViewEvent {
 pub trait MainView: Render + EventEmitter<ViewEvent> + Sized + 'static {
     /// Called on creation and whenever the vault changes (`None` = no vault).
     fn set_root(&mut self, root: Option<String>, cx: &mut Context<Self>);
+    /// The shell switched to another main view. The original unmounted the
+    /// view here, dropping its component-local state; views that had such
+    /// state reset it.
+    fn on_hide(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {}
 }
 
 /// Dock panel → shell.

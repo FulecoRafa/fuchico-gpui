@@ -46,6 +46,7 @@ impl Workspace {
                     .pl(u(10.))
                     .pr(u(8.))
                     .text_size(u(12.))
+                    .font_family(th.ui_font.clone())
                     .border_r_1()
                     .border_color(th.colors.border)
                     .cursor_pointer()

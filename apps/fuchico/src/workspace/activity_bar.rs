@@ -45,6 +45,7 @@ impl Workspace {
                 icon_button(("activity", i), icon, 30., 17., tr(label, &[]), view == current, cx, move |_, w, cx| {
                     entity.update(cx, |this, cx| this.set_view(view, w, cx)).ok();
                 })
+                .debug_selector(move || format!("activity:{i}"))
             }))
     }
 }

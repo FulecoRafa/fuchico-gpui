@@ -357,6 +357,9 @@ pub fn bind_global_keys(cx: &mut App) {
             KeyBinding::new("cmd-alt-h", HideOthers, None),
             KeyBinding::new("cmd-m", Minimize, None),
             KeyBinding::new("cmd-shift-w", CloseWindow, None),
+            // The palette listener accepts Ctrl as well as Cmd (spec 4 §1).
+            KeyBinding::new("ctrl-shift-p", CommandPalette, Some("Workspace")),
+            KeyBinding::new("ctrl-p", QuickOpen, Some("Workspace")),
         ]);
     } else {
         bindings.push(KeyBinding::new("ctrl-+", EditorZoomIn, None));

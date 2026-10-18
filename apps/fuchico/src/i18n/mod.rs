@@ -60,7 +60,15 @@ pub fn resolve(language: Language, os_locale: Option<&str>) -> Locale {
     }
 }
 
+#[cfg(not(test))]
 static CURRENT: AtomicU8 = AtomicU8::new(0);
+
+// Tests: per thread, so parallel tests (and settings loads resolving the OS
+// locale) can't flip each other's language mid-assertion.
+#[cfg(test)]
+thread_local! {
+    static CURRENT: AtomicU8 = const { AtomicU8::new(0) };
+}
 
 /// Applies the `language` setting (reads the OS locale for `System`).
 pub fn set_language(language: Language) {
@@ -69,11 +77,18 @@ pub fn set_language(language: Language) {
 }
 
 pub fn set_locale(locale: Locale) {
+    #[cfg(not(test))]
     CURRENT.store(locale as u8, Ordering::Relaxed);
+    #[cfg(test)]
+    CURRENT.with(|c| c.store(locale as u8, Ordering::Relaxed));
 }
 
 pub fn locale() -> Locale {
-    match CURRENT.load(Ordering::Relaxed) {
+    #[cfg(not(test))]
+    let current = CURRENT.load(Ordering::Relaxed);
+    #[cfg(test)]
+    let current = CURRENT.with(|c| c.load(Ordering::Relaxed));
+    match current {
         1 => Locale::PtBr,
         _ => Locale::En,
     }
@@ -170,7 +185,9 @@ mod tests {
     fn key_sets_are_equal_and_unique() {
         let keys: HashSet<_> = Msg::ALL.iter().map(|m| m.key()).collect();
         assert_eq!(keys.len(), Msg::ALL.len());
-        assert_eq!(Msg::ALL.len(), 300);
+        // 300 keys ported from the original catalog plus the native-only ones
+        // (CalDAV UI, shortcut reset, explorer, media, …) appended after them.
+        assert_eq!(Msg::ALL.len(), 356);
     }
 
     #[test]
