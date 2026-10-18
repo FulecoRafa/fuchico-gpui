@@ -14,7 +14,17 @@ pub fn iso(date: NaiveDate) -> String {
 /// `new Date().toISOString()` (UTC), which is off by a day near midnight
 /// outside UTC (PARITY QUIRK, fixed per DECISIONS.md).
 pub fn local_today() -> NaiveDate {
+    #[cfg(test)]
+    if let Some(d) = TODAY_OVERRIDE.with(|t| t.get()) {
+        return d;
+    }
     Local::now().date_naive()
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Pins "today" for snapshot tests (matching the original's screenshot).
+    pub static TODAY_OVERRIDE: std::cell::Cell<Option<NaiveDate>> = const { std::cell::Cell::new(None) };
 }
 
 /// The calendar's month cursor; `month` is 0-based like JS `Date`.

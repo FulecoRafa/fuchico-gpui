@@ -23,6 +23,8 @@
 mod model;
 #[cfg(test)]
 mod ui_tests;
+#[cfg(test)]
+mod snapshot_tests;
 
 use std::time::Duration;
 
@@ -670,6 +672,9 @@ impl Render for AgendaView {
             .overflow_hidden()
             .bg(th.colors.background)
             .text_color(th.colors.foreground)
+            // CSS `line-height: normal` (~1.2) instead of gpui's default phi,
+            // so row/section pitch matches the original.
+            .line_height(gpui_kit::relative(1.2))
             .on_key_down(|ev: &KeyDownEvent, window, cx| {
                 // Rows are tab stops (role=button tabIndex=0 in the original).
                 if ev.keystroke.key == "tab" && !ev.keystroke.modifiers.platform && !ev.keystroke.modifiers.control {
