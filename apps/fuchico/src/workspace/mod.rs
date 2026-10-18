@@ -156,6 +156,15 @@ impl Workspace {
         self.pane.as_ref().and_then(|p| p.handle.view().downcast::<crate::editor::EditorPane>().ok())
     }
 
+    /// The `blockKey` of the docked mermaid preview.
+    #[cfg(test)]
+    pub fn mermaid_dock_key(&self) -> Option<String> {
+        match &self.dock {
+            Some(Dock::Mermaid { block_key, .. }) => Some(block_key.clone()),
+            _ => None,
+        }
+    }
+
     #[cfg(test)]
     pub fn explorer(&self) -> &Entity<Explorer> {
         &self.explorer

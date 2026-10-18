@@ -933,6 +933,7 @@ impl Render for EditorPane {
         let button = |id: &'static str, label: String| {
             div()
                 .id(id)
+                .debug_selector(move || id.to_string())
                 .px(u(8.))
                 .py(u(1.))
                 .rounded(u(4.))

@@ -42,7 +42,7 @@ pub fn set_buffer_provider(cx: &mut App, f: impl Fn(&str, &App) -> Option<String
     cx.set_global(BufferProvider(Rc::new(f)));
 }
 
-fn note_content(path: &str, cx: &App) -> Task<Result<String, String>> {
+pub(crate) fn note_content(path: &str, cx: &App) -> Task<Result<String, String>> {
     if let Some(p) = cx.try_global::<BufferProvider>()
         && let Some(text) = (p.0)(path, cx)
     {
