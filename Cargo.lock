@@ -2401,6 +2401,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuchico-editor"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "fuchico-core",
+ "fuchico-helix",
+ "fuchico-markdown",
+ "gpui-kit",
+ "gpui-pre",
+ "gpui-pre-apple",
+ "gpui-pre-platform",
+ "image",
+ "log",
+ "regex",
+ "ropey 1.6.1",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "fuchico-excalidraw"
 version = "0.1.0"
 dependencies = [
