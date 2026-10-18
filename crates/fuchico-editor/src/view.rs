@@ -53,6 +53,19 @@ pub enum InsertCursor {
     Block,
 }
 
+/// Which key engine drives the view.
+///
+/// Seam for further engines (a Vim engine plugs in here as a new variant).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EngineKind {
+    /// Modal Helix keys (fuchico-helix).
+    #[default]
+    Helix,
+    /// Plain non-modal editing (CodeMirror defaults): always inserting,
+    /// shift-arrows extend the selection, Escape does nothing.
+    Normal,
+}
+
 /// View options (host settings).
 #[derive(Debug, Clone, PartialEq)]
 pub struct EditorOptions {
@@ -85,6 +98,9 @@ pub struct EditorOptions {
     /// `gn`/`gp`, `:bc`, `Space /`); enabled ones arrive as
     /// [`EditorEvent::External`]. All off by default, like cm-helix.
     pub externals: fuchico_helix::ExternalCommands,
+    /// Indent width in spaces (`Settings → Tab size`).
+    pub tab_size: u32,
+    pub engine: EngineKind,
 }
 
 impl Default for EditorOptions {
@@ -104,6 +120,8 @@ impl Default for EditorOptions {
             vault_root: None,
             mode_chip: true,
             externals: Default::default(),
+            tab_size: 2,
+            engine: EngineKind::Helix,
         }
     }
 }
@@ -288,7 +306,7 @@ fn md_settings(o: &EditorOptions) -> Settings {
     Settings {
         fold_start_marker: o.fold_start_marker.clone(),
         fold_end_marker: o.fold_end_marker.clone(),
-        tab_size: 2,
+        tab_size: o.tab_size.max(1) as usize,
         rulers: o.rulers.clone(),
         inline_images: o.inline_images,
     }
@@ -309,6 +327,8 @@ impl EditorView {
         }));
         let config = Config {
             externals: options.externals.clone(),
+            tab_size: options.tab_size.max(1) as usize,
+            indent_unit: " ".repeat(options.tab_size.max(1) as usize),
             ..Config::default()
         };
         let engine = Editor::with_host(
@@ -320,7 +340,7 @@ impl EditorView {
         );
         let normalized = engine.text();
         let model = MarkdownModel::new(&normalized, md_settings(&options));
-        EditorView {
+        let mut view = EditorView {
             engine,
             shared,
             model,
@@ -352,7 +372,9 @@ impl EditorView {
             mermaid: Vec::new(),
             next_mermaid_key: 1,
             suppress_completion: false,
-        }
+        };
+        view.ensure_engine_mode(cx);
+        view
     }
 
     // ---- read accessors ---------------------------------------------------
@@ -510,8 +532,12 @@ impl EditorView {
             self.model.set_settings(settings);
         }
         self.shared.borrow_mut().path = options.path.clone();
-        self.engine.config_mut().externals = options.externals.clone();
+        let cfg = self.engine.config_mut();
+        cfg.externals = options.externals.clone();
+        cfg.tab_size = options.tab_size.max(1) as usize;
+        cfg.indent_unit = " ".repeat(cfg.tab_size);
         self.options = options;
+        self.ensure_engine_mode(cx);
         self.layout_dirty = true;
         self.wrap_rows.clear();
         cx.notify();
@@ -919,10 +945,104 @@ impl EditorView {
         if insert && typed_char(ks).is_some() {
             return; // goes to the input handler (IME)
         }
+        if self.options.engine == EngineKind::Normal && self.normal_key(ks, cx) {
+            cx.stop_propagation();
+            return;
+        }
         if let Some(kev) = to_helix(ks) {
             self.feed_key(kev, cx);
             cx.stop_propagation();
         }
+    }
+
+    // ---- non-modal engine ----------------------------------------------------------
+
+    /// [`EngineKind::Normal`] keeps the engine in insert mode.
+    fn ensure_engine_mode(&mut self, cx: &mut Context<Self>) {
+        if self.options.engine == EngineKind::Normal && self.mode() != ModeType::Insert {
+            if self.mode() == ModeType::Select {
+                self.feed_key(KeyEvent::new(Key::Escape, HxMods::default()), cx);
+            }
+            if self.mode() == ModeType::Normal {
+                self.feed_key(KeyEvent::char('i'), cx);
+            }
+        }
+    }
+
+    /// Non-modal keys the insert keymap lacks. Returns whether it handled.
+    fn normal_key(&mut self, ks: &Keystroke, cx: &mut Context<Self>) -> bool {
+        let m = ks.modifiers;
+        let key = ks.key.as_str();
+        if key == "escape" && !m.control && !m.alt {
+            return true;
+        }
+        let main = self.engine.selection().main();
+        if matches!(key, "backspace" | "delete")
+            && !m.control
+            && !m.alt
+            && !main.is_empty()
+        {
+            self.message = None;
+            let fx = self.engine.insert_text("");
+            self.apply_effects(fx, cx);
+            return true;
+        }
+        let nav = matches!(
+            key,
+            "left" | "right" | "up" | "down" | "home" | "end" | "pageup" | "pagedown"
+        );
+        if nav && m.shift && !m.control {
+            let anchor = main.anchor;
+            let mut plain = ks.clone();
+            plain.modifiers.shift = false;
+            if let Some(kev) = to_helix(&plain) {
+                if !main.is_empty() {
+                    // Move from the head, not from the collapsed range edge.
+                    let fx = self
+                        .engine
+                        .set_selection_from_pointer(Selection::single(main.head, main.head));
+                    self.apply_effects(fx, cx);
+                }
+                self.feed_key(kev, cx);
+                let head = self.engine.selection().main().head;
+                let fx = self
+                    .engine
+                    .set_selection_from_pointer(Selection::single(anchor, head));
+                self.apply_effects(fx, cx);
+            }
+            return true;
+        }
+        if nav && !m.shift && !main.is_empty() && matches!(key, "left" | "right") {
+            let to = if key == "left" { main.from() } else { main.to() };
+            let fx = self
+                .engine
+                .set_selection_from_pointer(Selection::single(to, to));
+            self.apply_effects(fx, cx);
+            return true;
+        }
+        false
+    }
+
+    /// Mod-z / Mod-shift-z (CodeMirror `historyKeymap`), every engine.
+    pub fn undo(&mut self, redo: bool, cx: &mut Context<Self>) {
+        let was_insert = self.mode() == ModeType::Insert;
+        if was_insert {
+            self.feed_key(KeyEvent::new(Key::Escape, HxMods::default()), cx);
+        }
+        self.feed_key(KeyEvent::char(if redo { 'U' } else { 'u' }), cx);
+        if was_insert && self.options.engine == EngineKind::Helix {
+            self.feed_key(KeyEvent::char('i'), cx);
+        }
+        self.ensure_engine_mode(cx);
+    }
+
+    /// Mod-a.
+    pub fn select_all(&mut self, cx: &mut Context<Self>) {
+        let len = self.engine.doc().len();
+        let fx = self
+            .engine
+            .set_selection_from_pointer(Selection::single(0, len));
+        self.apply_effects(fx, cx);
     }
 
     // ---- prompt (`:` and search) ---------------------------------------------------
@@ -2153,6 +2273,9 @@ impl Render for EditorView {
             .on_action(cx.listener(Self::act_paste))
             .on_action(cx.listener(Self::act_tab))
             .on_action(cx.listener(Self::act_backtab))
+            .on_action(cx.listener(|this, _: &Undo, _, cx| this.undo(false, cx)))
+            .on_action(cx.listener(|this, _: &Redo, _, cx| this.undo(true, cx)))
+            .on_action(cx.listener(|this, _: &SelectAll, _, cx| this.select_all(cx)))
             .on_key_down(cx.listener(Self::on_key_down))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
@@ -2165,7 +2288,7 @@ impl Render for EditorView {
         let bottom_bar = matches!(self.overlay, Overlay::Prompt(_));
 
         // Mode chip (bottom-left, over the gutter).
-        if self.options.mode_chip && !bottom_bar {
+        if self.options.mode_chip && self.options.engine == EngineKind::Helix && !bottom_bar {
             root = root.child(
                 div()
                     .id("fuchico-editor-mode-chip")

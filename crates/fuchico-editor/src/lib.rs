@@ -26,7 +26,7 @@ pub use actions::*;
 pub use commands::{CommandEdit, TokenKind};
 pub use style::EditorStyle;
 pub use view::{
-    EditorEvent, EditorOptions, EditorView, InsertCursor, LineNumbers, MermaidBlock, ZoomDirection,
+    EditorEvent, EditorOptions, EditorView, EngineKind, InsertCursor, LineNumbers, MermaidBlock, ZoomDirection,
 };
 
 /// Key context of the editor (`key_context("FuchicoEditor")`).
@@ -62,5 +62,8 @@ pub fn init(cx: &mut gpui_kit::App) {
         KeyBinding::new("secondary-v", Paste, c),
         KeyBinding::new("tab", EditorTab, c),
         KeyBinding::new("shift-tab", EditorBacktab, c),
+        KeyBinding::new("secondary-z", Undo, c),
+        KeyBinding::new("secondary-shift-z", Redo, c),
+        KeyBinding::new("secondary-a", SelectAll, c),
     ]);
 }

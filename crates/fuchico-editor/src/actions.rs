@@ -51,5 +51,10 @@ gpui_kit::actions!(
         /// (indent, completion cycling, table cells, prompt completion).
         EditorTab,
         EditorBacktab,
+        /// Mod-z / Mod-shift-z / Mod-a (CodeMirror `historyKeymap` +
+        /// `selectAll`).
+        Undo,
+        Redo,
+        SelectAll,
     ]
 );
