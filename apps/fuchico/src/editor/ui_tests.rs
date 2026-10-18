@@ -313,7 +313,10 @@ async fn paste_and_drop_images_into_attachments(cx: &mut TestAppContext) {
     ui.cx.update(|_, cx| {
         view.update(cx, |_, cx| cx.emit(EditorEvent::PasteImage { mime: "image/png".into(), bytes: vec![1, 2, 3] }))
     });
+    // The placeholder goes in at once, then becomes the link.
+    assert!(ui.cx.read(|cx| view.read(cx).text()).contains("![uploading image…]()"));
     ui.wait("pasted link", |cx| view.read(cx).text().contains("](../attachments/pasted-")).await;
+    assert!(!ui.cx.read(|cx| view.read(cx).text()).contains("uploading"));
     let saved: Vec<_> = std::fs::read_dir(dir.join("attachments")).unwrap().flatten().collect();
     assert_eq!(saved.len(), 1);
     assert_eq!(std::fs::read(saved[0].path()).unwrap(), vec![1, 2, 3]);
@@ -438,5 +441,49 @@ async fn workspace_navigation_mermaid_export_and_tab_flush(cx: &mut TestAppConte
     ui.cx.update(|_, cx| view_b.update(cx, |v, cx| v.execute_command("q", cx)));
     ui.frame();
     assert!(!ui.cx.read(|cx| ws.read(cx).tabs().tabs.iter().any(|t| t.path == b)), "`:q` closed b");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn image_upload_placeholder_and_failure_comment() {
+    use super::{ImageSource, save_all, upload_placeholder};
+    assert_eq!(upload_placeholder(1), "![uploading image…]()");
+    assert_eq!(upload_placeholder(3), "![uploading 3 images…]()");
+    let dir = test_ui::temp_dir("editor-images-fail");
+    // `attachments` is a file: saving fails; the rest is skipped.
+    let blocker = dir.join("attachments");
+    std::fs::write(&blocker, "x").unwrap();
+    let now = chrono::Local::now().naive_local();
+    let links = save_all(
+        vec![
+            ImageSource::Bytes(String::new(), "image/png".into(), vec![1]),
+            ImageSource::Bytes(String::new(), "image/png".into(), vec![2]),
+        ],
+        &blocker.to_string_lossy(),
+        &dir.join("n.md").to_string_lossy(),
+        &now,
+    );
+    assert_eq!(links.len(), 1, "{links:?}");
+    assert!(links[0].starts_with("<!-- image upload failed: ") && links[0].ends_with(" -->"), "{links:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[gpui_kit::test]
+async fn removed_upload_placeholder_inserts_nothing(cx: &mut TestAppContext) {
+    cx.update(test_ui::init_shell);
+    let dir = test_ui::temp_dir("editor-images-removed");
+    let root = dir.to_string_lossy().to_string();
+    let path = dir.join("n.md").to_string_lossy().to_string();
+    std::fs::write(&path, "x\n").unwrap();
+    let (mut ui, pane, _) = open_pane(cx, &path, PaneContext { root: Some(root), ..Default::default() }).await;
+    let view = ui.cx.read(|cx| pane.read(cx).view().unwrap().clone());
+    ui.cx.update(|_, cx| {
+        view.update(cx, |_, cx| cx.emit(EditorEvent::PasteImage { mime: "image/png".into(), bytes: vec![1] }))
+    });
+    assert!(ui.cx.read(|cx| view.read(cx).text()).contains("uploading"));
+    // The user deletes the placeholder before the save finishes.
+    ui.cx.update(|_, cx| view.update(cx, |v, cx| v.set_text("x\n", cx)));
+    ui.sleep(50).await;
+    assert_eq!(ui.cx.read(|cx| view.read(cx).text()), "x\n");
     let _ = std::fs::remove_dir_all(&dir);
 }

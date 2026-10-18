@@ -786,33 +786,38 @@ impl EditorPane {
     // ---- images -------------------------------------------------------------
 
     /// Saves `(file_name, mime, bytes)` images into `<root>/attachments`
-    /// and inserts their links. Nothing without a vault.
+    /// and links them. Nothing without a vault.
     fn save_images(&mut self, images: Vec<(String, String, Vec<u8>)>, cx: &mut Context<Self>) {
+        let sources = images.into_iter().map(|(n, m, b)| ImageSource::Bytes(n, m, b)).collect();
+        self.upload_images(sources, cx);
+    }
+
+    /// `imageAttachmentsExtension`: inserts `![uploading image…]()` (or `…N
+    /// images…`) at the cursor right away, saves the images one by one,
+    /// then swaps the placeholder for the links (joined by `\n`, cursor
+    /// after them). The first failure appends `<!-- image upload failed:
+    /// {e} -->` and stops; a placeholder the user removed meanwhile means
+    /// nothing is inserted.
+    fn upload_images(&mut self, images: Vec<ImageSource>, cx: &mut Context<Self>) {
         let Some(root) = self.pcx.root.clone() else { return };
+        let State::Ready(view) = &self.state else { return };
+        if images.is_empty() {
+            return;
+        }
+        let view = view.clone();
+        let placeholder = upload_placeholder(images.len());
+        view.update(cx, |v, cx| v.insert_image_link(&placeholder, cx));
         let current = self.path.clone();
+        let view = view.downgrade();
         let task = cx.background_spawn(async move {
             let dir = format!("{root}/attachments");
             let now = chrono::Local::now().naive_local();
-            images
-                .into_iter()
-                .filter_map(|(name, mime, bytes)| match save_image(&bytes, &name, &mime, &dir, &now) {
-                    Ok(saved) => Some(image_link(&saved, &current)),
-                    Err(e) => {
-                        log::warn!("editor: image save failed: {e}");
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
+            save_all(images, &dir, &current, &now)
         });
-        cx.spawn(async move |this, cx| {
+        cx.spawn(async move |_, cx| {
             let links = task.await;
-            if links.is_empty() {
-                return;
-            }
-            this.update(cx, |this, cx| {
-                if let State::Ready(v) = &this.state {
-                    v.update(cx, |v, cx| v.insert_image_link(&links.join("\n"), cx));
-                }
+            view.update(cx, |v, cx| {
+                v.replace_placeholder(&placeholder, &links.join("\n"), cx);
             })
             .ok();
         })
@@ -822,26 +827,44 @@ impl EditorPane {
     /// Finder files dropped on the editor: images are copied into the
     /// attachments folder and linked.
     pub fn drop_external(&mut self, paths: &[PathBuf], cx: &mut Context<Self>) {
-        let files: Vec<PathBuf> = paths.iter().filter(|p| is_image_path(&p.to_string_lossy())).cloned().collect();
-        if files.is_empty() || self.pcx.root.is_none() {
-            return;
-        }
-        let read = cx.background_spawn(async move {
-            files
-                .into_iter()
-                .filter_map(|p| {
-                    let bytes = std::fs::read(&p).ok()?;
-                    let name = p.file_name()?.to_string_lossy().into_owned();
-                    Some((name, image_mime(&p.to_string_lossy()).to_string(), bytes))
-                })
-                .collect::<Vec<_>>()
-        });
-        cx.spawn(async move |this, cx| {
-            let images = read.await;
-            this.update(cx, |this, cx| this.save_images(images, cx)).ok();
-        })
-        .detach();
+        let files: Vec<ImageSource> =
+            paths.iter().filter(|p| is_image_path(&p.to_string_lossy())).cloned().map(ImageSource::File).collect();
+        self.upload_images(files, cx);
     }
+}
+
+/// An image to attach: pasted bytes `(file_name, mime, bytes)` or a file.
+enum ImageSource {
+    Bytes(String, String, Vec<u8>),
+    File(PathBuf),
+}
+
+fn upload_placeholder(n: usize) -> String {
+    if n > 1 { format!("![uploading {n} images…]()") } else { "![uploading image…]()".to_string() }
+}
+
+/// Saves the images in order; the first failure becomes an
+/// `<!-- image upload failed: … -->` line and stops the rest.
+fn save_all(images: Vec<ImageSource>, dir: &str, current: &str, now: &chrono::NaiveDateTime) -> Vec<String> {
+    let mut links = Vec::new();
+    for img in images {
+        let saved = match img {
+            ImageSource::Bytes(name, mime, bytes) => save_image(&bytes, &name, &mime, dir, now),
+            ImageSource::File(p) => std::fs::read(&p).map_err(|e| e.to_string()).and_then(|bytes| {
+                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                save_image(&bytes, &name, image_mime(&p.to_string_lossy()), dir, now)
+            }),
+        };
+        match saved {
+            Ok(saved) => links.push(image_link(&saved, current)),
+            Err(e) => {
+                log::warn!("editor: image save failed: {e}");
+                links.push(format!("<!-- image upload failed: {e} -->"));
+                break;
+            }
+        }
+    }
+    links
 }
 
 impl EventEmitter<PaneEvent> for EditorPane {}

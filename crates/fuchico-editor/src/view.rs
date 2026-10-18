@@ -636,6 +636,31 @@ impl EditorView {
         self.insert_at_main(link, cx);
     }
 
+    /// Replaces the first occurrence of `placeholder` (e.g. the
+    /// `![uploading image…]()` of a pending paste) with `insert`, leaving
+    /// the cursor after it. Returns `false` (and does nothing) when the
+    /// placeholder is gone.
+    pub fn replace_placeholder(
+        &mut self,
+        placeholder: &str,
+        insert: &str,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(idx) = self.model.text().find(placeholder) else {
+            return false;
+        };
+        let from = self.char_of(idx);
+        let to = self.char_of(idx + placeholder.len());
+        let fx = self
+            .engine
+            .apply_host_edit(vec![Change::new(from, to, insert)], None);
+        self.apply_effects(fx, cx);
+        let end = from + insert.chars().count();
+        let fx = self.engine.set_selection(Selection::single(end, end));
+        self.apply_effects(fx, cx);
+        true
+    }
+
     fn insert_at_main(&mut self, text: &str, cx: &mut Context<Self>) {
         let r = self.engine.selection().main();
         let (from, to) = if self.mode() == ModeType::Insert {
