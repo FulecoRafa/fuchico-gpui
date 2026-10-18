@@ -72,6 +72,6 @@ fn main() {
             cx.new(|_| Gallery { view, selected: start, theme: theme2 })
         })
         .expect("window");
-        cx.activate(true);
+        if std::env::var_os("FUCHICO_BACKGROUND").is_none() { cx.activate(true); }
     });
 }

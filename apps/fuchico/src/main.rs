@@ -72,6 +72,14 @@ fn main() {
             windows::push_open_requests(argv);
         }
         windows::open_main_window(cx);
-        cx.activate(true);
+        if !background_mode() {
+            cx.activate(true);
+        }
     });
+}
+
+/// `FUCHICO_BACKGROUND=1` keeps the app from taking focus on launch, for
+/// automated runs on a machine someone is using.
+pub fn background_mode() -> bool {
+    std::env::var_os("FUCHICO_BACKGROUND").is_some_and(|v| v != "0")
 }

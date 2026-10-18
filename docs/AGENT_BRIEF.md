@@ -19,3 +19,9 @@ Acceptance criterion: FEATURE PARITY with the original, as specified in docs/PAR
   (window id via CGWindowListCopyWindowInfo — the owner name may show as "Zed"; `screencapture -x -o -l <id>`). NEVER capture the full screen —
   the user is using this machine. Kill only the processes you started.
 - Final reply: what's done (map to parity checklist bullets), what's verified interactively vs only compiled, known gaps, commits on your branch.
+
+## Never take focus (user request)
+The user is working on this machine. Never steal focus or move their cursor:
+- Launch with `FUCHICO_BACKGROUND=1` (the app then neither activates nor focuses its window). Never `open -a`, never `osascript ... activate`, never click the window.
+- No global synthetic input (cliclick, CGEventPost to the HID/session tap, AppleScript keystrokes) — they hit whatever app the user has focused.
+- Verify interactions instead with gpui's test harness (`gpui` `test-support` feature: `#[gpui::test]`, `TestAppContext`/`VisualTestContext`, `simulate_keystrokes`, `simulate_click`, dispatching actions), or an in-process debug hook. Background screenshots of your own window with `screencapture -x -o -l <id>` are fine.
