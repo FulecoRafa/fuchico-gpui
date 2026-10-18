@@ -25,3 +25,10 @@ The user is working on this machine. Never steal focus or move their cursor:
 - Launch with `FUCHICO_BACKGROUND=1` (the app then neither activates nor focuses its window). Never `open -a`, never `osascript ... activate`, never click the window.
 - No global synthetic input (cliclick, CGEventPost to the HID/session tap, AppleScript keystrokes) — they hit whatever app the user has focused.
 - Verify interactions instead with gpui's test harness (`gpui` `test-support` feature: `#[gpui::test]`, `TestAppContext`/`VisualTestContext`, `simulate_keystrokes`, `simulate_click`, dispatching actions), or an in-process debug hook. Background screenshots of your own window with `screencapture -x -o -l <id>` are fine.
+
+## Visual checks without a visible window
+A FUCHICO_BACKGROUND window sits behind other apps/Spaces, macOS reports it occluded, and GPUI stops painting (black capture). Don't fight that. Render offscreen in-process instead:
+
+- dev-deps: `gpui-pre = { version = "=0.3.9", features = ["test-support"] }` and `gpui-pre-platform = { version = "=0.3.9", features = ["test-support"] }` (do NOT enable gpui-kit's `test-support`; it drags gpui-fast into the lockfile and conflicts).
+- `HeadlessAppContext::with_platform(current_platform(true).text_system(), Arc::new(Assets), || current_headless_renderer())`, then `open_window(size, ..)` (it uses `focus: false, show: false`, so no NSWindow ever appears), `run_until_parked()`, `capture_screenshot(handle.into())`, and save the `RgbaImage` as PNG.
+- Use the shared helper `apps/fuchico/src/snapshot.rs` once it lands on main (test-only, `cfg(test)`). Don't use `VisualTestAppContext`: it opens real NSWindows.
