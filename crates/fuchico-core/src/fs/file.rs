@@ -412,4 +412,16 @@ mod tests {
         fs_write_binary(s(&f), "AA==".into()).unwrap();
         assert_eq!(std::fs::metadata(&f).unwrap().permissions().mode() & 0o777, 0o600);
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn canonicalize_resolves_symlinks_and_requires_existence() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = std::fs::canonicalize(dir.path()).unwrap().join("real.md");
+        std::fs::write(&real, "").unwrap();
+        let link = dir.path().join("link.md");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        assert_eq!(fs_canonicalize(s(&link)).unwrap(), s(&real));
+        assert!(fs_canonicalize(s(&dir.path().join("missing"))).is_err());
+    }
 }
