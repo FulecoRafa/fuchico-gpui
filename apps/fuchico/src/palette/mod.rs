@@ -19,6 +19,8 @@ mod overlay;
 mod quick_switcher;
 mod run;
 mod shortcuts;
+#[cfg(test)]
+mod ui_tests;
 
 use std::sync::Arc;
 
