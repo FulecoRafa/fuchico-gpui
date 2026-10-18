@@ -411,11 +411,10 @@ impl Scene {
     pub fn remove(&mut self, ids: &HashSet<String>) {
         let mut all = ids.clone();
         for el in self.elements() {
-            if let Some(c) = el.container_id() {
-                if ids.contains(c) {
+            if let Some(c) = el.container_id()
+                && ids.contains(c) {
                     all.insert(el.id.clone());
                 }
-            }
         }
         self.items
             .retain(|i| !matches!(i, Item::El(e) if all.contains(&e.id)));
@@ -429,22 +428,19 @@ impl Scene {
                 }
             }
             for binding in [&mut el.f.start_binding, &mut el.f.end_binding] {
-                if let Some(bd) = binding.get() {
-                    if all.contains(&bd.element_id) {
+                if let Some(bd) = binding.get()
+                    && all.contains(&bd.element_id) {
                         binding.set_null();
                     }
-                }
             }
-            if let Some(c) = el.f.container_id.get() {
-                if all.contains(c) {
+            if let Some(c) = el.f.container_id.get()
+                && all.contains(c) {
                     el.f.container_id.set_null();
                 }
-            }
-            if let Some(fr) = el.f.frame_id.get() {
-                if all.contains(fr) {
+            if let Some(fr) = el.f.frame_id.get()
+                && all.contains(fr) {
                     el.f.frame_id.set_null();
                 }
-            }
         }
     }
 
@@ -692,11 +688,10 @@ impl Scene {
                 _ => th + pad * 2.0,
             };
         }
-        if (container_h - ch).abs() > 0.01 {
-            if let Some(cm) = self.get_mut(container) {
+        if (container_h - ch).abs() > 0.01
+            && let Some(cm) = self.get_mut(container) {
                 cm.f.height.set(Num(container_h));
             }
-        }
         let c = self.get(container).cloned().unwrap();
         let cc = [c.x() + c.width() / 2.0, c.y() + c.height() / 2.0];
         let tw = tw.min(max_w.max(tw.min(max_w)));
@@ -761,24 +756,20 @@ impl Scene {
                 })
                 .unwrap_or(false)
         };
-        if let Some(o) = old {
-            if Some(o.as_str()) != target && !still(self, &o) {
-                if let Some(t) = self.get_mut(&o) {
-                    if let Some(b) = t.f.bound_elements.get_mut() {
+        if let Some(o) = old
+            && Some(o.as_str()) != target && !still(self, &o)
+                && let Some(t) = self.get_mut(&o)
+                    && let Some(b) = t.f.bound_elements.get_mut() {
                         b.retain(|be| be.id != arrow);
                     }
-                }
-            }
-        }
-        if let Some(t) = target {
-            if let Some(te) = self.get_mut(t) {
+        if let Some(t) = target
+            && let Some(te) = self.get_mut(t) {
                 let mut b = te.bound_elements().to_vec();
                 if !b.iter().any(|be| be.id == arrow) {
                     b.push(BoundElement { id: arrow.to_string(), kind: "arrow".into(), extra: Map::new() });
                     te.f.bound_elements.set(b);
                 }
             }
-        }
     }
 }
 

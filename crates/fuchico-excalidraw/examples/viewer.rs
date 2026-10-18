@@ -79,10 +79,10 @@ fn main() {
                 let now = mtime(&watch);
                 if now != last {
                     last = now;
-                    if let Ok(s) = std::fs::read_to_string(&watch) {
-                        if view.update(cx, |v, cx| v.reload(&s, cx)).is_err() {
-                            break;
-                        }
+                    if let Ok(s) = std::fs::read_to_string(&watch)
+                        && view.update(cx, |v, cx| v.reload(&s, cx)).is_err()
+                    {
+                        break;
                     }
                 }
             }

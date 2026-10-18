@@ -92,11 +92,10 @@ pub type SharedCaches = Rc<RefCell<Caches>>;
 impl Caches {
     pub fn shape(&mut self, el: &Element) -> Rc<Shape> {
         let key = shape::shape_key(el);
-        if let Some((k, s)) = self.shapes.get(&el.id) {
-            if *k == key {
+        if let Some((k, s)) = self.shapes.get(&el.id)
+            && *k == key {
                 return s.clone();
             }
-        }
         let s = Rc::new(shape::generate(el));
         self.shapes.insert(el.id.clone(), (key, s.clone()));
         s
@@ -520,11 +519,10 @@ pub fn paint_screen_ops(ops: &[Op], at: Point<Pixels>, color: Rgba, window: &mut
             Op::Close => b.close(),
         }
     }
-    if any {
-        if let Ok(path) = b.build() {
+    if any
+        && let Ok(path) = b.build() {
             window.paint_path(path, color.to_hsla());
         }
-    }
 }
 
 /// Content mask for a frame's children (frames are never rotated in

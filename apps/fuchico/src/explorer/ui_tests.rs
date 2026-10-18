@@ -130,8 +130,7 @@ fn exists(p: &str) -> bool {
 async fn explorer_end_to_end(cx: &mut TestAppContext) {
     let vault = temp_vault();
     let config = vault.join(".config");
-    // SAFETY: set before anything reads it (persist caches it once).
-    unsafe { std::env::set_var("FUCHICO_CONFIG_DIR", &config) };
+    crate::persist::set_test_dir(config.clone());
     let root = vault.to_string_lossy().to_string();
     cx.update(|cx| {
         gpui_kit::init(cx);
@@ -254,7 +253,9 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     ui.type_text("sketch");
     ui.press("enter");
     let sketch = ui.p("sketch.excalidraw");
-    ui.wait("drawing created", |_| exists(&sketch)).await;
+    ui.wait("drawing created", |_| std::fs::metadata(&sketch).is_ok_and(|m| m.len() > 0)).await;
+    let scene = std::fs::read_to_string(&sketch).unwrap();
+    assert_eq!(scene, crate::excalidraw::drawing_template(), "new drawing is the excalidraw template");
 
     let at = ui.bounds("ex-new-folder").center();
     ui.click(at, Modifiers::none());

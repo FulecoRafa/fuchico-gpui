@@ -63,6 +63,7 @@ pub fn run(ws: &mut Workspace, action: CommandAction, window: &mut Window, cx: &
         A::ToggleBacklinks => ws.toggle_backlinks(window, cx),
         A::ExportHtml(path) => crate::export::export_html(&path, window, cx),
         A::ExportPdf(path) => crate::export::export_pdf(&path, window, cx),
+        A::PrintPdf(path) => crate::export::print_pdf(&path, window, cx),
         A::ToggleTheme => cx.dispatch_action(&ToggleTheme),
         A::SelectPalette(p) => SettingsStore::update(cx, |s| s.palette = p),
         A::SelectCustomTheme(id) => SettingsStore::update(cx, |s| {

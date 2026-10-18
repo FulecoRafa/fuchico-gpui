@@ -189,11 +189,10 @@ impl MermaidView {
         self.icon_cache.clear();
         if let Some(src) = self.svg_source.clone() {
             self.render_text(&src);
-            if let Some(cur) = self.source.clone() {
-                if cur != src {
+            if let Some(cur) = self.source.clone()
+                && cur != src {
                     self.render_text(&cur);
                 }
-            }
         }
         cx.notify();
     }
@@ -287,11 +286,10 @@ impl MermaidView {
     fn ensure_raster(&mut self, dpr: f32) {
         let (Some(svg), Some(src)) = (&self.svg, &self.svg_source) else { return };
         let want = dpr * self.pz.scale;
-        if let Some(r) = &self.raster {
-            if r.scale >= want * 0.8 && r.scale <= want * 3.0 {
+        if let Some(r) = &self.raster
+            && r.scale >= want * 0.8 && r.scale <= want * 3.0 {
                 return;
             }
-        }
         let scale = raster::quantize_scale(want);
         self.raster = raster::rasterize_cached(src, &self.theme, Some(svg), scale).ok();
     }

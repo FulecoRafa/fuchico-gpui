@@ -100,7 +100,7 @@ mod tests {
         assert!(weeks.iter().all(|w| w.len() == 7));
         assert_eq!(weeks[0].iter().filter(|c| c.iso.is_none()).count(), 6);
         assert_eq!(weeks[0][6].iso.as_deref(), Some("2026-08-01"));
-        assert_eq!(weeks.last().unwrap().iter().filter(|c| c.iso.is_some()).count() > 0, true);
+        assert!(weeks.last().unwrap().iter().any(|c| c.iso.is_some()));
         assert_eq!(weeks.iter().flatten().filter(|c| c.iso.is_some()).count(), 31);
         assert_eq!(weeks[0][0].key, "2026-7-lead-0");
     }

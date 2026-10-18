@@ -34,6 +34,7 @@ pub enum CommandAction {
     /// Absolute path of the active note.
     ExportHtml(String),
     ExportPdf(String),
+    PrintPdf(String),
     ToggleTheme,
     SelectPalette(PaletteId),
     SelectCustomTheme(String),
@@ -223,13 +224,19 @@ pub fn build_commands(ctx: &CommandContext, settings: &Settings) -> Vec<AppComma
             )
         });
         out.push(AppCommand {
-            aliases: &[":pdf", ":print"],
+            aliases: &[":pdf"],
             ..cmd(
                 "export-pdf",
                 t(Msg::CommandExportPdf),
-                kw(&["export", "pdf", "print", "share"]),
+                kw(&["export", "pdf", "share"]),
                 A::ExportPdf(path.clone()),
             )
+        });
+        // Native split of the original's `:pdf`/`:print` row: `:print` hands
+        // the rendered PDF to the system viewer's print dialog.
+        out.push(AppCommand {
+            aliases: &[":print"],
+            ..cmd("print-pdf", t(Msg::ExportPrint), kw(&["print", "pdf", "printer"]), A::PrintPdf(path.clone()))
         });
     }
     out.push(AppCommand {
@@ -392,6 +399,7 @@ mod tests {
                 "toggle-backlinks",
                 "export-html",
                 "export-pdf",
+                "print-pdf",
                 "toggle-theme",
                 "select-theme:ayu",
                 "select-theme:dracula",
@@ -419,7 +427,10 @@ mod tests {
         assert!(ids.contains(&"editor:insertDate".to_string()));
         assert!(!ids.contains(&"export-html".to_string()));
         let ctx = CommandContext { active_path: Some("/v/A.MARKDOWN".into()), ..ctx_full() };
-        assert!(build_commands(&ctx, &Settings::default()).iter().any(|c| c.id == "export-pdf"));
+        let cmds = build_commands(&ctx, &Settings::default());
+        assert!(cmds.iter().any(|c| c.id == "export-pdf" && c.aliases == [":pdf"]));
+        assert!(cmds.iter().any(|c| c.id == "print-pdf" && c.aliases == [":print"]));
+        assert!(cmds.iter().any(|c| c.id == "export-html" && c.aliases == [":export"]));
         let ctx = CommandContext { backlinks_open: true, ..ctx_full() };
         let c = build_commands(&ctx, &Settings::default()).into_iter().find(|c| c.id == "toggle-backlinks").unwrap();
         assert_eq!(c.title, "Hide Backlinks");

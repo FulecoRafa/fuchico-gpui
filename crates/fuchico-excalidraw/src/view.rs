@@ -204,11 +204,9 @@ fn camera_from(scene: &Scene) -> Camera {
         if let Some(z) = a
             .get("zoom")
             .and_then(|v| v.get("value").and_then(|v| v.as_f64()).or_else(|| v.as_f64()))
-        {
-            if z > 0.0 {
+            && z > 0.0 {
                 cam.zoom = z;
             }
-        }
     }
     cam
 }
@@ -468,11 +466,10 @@ impl ExcalidrawView {
                 continue;
             }
             if geom::hit(el, p, tol) {
-                if let Some(c) = el.container_id() {
-                    if self.scene.get(c).is_some() {
+                if let Some(c) = el.container_id()
+                    && self.scene.get(c).is_some() {
                         return Some(c.to_string());
                     }
-                }
                 return Some(el.id.clone());
             }
             // A container's text area counts as the container.
@@ -557,8 +554,8 @@ impl ExcalidrawView {
             for (h, p) in hs {
                 out.push((h, geom::to_world(el, p)));
             }
-        } else if self.selected.len() > 1 {
-            if let Some(b) = self.selection_bbox() {
+        } else if self.selected.len() > 1
+            && let Some(b) = self.selection_bbox() {
                 let (x0, y0, x1, y1) = (b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad);
                 out = vec![
                     (Handle::NW, [x0, y0]),
@@ -568,7 +565,6 @@ impl ExcalidrawView {
                     (Handle::Rotate, [(x0 + x1) / 2.0, y0 - rot]),
                 ];
             }
-        }
         out
     }
 
@@ -648,11 +644,10 @@ impl ExcalidrawView {
                 self.drag = Some(Drag::Erase);
             }
             Tool::Text => {
-                if let Some(id) = self.hit_element(p) {
-                    if self.start_text_edit_on(&id, p, cx) {
+                if let Some(id) = self.hit_element(p)
+                    && self.start_text_edit_on(&id, p, cx) {
                         return;
                     }
-                }
                 self.create_text_at(p, None, cx);
             }
             Tool::Image => self.prompt_image(window, cx),
@@ -792,11 +787,10 @@ impl ExcalidrawView {
         let mut ids: HashSet<String> = self.selected.clone();
         // Bound text and frame children move along.
         for el in self.scene.elements() {
-            if let Some(c) = el.container_id() {
-                if ids.contains(c) {
+            if let Some(c) = el.container_id()
+                && ids.contains(c) {
                     ids.insert(el.id.clone());
                 }
-            }
         }
         let frames: HashSet<String> = ids
             .iter()
@@ -809,11 +803,10 @@ impl ExcalidrawView {
             }
         }
         for el in self.scene.elements() {
-            if let Some(c) = el.container_id() {
-                if ids.contains(c) {
+            if let Some(c) = el.container_id()
+                && ids.contains(c) {
                     ids.insert(el.id.clone());
                 }
-            }
         }
         let orig = ids
             .iter()
@@ -981,11 +974,10 @@ impl ExcalidrawView {
                             (false, el.f.end_binding.get().map(|b| b.element_id.clone())),
                         ];
                         for (start, t) in ends {
-                            if let Some(t) = t {
-                                if !set.contains(&t) {
+                            if let Some(t) = t
+                                && !set.contains(&t) {
                                     self.scene.bind(id, start, None);
                                 }
-                            }
                         }
                     }
                     self.update_frames(&set);
@@ -1292,15 +1284,14 @@ impl ExcalidrawView {
             return true;
         }
         if matches!(el.kind.as_str(), "rectangle" | "diamond" | "ellipse" | "arrow" | "line") {
-            if let Some(t) = el.bound_elements().iter().find(|b| b.kind == "text") {
-                if let Some(te) = self.scene.get(&t.id) {
+            if let Some(t) = el.bound_elements().iter().find(|b| b.kind == "text")
+                && let Some(te) = self.scene.get(&t.id) {
                     let n = te.f.original_text.get().map(|s| s.chars().count()).unwrap_or(0);
                     self.editing = Some(TextEdit { id: t.id.clone(), caret: n });
                     self.selected = [t.id.clone()].into();
                     cx.notify();
                     return true;
                 }
-            }
             if el.kind == "line" || el.kind == "arrow" {
                 return false;
             }
@@ -1435,11 +1426,10 @@ impl ExcalidrawView {
         if s.trim().is_empty() {
             self.scene.remove(&[ed.id.clone()].into());
             if let Some(c) = el.container_id() {
-                if let Some(ce) = self.scene.get_mut(c) {
-                    if let Some(b) = ce.f.bound_elements.get_mut() {
+                if let Some(ce) = self.scene.get_mut(c)
+                    && let Some(b) = ce.f.bound_elements.get_mut() {
                         b.retain(|x| x.id != ed.id);
                     }
-                }
                 self.selected = [c.to_string()].into();
             } else {
                 self.selected.clear();
@@ -1563,12 +1553,11 @@ impl ExcalidrawView {
                 if primary {
                     return true;
                 }
-                if let Some(kc) = &ks.key_char {
-                    if !kc.chars().any(|c| c.is_control()) {
+                if let Some(kc) = &ks.key_char
+                    && !kc.chars().any(|c| c.is_control()) {
                         let (o, c) = insert(&chars, caret, kc);
                         self.set_edit_string(o, c);
                     }
-                }
             }
         }
         cx.notify();
@@ -1791,11 +1780,10 @@ impl ExcalidrawView {
         let mut d = self.defaults.clone();
         let mut ids: HashSet<String> = self.selected.clone();
         for el in self.scene.elements() {
-            if let Some(c) = el.container_id() {
-                if ids.contains(c) {
+            if let Some(c) = el.container_id()
+                && ids.contains(c) {
                     ids.insert(el.id.clone());
                 }
-            }
         }
         for id in &ids {
             if let Some(el) = self.scene.get_mut(id) {
@@ -1849,11 +1837,10 @@ impl ExcalidrawView {
             .collect();
         let mut files = serde_json::Map::new();
         for e in self.scene.elements().filter(|e| ids.contains(&e.id)) {
-            if let Some(fid) = e.f.file_id.get() {
-                if let Some(f) = self.scene.files.get(fid) {
+            if let Some(fid) = e.f.file_id.get()
+                && let Some(f) = self.scene.files.get(fid) {
                     files.insert(fid.clone(), f.clone());
                 }
-            }
         }
         let v = serde_json::json!({ "type": "excalidraw/clipboard", "elements": els, "files": files });
         cx.write_to_clipboard(ClipboardItem::new_string(serde_json::to_string(&v).unwrap_or_default()));
@@ -1940,11 +1927,10 @@ impl ExcalidrawView {
         cx.spawn(async move |this: WeakEntity<Self>, cx: &mut AsyncApp| {
             let paths = rx.await.ok().and_then(|r| r.ok()).flatten();
             let _ = this.update(cx, |v, cx| {
-                if let Some(p) = paths.and_then(|p| p.into_iter().next()) {
-                    if let Ok(bytes) = std::fs::read(&p) {
+                if let Some(p) = paths.and_then(|p| p.into_iter().next())
+                    && let Ok(bytes) = std::fs::read(&p) {
                         v.insert_image_bytes(&bytes, None, cx);
                     }
-                }
                 if !v.tool_locked {
                     v.tool = Tool::Selection;
                 }

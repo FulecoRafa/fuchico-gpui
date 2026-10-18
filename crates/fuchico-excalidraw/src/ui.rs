@@ -260,8 +260,6 @@ fn paint_canvas(bounds: Bounds<Pixels>, hitbox: Hitbox, snap: Snapshot, window: 
                     handle_cursor(h, a)
                 } else if v.point_handles().iter().any(|(_, q, _)| geom::dist(wp, *q) <= 8.0 / cam.zoom) {
                     CursorStyle::PointingHand
-                } else if v.hit_element(wp).is_some() {
-                    CursorStyle::Arrow
                 } else {
                     CursorStyle::Arrow
                 }
@@ -333,17 +331,16 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
     let pad = 4.0 / cam.zoom;
 
     // Bind hint: highlight the target shape.
-    if let Some(id) = &v.bind_hint {
-        if let Some(t) = v.scene.get(id) {
+    if let Some(id) = &v.bind_hint
+        && let Some(t) = v.scene.get(id) {
             let b = geom::local_bounds(t);
             let r = [b[0] - 3.0, b[1] - 3.0, b[2] + 3.0, b[3] + 3.0];
             render::stroke_screen(&rect_screen(cam, origin, t, r), true, 4.0, None, sel.with_alpha(0.35), window);
         }
-    }
 
     // Text caret.
-    if let Some(ed) = &v.editing {
-        if let Some(el) = v.scene.get(&ed.id) {
+    if let Some(ed) = &v.editing
+        && let Some(el) = v.scene.get(&ed.id) {
             if let Some((x, y, lh)) = v.caret_local() {
                 let a = cam.to_screen(origin, geom::to_world(el, [x, y]));
                 let b = cam.to_screen(origin, geom::to_world(el, [x, y + lh]));
@@ -354,7 +351,6 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
             let r = [-pad, -pad, el.width() + pad, el.height().max(el.font_size() * el.line_height()) + pad];
             render::stroke_screen(&rect_screen(cam, origin, el, r), true, 1.0, None, sel.with_alpha(0.5), window);
         }
-    }
 
     // Selection outlines.
     let list = v.selection_list();
@@ -375,13 +371,12 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
             let r = [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad];
             render::stroke_screen(&rect_screen(cam, origin, el, r), true, 1.0, if groupish { Some([4.0, 4.0]) } else { None }, sel, window);
         }
-        if groupish {
-            if let Some(b) = v.selection_bbox() {
+        if groupish
+            && let Some(b) = v.selection_bbox() {
                 let pts = [[b[0] - pad, b[1] - pad], [b[2] + pad, b[1] - pad], [b[2] + pad, b[3] + pad], [b[0] - pad, b[3] + pad]]
                     .map(|q| cam.to_screen(origin, q));
                 render::stroke_screen(&pts, true, 1.0, None, sel, window);
             }
-        }
         for (h, q) in v.handles() {
             let at = cam.to_screen(origin, q);
             render::handle(at, if h == Handle::Rotate { 4.5 } else { 4.0 }, h == Handle::Rotate, white, sel, window);
@@ -397,14 +392,13 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
     }
 
     // Multi-point preview: show committed points.
-    if let Some(id) = &v.multi {
-        if let Some(el) = v.scene.get(id) {
+    if let Some(id) = &v.multi
+        && let Some(el) = v.scene.get(id) {
             let pts = el.points();
             for p in &pts[..pts.len().saturating_sub(1)] {
                 render::handle(cam.to_screen(origin, geom::to_world(el, *p)), 4.0, true, white, sel, window);
             }
         }
-    }
 
     // Marquee.
     if let Some(Drag::Marquee { start, current }) = &v.drag {
@@ -417,8 +411,8 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
     }
 
     // Eraser trail cursor.
-    if v.tool == Tool::Eraser {
-        if let Some(p) = v.pointer {
+    if v.tool == Tool::Eraser
+        && let Some(p) = v.pointer {
             let pts: Vec<Point<Pixels>> = (0..20)
                 .map(|k| {
                     let a = k as f32 / 20.0 * std::f32::consts::TAU;
@@ -428,7 +422,6 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
             let c = if pal.dark { Rgba::new(0.8, 0.8, 0.8, 0.8) } else { Rgba::new(0.2, 0.2, 0.2, 0.6) };
             render::stroke_screen(&pts, true, 1.0, None, c, window);
         }
-    }
 }
 
 // ---------------------------------------------------------------- chrome helpers

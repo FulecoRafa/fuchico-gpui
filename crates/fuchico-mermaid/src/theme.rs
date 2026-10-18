@@ -199,8 +199,8 @@ impl MermaidTheme {
         t.pie_stroke_color = bg.css();
         t.pie_outer_stroke_color = border;
         t.pie_opacity = 1.0;
-        for i in 0..8 {
-            t.git_colors[i] = series[i].css();
+        for (i, c) in series.iter().enumerate().take(8) {
+            t.git_colors[i] = c.css();
             t.git_inv_colors[i] = bg.css();
             t.git_branch_label_colors[i] = bg.css();
         }

@@ -466,8 +466,13 @@ impl Explorer {
         let Some(name) = tree::create_name(value, p.default_ext) else { return };
         let path = tree::join(&p.parent, &name);
         let kind = p.kind;
+        // "New drawing" goes through the same helper as the excalidraw module
+        // so the file starts as a valid empty scene, not a 0-byte file.
+        let drawing = kind == PendingKind::File && name.to_lowercase().ends_with(".excalidraw");
+        let dir = p.parent.clone();
         let task = cx.background_spawn(async move {
             match kind {
+                PendingKind::File if drawing => crate::excalidraw::create_drawing(&dir, &name).map(|_| ()),
                 PendingKind::File => fuchico_core::fs::mutate::fs_create_file(path),
                 PendingKind::Dir => fuchico_core::fs::mutate::fs_create_dir(path),
             }
