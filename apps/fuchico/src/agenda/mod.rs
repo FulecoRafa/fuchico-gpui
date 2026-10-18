@@ -21,6 +21,8 @@
 //!   buffer (the rescan rides on that same event).
 
 mod model;
+#[cfg(test)]
+mod ui_tests;
 
 use std::time::Duration;
 
@@ -223,6 +225,7 @@ impl AgendaView {
         let nav = |id: &'static str, icon: IconName, prev: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
+                .debug_selector(|| id.to_string())
                 .flex()
                 .items_center()
                 .justify_center()
@@ -280,6 +283,7 @@ impl AgendaView {
                 row = row.child(
                     div()
                         .id(SharedString::from(format!("agenda-day-{day}")))
+                        .debug_selector(|| format!("agenda-day-{day}"))
                         .relative()
                         .flex_1()
                         .h(u(30.))
@@ -320,6 +324,7 @@ impl AgendaView {
         let clear = self.selected.clone().map(|date| {
             div()
                 .id("agenda-clear-filter")
+                .debug_selector(|| "agenda-clear-filter".into())
                 .mt(u(12.))
                 .w_full()
                 .flex()
@@ -395,6 +400,7 @@ impl AgendaView {
         let tint = th.fg_alpha(0.05);
         div()
             .id(("agenda-routine", ix))
+            .debug_selector(|| format!("agenda-routine-{ix}"))
             .track_focus(&focus)
             .flex()
             .flex_col()
@@ -448,6 +454,7 @@ impl AgendaView {
                 let checked = item.checked;
                 div()
                     .id(SharedString::from(format!("{key}-cb")))
+                    .debug_selector(|| format!("{key}-cb"))
                     .flex_none()
                     .size(u(14.))
                     .flex()
@@ -492,6 +499,7 @@ impl AgendaView {
         let tint = th.fg_alpha(0.05);
         div()
             .id(SharedString::from(key.to_string()))
+            .debug_selector(|| key.to_string())
             .track_focus(&focus)
             .flex()
             .items_center()
