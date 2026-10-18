@@ -5,3 +5,31 @@ version.workspace = true
 license.workspace = true
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+log.workspace = true
+chrono.workspace = true
+tempfile = "3"
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "http2"] }
+quick-xml = "0.41.0"
+icalendar = "0.17.12"
+uuid = { version = "1.24.0", features = ["v4"] }
+sha2 = "0.11.0"
+tokio = { version = "1.53.0", features = ["time", "rt", "rt-multi-thread", "macros"] }
+font-kit = "0.14"
+base64 = "0.22"
+crossbeam-channel = "0.5"
+notify = "8"
+dirs = "6"
+pulldown-cmark = "0.13"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring-core = "1.0.0"
+linux-keyutils-keyring-store = "1.0.0"
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+keyring = "4.1.5"
+
+[dev-dependencies]
+wiremock = "0.6.5"
