@@ -25,3 +25,15 @@ typst-pdf = "0.15"
 typst-kit = { version = "0.15", default-features = false, features = ["scan-fonts", "embedded-fonts"] }
 base64.workspace = true
 typst-layout = "0.15"
+
+[dev-dependencies]
+# Headless UI tests (`#[gpui_kit::test]`): enables gpui's TestAppContext.
+# Not gpui-kit/test-support: its weak `gpui-fast?/…` features drag the
+# conflicting gpui-fast tree into the lockfile.
+gpui-pre = { version = "=0.3.9", features = ["test-support"] }
+gpui-pre-platform = { version = "=0.3.9", features = ["test-support"] }
+
+# Offscreen snapshots: the platform text system without creating a
+# MacPlatform (which must run on the main thread; test threads are not).
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+gpui-pre-apple = { version = "=0.3.9", features = ["font-kit"] }
