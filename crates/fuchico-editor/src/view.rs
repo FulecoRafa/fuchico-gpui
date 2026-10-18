@@ -10,19 +10,21 @@ use chrono::Local;
 use fuchico_core::fuzzy::fuzzy_match;
 use fuchico_core::outline::OutlineHeader;
 use fuchico_helix::{
-    Change, Completions, Config, Editor, Effect, External, Key, KeyEvent, Modifiers as HxMods, ModeType, PromptKind,
-    Range as HxRange, Scroll, ScrollAlign, Selection, TextEdit as HxEdit,
+    Change, Completions, Config, Editor, Effect, External, Key, KeyEvent, ModeType,
+    Modifiers as HxMods, PromptKind, Range as HxRange, Scroll, ScrollAlign, Selection,
+    TextEdit as HxEdit,
 };
 use fuchico_markdown::completion::should_open_completion;
 use fuchico_markdown::text::{Assoc, map_pos};
 use fuchico_markdown::{
-    CompletionContext, CompletionOption, FenceToolbar, FoldState, MarkdownModel, Settings, TableData, TableEditState,
-    TableKey, TableModel, TableOutcome, TextEdit as MdEdit,
+    CompletionContext, CompletionOption, FenceToolbar, FoldState, MarkdownModel, Settings,
+    TableData, TableEditState, TableKey, TableModel, TableOutcome, TextEdit as MdEdit,
 };
 use gpui_kit::{
-    App, ClipboardEntry, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, KeyDownEvent, Keystroke, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement,
-    Pixels, Point, Render, ScrollWheelEvent, SharedString, Styled, Window, div, px,
+    App, ClipboardEntry, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable,
+    InteractiveElement, IntoElement, KeyDownEvent, Keystroke, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point, Render, ScrollWheelEvent,
+    SharedString, Styled, Window, div, px,
 };
 
 use crate::actions::*;
@@ -74,6 +76,10 @@ pub struct EditorOptions {
     pub inline_images: bool,
     /// Draw the mode chip (bottom-left).
     pub mode_chip: bool,
+    /// Helix "external" commands the host implements (`Space f`, `Space b`,
+    /// `gn`/`gp`, `:bc`, `Space /`); enabled ones arrive as
+    /// [`EditorEvent::External`]. All off by default, like cm-helix.
+    pub externals: fuchico_helix::ExternalCommands,
 }
 
 impl Default for EditorOptions {
@@ -91,6 +97,7 @@ impl Default for EditorOptions {
             fold_end_marker: ":::endfold".into(),
             inline_images: false,
             mode_chip: true,
+            externals: Default::default(),
         }
     }
 }
@@ -114,29 +121,47 @@ pub struct MermaidBlock {
 #[derive(Debug, Clone, PartialEq)]
 pub enum EditorEvent {
     /// The text changed (`dirty` = differs from the last saved text).
-    Changed { dirty: bool },
+    Changed {
+        dirty: bool,
+    },
     /// The dirty flag flipped.
     DirtyChanged(bool),
     /// `:w` / Mod-s.
     Save,
     /// `:q`.
     Quit,
-    OpenWikilink { target: String, resolved: Option<String> },
+    OpenWikilink {
+        target: String,
+        resolved: Option<String>,
+    },
     OpenLink(String),
     TagClicked(String),
-    HostCommand { name: String, args: Vec<String> },
+    HostCommand {
+        name: String,
+        args: Vec<String>,
+    },
     External(External),
     ChangeTheme(String),
-    Message { text: String, error: bool },
+    Message {
+        text: String,
+        error: bool,
+    },
     ModeChanged(ModeType),
     /// `:` with [`EditorOptions::command_line_via_host`].
-    OpenCommandLine { placeholder: Option<String> },
+    OpenCommandLine {
+        placeholder: Option<String>,
+    },
     MermaidOpen(MermaidBlock),
     MermaidUpdate(MermaidBlock),
-    MermaidClose { key: u64 },
+    MermaidClose {
+        key: u64,
+    },
     /// Mod-v with an image on the clipboard: the host saves it and calls
     /// [`EditorView::insert_image_link`].
-    PasteImage { mime: String, bytes: Vec<u8> },
+    PasteImage {
+        mime: String,
+        bytes: Vec<u8>,
+    },
     Zoom(ZoomDirection),
 }
 
@@ -260,9 +285,29 @@ fn md_settings(o: &EditorOptions) -> Settings {
 }
 
 impl EditorView {
-    pub fn new(text: &str, options: EditorOptions, style: EditorStyle, _window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let shared = Rc::new(RefCell::new(SharedLayout { path: options.path.clone(), half_page: 10, ..Default::default() }));
-        let engine = Editor::with_host(text, Config::default(), Box::new(ViewHost { shared: shared.clone() }));
+    pub fn new(
+        text: &str,
+        options: EditorOptions,
+        style: EditorStyle,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let shared = Rc::new(RefCell::new(SharedLayout {
+            path: options.path.clone(),
+            half_page: 10,
+            ..Default::default()
+        }));
+        let config = Config {
+            externals: options.externals.clone(),
+            ..Config::default()
+        };
+        let engine = Editor::with_host(
+            text,
+            config,
+            Box::new(ViewHost {
+                shared: shared.clone(),
+            }),
+        );
         let normalized = engine.text();
         let model = MarkdownModel::new(&normalized, md_settings(&options));
         EditorView {
@@ -386,22 +431,37 @@ impl EditorView {
     }
     pub fn outline_items(&self) -> Option<Vec<String>> {
         match &self.overlay {
-            Overlay::Outline(o) => Some(o.filtered.iter().map(|&i| o.items[i].text.clone()).collect()),
+            Overlay::Outline(o) => Some(
+                o.filtered
+                    .iter()
+                    .map(|&i| o.items[i].text.clone())
+                    .collect(),
+            ),
             _ => None,
         }
     }
     pub fn completion_labels(&self) -> Option<Vec<String>> {
-        self.completion.as_ref().map(|c| c.options.iter().map(|o| o.label.clone()).collect())
+        self.completion
+            .as_ref()
+            .map(|c| c.options.iter().map(|o| o.label.clone()).collect())
     }
     /// Active table cell `(row, col, editing)`.
     pub fn table_cell(&self) -> Option<(usize, usize, bool)> {
-        self.table.as_ref().map(|t| (t.state.row, t.state.col, t.state.editing))
+        self.table
+            .as_ref()
+            .map(|t| (t.state.row, t.state.col, t.state.editing))
     }
     pub fn marked_range(&self) -> Option<Range<usize>> {
         self.marked.clone()
     }
     pub fn open_mermaid_blocks(&self) -> Vec<MermaidBlock> {
-        self.mermaid.iter().map(|(k, _, s)| MermaidBlock { key: *k, source: s.clone() }).collect()
+        self.mermaid
+            .iter()
+            .map(|(k, _, s)| MermaidBlock {
+                key: *k,
+                source: s.clone(),
+            })
+            .collect()
     }
 
     // ---- host mutators ----------------------------------------------------
@@ -438,13 +498,19 @@ impl EditorView {
             self.model.set_settings(settings);
         }
         self.shared.borrow_mut().path = options.path.clone();
+        self.engine.config_mut().externals = options.externals.clone();
         self.options = options;
         self.layout_dirty = true;
         self.wrap_rows.clear();
         cx.notify();
     }
 
-    pub fn set_vault(&mut self, vault_files: Vec<String>, all_tags: Vec<String>, cx: &mut Context<Self>) {
+    pub fn set_vault(
+        &mut self,
+        vault_files: Vec<String>,
+        all_tags: Vec<String>,
+        cx: &mut Context<Self>,
+    ) {
         self.options.vault_files = vault_files;
         self.options.all_tags = all_tags;
         cx.notify();
@@ -461,9 +527,14 @@ impl EditorView {
         let doc = self.engine.doc();
         let line = line.clamp(1, doc.lines());
         let from = doc.line(line).from;
-        let fx = self.engine.set_selection_from_pointer(Selection::single(from, from));
+        let fx = self
+            .engine
+            .set_selection_from_pointer(Selection::single(from, from));
         self.apply_effects(fx, cx);
-        self.pending_scroll = Some(Scroll::To { pos: from, align: ScrollAlign::Center });
+        self.pending_scroll = Some(Scroll::To {
+            pos: from,
+            align: ScrollAlign::Center,
+        });
         cx.notify();
     }
 
@@ -474,11 +545,14 @@ impl EditorView {
     /// Selection by char offsets (pointer semantics: collapsed = block in
     /// normal mode).
     pub fn set_selection(&mut self, anchor: usize, head: usize, cx: &mut Context<Self>) {
-        let fx = self.engine.set_selection_from_pointer(Selection::single(anchor, head));
+        let fx = self
+            .engine
+            .set_selection_from_pointer(Selection::single(anchor, head));
         self.apply_effects(fx, cx);
     }
 
-    /// Feeds keys in fuchico-helix notation (`"ihello<Esc>"`).
+    /// Feeds keys in fuchico-helix notation (`"ihello<Esc>"`) straight to the
+    /// engine; overlays (prompt, find, outline, completion) are bypassed.
     pub fn handle_keys(&mut self, keys: &str, cx: &mut Context<Self>) {
         for ev in fuchico_helix::parse_keys(keys) {
             self.feed_key(ev, cx);
@@ -497,7 +571,9 @@ impl EditorView {
             return;
         }
         let head = self.engine.selection().main().head;
-        let before = head.checked_sub(1).and_then(|p| self.engine.doc().char_at(p));
+        let before = head
+            .checked_sub(1)
+            .and_then(|p| self.engine.doc().char_at(p));
         let current = self.options.path.clone().unwrap_or_default();
         let text = fuchico_core::attachments::drop_insert_text(paths, &current, before);
         self.insert_at_main(&text, cx);
@@ -510,7 +586,11 @@ impl EditorView {
 
     fn insert_at_main(&mut self, text: &str, cx: &mut Context<Self>) {
         let r = self.engine.selection().main();
-        let (from, to) = if self.mode() == ModeType::Insert { (r.from(), r.to()) } else { (r.to(), r.to()) };
+        let (from, to) = if self.mode() == ModeType::Insert {
+            (r.from(), r.to())
+        } else {
+            (r.to(), r.to())
+        };
         let end = from + text.chars().count();
         let fx = self.engine.apply_changes(vec![Change::new(from, to, text)]);
         self.apply_effects(fx, cx);
@@ -526,7 +606,9 @@ impl EditorView {
 
     /// Opens the preview of the mermaid fence starting at byte `anchor`.
     pub fn open_mermaid(&mut self, anchor: usize, cx: &mut Context<Self>) {
-        let Some(src) = self.mermaid_source(anchor) else { return };
+        let Some(src) = self.mermaid_source(anchor) else {
+            return;
+        };
         if let Some((k, _, _)) = self.mermaid.iter().find(|(_, a, _)| *a == anchor) {
             let key = *k;
             cx.emit(EditorEvent::MermaidOpen(MermaidBlock { key, source: src }));
@@ -540,13 +622,24 @@ impl EditorView {
 
     fn mermaid_source(&self, anchor: usize) -> Option<String> {
         let p = self.model.parsed();
-        let f = p.fences.iter().find(|f| f.range.start == anchor && f.is_mermaid())?;
+        let f = p
+            .fences
+            .iter()
+            .find(|f| f.range.start == anchor && f.is_mermaid())?;
         let lines = self.model.lines();
         let from = lines.line_range(f.open_line).end + 1;
-        let to = if f.closed { lines.line_range(f.last_line).start } else { f.range.end };
+        let to = if f.closed {
+            lines.line_range(f.last_line).start
+        } else {
+            f.range.end
+        };
         let t = self.model.text();
         let (from, to) = (from.min(t.len()), to.min(t.len()));
-        Some(if from < to { t[from..to].trim_end_matches('\n').to_string() } else { String::new() })
+        Some(if from < to {
+            t[from..to].trim_end_matches('\n').to_string()
+        } else {
+            String::new()
+        })
     }
 
     // ---- conversions --------------------------------------------------------
@@ -564,10 +657,20 @@ impl EditorView {
         self.engine.doc().byte_to_char(b)
     }
     fn ranges_bytes(&self) -> Vec<Range<usize>> {
-        self.engine.selection().ranges().iter().map(|r| self.byte_of(r.from())..self.byte_of(r.to())).collect()
+        self.engine
+            .selection()
+            .ranges()
+            .iter()
+            .map(|r| self.byte_of(r.from())..self.byte_of(r.to()))
+            .collect()
     }
     fn heads_bytes(&self) -> Vec<usize> {
-        self.engine.selection().ranges().iter().map(|r| self.byte_of(r.head)).collect()
+        self.engine
+            .selection()
+            .ranges()
+            .iter()
+            .map(|r| self.byte_of(r.head))
+            .collect()
     }
 
     /// Applies a byte-offset command edit (not undoable: engine host edit).
@@ -582,15 +685,22 @@ impl EditorView {
             self.apply_effects(fx, cx);
         }
         if !e.selection.is_empty() {
-            let ranges: Vec<HxRange> =
-                e.selection.iter().map(|&(a, h)| HxRange::new(self.char_of(a), self.char_of(h))).collect();
+            let ranges: Vec<HxRange> = e
+                .selection
+                .iter()
+                .map(|&(a, h)| HxRange::new(self.char_of(a), self.char_of(h)))
+                .collect();
             let fx = self.engine.set_selection(Selection::create(ranges, 0));
             self.apply_effects(fx, cx);
         }
     }
 
     fn apply_md_edit(&mut self, e: &MdEdit, cx: &mut Context<Self>) {
-        let ch = Change::new(self.char_of(e.range.start), self.char_of(e.range.end), e.insert.clone());
+        let ch = Change::new(
+            self.char_of(e.range.start),
+            self.char_of(e.range.end),
+            e.insert.clone(),
+        );
         let fx = self.engine.apply_changes(vec![ch]);
         self.apply_effects(fx, cx);
     }
@@ -639,14 +749,19 @@ impl EditorView {
                 Effect::External(e) => cx.emit(EditorEvent::External(e)),
                 Effect::Save => cx.emit(EditorEvent::Save),
                 Effect::Quit => cx.emit(EditorEvent::Quit),
-                Effect::HostCommand { name, args } => cx.emit(EditorEvent::HostCommand { name, args }),
+                Effect::HostCommand { name, args } => {
+                    cx.emit(EditorEvent::HostCommand { name, args })
+                }
                 Effect::ChangeTheme(t) => cx.emit(EditorEvent::ChangeTheme(t)),
             }
         }
         if sel_changed || doc_changed {
             if self.pending_scroll.is_none() && self.drag_anchor.is_none() {
                 let head = self.engine.selection().main().head;
-                self.pending_scroll = Some(Scroll::To { pos: head, align: ScrollAlign::Nearest });
+                self.pending_scroll = Some(Scroll::To {
+                    pos: head,
+                    align: ScrollAlign::Nearest,
+                });
             }
             let head = self.byte_of(self.engine.selection().main().head);
             let before = self.folds.ranges().len();
@@ -656,7 +771,10 @@ impl EditorView {
             }
             if let Some(t) = &self.table
                 && !t.state.editing
-                && self.model.table_at(head).is_none_or(|(_, m)| m.range.start != t.state.anchor)
+                && self
+                    .model
+                    .table_at(head)
+                    .is_none_or(|(_, m)| m.range.start != t.state.anchor)
             {
                 self.table = None;
             }
@@ -670,12 +788,18 @@ impl EditorView {
     }
 
     fn on_doc_changed(&mut self, edits: &[HxEdit], cx: &mut Context<Self>) {
-        let md: Vec<MdEdit> = edits.iter().map(|e| MdEdit::new(e.from_byte..e.to_byte, e.insert.clone())).collect();
+        let md: Vec<MdEdit> = edits
+            .iter()
+            .map(|e| MdEdit::new(e.from_byte..e.to_byte, e.insert.clone()))
+            .collect();
         self.folds.map(&md);
         let text = self.engine.text();
         self.model.update(&text, &md);
         self.layout_dirty = true;
-        self.marked = self.marked.take().filter(|m| m.end <= self.engine.doc().len());
+        self.marked = self
+            .marked
+            .take()
+            .filter(|m| m.end <= self.engine.doc().len());
         if let Some(t) = &mut self.table {
             t.state.anchor = map_pos(t.state.anchor, &md, Assoc::Before);
         }
@@ -692,7 +816,10 @@ impl EditorView {
                 Some(s) => {
                     if s != *src {
                         *src = s.clone();
-                        events.push(EditorEvent::MermaidUpdate(MermaidBlock { key: *key, source: s }));
+                        events.push(EditorEvent::MermaidUpdate(MermaidBlock {
+                            key: *key,
+                            source: s,
+                        }));
                     }
                     true
                 }
@@ -737,7 +864,12 @@ impl EditorView {
         self.apply_effects(fx, cx);
     }
 
-    pub(crate) fn on_key_down(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_key_down(
+        &mut self,
+        ev: &KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let ks = &ev.keystroke;
         if ks.modifiers.platform || ks.modifiers.function {
             return; // Mod-* belongs to actions / the host
@@ -819,7 +951,9 @@ impl EditorView {
     }
 
     fn prompt_key(&mut self, ks: &Keystroke, cx: &mut Context<Self>) {
-        let Overlay::Prompt(p) = &self.overlay else { return };
+        let Overlay::Prompt(p) = &self.overlay else {
+            return;
+        };
         let p = p.clone();
         let m = ks.modifiers;
         match ks.key.as_str() {
@@ -845,7 +979,9 @@ impl EditorView {
                     (Some(i), false) => (i + 1) % n,
                     (Some(i), true) => (i + n - 1) % n,
                 };
-                let value = self.engine.prompt_accept_completion(&p.typed, &p.completions.options[next]);
+                let value = self
+                    .engine
+                    .prompt_accept_completion(&p.typed, &p.completions.options[next]);
                 let fx = self.engine.prompt_input(&value);
                 if let Overlay::Prompt(pp) = &mut self.overlay {
                     pp.value = value;
@@ -880,9 +1016,17 @@ impl EditorView {
     pub(crate) fn open_find(&mut self, cx: &mut Context<Self>) {
         let r = self.engine.selection().main();
         let sel = self.engine.doc().slice(r.from(), r.to());
-        let query = if sel.chars().count() > 1 && !sel.contains('\n') { sel } else { String::new() };
+        let query = if sel.chars().count() > 1 && !sel.contains('\n') {
+            sel
+        } else {
+            String::new()
+        };
         let matches = find_matches(self.model.text(), &query);
-        self.overlay = Overlay::Find(FindState { query, matches, current: 0 });
+        self.overlay = Overlay::Find(FindState {
+            query,
+            matches,
+            current: 0,
+        });
         cx.notify();
     }
 
@@ -890,30 +1034,51 @@ impl EditorView {
         let head = self.byte_of(self.engine.selection().main().from());
         let matches = find_matches(self.model.text(), &query);
         let current = matches.iter().position(|m| m.start >= head).unwrap_or(0);
-        self.overlay = Overlay::Find(FindState { query, matches, current });
+        self.overlay = Overlay::Find(FindState {
+            query,
+            matches,
+            current,
+        });
         self.find_select(cx);
     }
 
     fn find_select(&mut self, cx: &mut Context<Self>) {
-        let Overlay::Find(f) = &self.overlay else { return };
-        let Some(m) = f.matches.get(f.current).cloned() else { return };
+        let Overlay::Find(f) = &self.overlay else {
+            return;
+        };
+        let Some(m) = f.matches.get(f.current).cloned() else {
+            return;
+        };
         let (a, h) = (self.char_of(m.start), self.char_of(m.end));
         let fx = self.engine.set_selection(Selection::single(a, h));
         self.apply_effects(fx, cx);
-        self.pending_scroll = Some(Scroll::To { pos: h, align: ScrollAlign::Center });
+        self.pending_scroll = Some(Scroll::To {
+            pos: h,
+            align: ScrollAlign::Center,
+        });
     }
 
     fn find_key(&mut self, ks: &Keystroke, _window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let Overlay::Find(f) = &self.overlay else { return false };
+        let Overlay::Find(f) = &self.overlay else {
+            return false;
+        };
         let f = f.clone();
         match ks.key.as_str() {
             "escape" => self.overlay = Overlay::None,
             "enter" | "f3" => {
                 let n = f.matches.len();
                 if n > 0 {
-                    let cur = if ks.modifiers.shift { (f.current + n - 1) % n } else { (f.current + 1) % n };
+                    let cur = if ks.modifiers.shift {
+                        (f.current + n - 1) % n
+                    } else {
+                        (f.current + 1) % n
+                    };
                     // The first Enter after typing selects the current match.
-                    let cur = if self.find_selected(&f) { cur } else { f.current };
+                    let cur = if self.find_selected(&f) {
+                        cur
+                    } else {
+                        f.current
+                    };
                     if let Overlay::Find(ff) = &mut self.overlay {
                         ff.current = cur;
                     }
@@ -950,7 +1115,12 @@ impl EditorView {
     pub(crate) fn open_outline(&mut self, cx: &mut Context<Self>) {
         let items = self.model.outline();
         let filtered = (0..items.len()).collect();
-        self.overlay = Overlay::Outline(OutlineState { query: String::new(), items, filtered, selected: 0 });
+        self.overlay = Overlay::Outline(OutlineState {
+            query: String::new(),
+            items,
+            filtered,
+            selected: 0,
+        });
         cx.notify();
     }
 
@@ -974,7 +1144,9 @@ impl EditorView {
     }
 
     pub(crate) fn outline_pick(&mut self, ix: usize, cx: &mut Context<Self>) {
-        let Overlay::Outline(o) = &self.overlay else { return };
+        let Overlay::Outline(o) = &self.overlay else {
+            return;
+        };
         let Some(&i) = o.filtered.get(ix) else { return };
         let line = o.items[i].line;
         self.overlay = Overlay::None;
@@ -982,7 +1154,9 @@ impl EditorView {
     }
 
     fn outline_key(&mut self, ks: &Keystroke, cx: &mut Context<Self>) {
-        let Overlay::Outline(o) = &mut self.overlay else { return };
+        let Overlay::Outline(o) = &mut self.overlay else {
+            return;
+        };
         let n = o.filtered.len();
         match ks.key.as_str() {
             "escape" => self.overlay = Overlay::None,
@@ -992,8 +1166,12 @@ impl EditorView {
             }
             "down" => o.selected = if n == 0 { 0 } else { (o.selected + 1) % n },
             "up" => o.selected = if n == 0 { 0 } else { (o.selected + n - 1) % n },
-            "n" if ks.modifiers.control => o.selected = if n == 0 { 0 } else { (o.selected + 1) % n },
-            "p" if ks.modifiers.control => o.selected = if n == 0 { 0 } else { (o.selected + n - 1) % n },
+            "n" if ks.modifiers.control => {
+                o.selected = if n == 0 { 0 } else { (o.selected + 1) % n }
+            }
+            "p" if ks.modifiers.control => {
+                o.selected = if n == 0 { 0 } else { (o.selected + n - 1) % n }
+            }
             "backspace" => {
                 o.query.pop();
                 Self::outline_filter(o);
@@ -1030,12 +1208,19 @@ impl EditorView {
             read_note: &read,
         };
         let options = self.model.completions(&ctx);
-        self.completion = (!options.is_empty()).then_some(CompletionState { options, selected: 0 });
+        self.completion = (!options.is_empty()).then_some(CompletionState {
+            options,
+            selected: 0,
+        });
     }
 
     pub(crate) fn accept_completion(&mut self, ix: usize, cx: &mut Context<Self>) {
-        let Some(c) = self.completion.take() else { return };
-        let Some(opt) = c.options.get(ix).cloned() else { return };
+        let Some(c) = self.completion.take() else {
+            return;
+        };
+        let Some(opt) = c.options.get(ix).cloned() else {
+            return;
+        };
         self.suppress_completion = opt.picked;
         self.apply_md_edit(&opt.edit, cx);
         let cur = self.char_of(opt.cursor);
@@ -1049,7 +1234,9 @@ impl EditorView {
     }
 
     fn completion_key(&mut self, ks: &Keystroke, cx: &mut Context<Self>) -> bool {
-        let Some(c) = &mut self.completion else { return false };
+        let Some(c) = &mut self.completion else {
+            return false;
+        };
         let n = c.options.len();
         let m = ks.modifiers;
         match ks.key.as_str() {
@@ -1074,7 +1261,10 @@ impl EditorView {
 
     fn table_model(&self) -> Option<TableModel> {
         let t = self.table.as_ref()?;
-        self.model.table_at(t.state.anchor).map(|(_, m)| m).filter(|m| m.range.start == t.state.anchor)
+        self.model
+            .table_at(t.state.anchor)
+            .map(|(_, m)| m)
+            .filter(|m| m.range.start == t.state.anchor)
     }
 
     fn apply_table_outcome(&mut self, out: TableOutcome, cx: &mut Context<Self>) {
@@ -1084,37 +1274,65 @@ impl EditorView {
         }
         let sel = self.char_of(out.selection);
         let fx = self.engine.set_selection(Selection::single(sel, sel));
-        self.table = out.state.map(|state| TableEdit { state, data: out.data.clone() });
+        self.table = out.state.map(|state| TableEdit {
+            state,
+            data: out.data.clone(),
+        });
         self.apply_effects(fx, cx);
         if let Some(t) = &mut self.table {
             // apply_effects may have dropped a navigating table; re-arm.
             t.data = out.data;
         } else if let Some(state) = out.state {
-            self.table = Some(TableEdit { state, data: out.data });
+            self.table = Some(TableEdit {
+                state,
+                data: out.data,
+            });
         }
         self.suppress_completion = false;
         cx.notify();
     }
 
     /// Activates cell `(row, col)` of the table starting at byte `anchor`.
-    pub fn table_activate(&mut self, anchor: usize, row: usize, col: usize, editing: bool, cx: &mut Context<Self>) {
-        let Some((_, model)) = self.model.table_at(anchor) else { return };
+    pub fn table_activate(
+        &mut self,
+        anchor: usize,
+        row: usize,
+        col: usize,
+        editing: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let Some((_, model)) = self.model.table_at(anchor) else {
+            return;
+        };
         let data = model.data();
-        let out = fuchico_markdown::table::table_activate(self.model.text(), &model, data, row, col, editing);
+        let out = fuchico_markdown::table::table_activate(
+            self.model.text(),
+            &model,
+            data,
+            row,
+            col,
+            editing,
+        );
         self.apply_table_outcome(out, cx);
     }
 
     pub fn table_add_row(&mut self, anchor: usize, cx: &mut Context<Self>) {
-        let Some((_, model)) = self.model.table_at(anchor) else { return };
+        let Some((_, model)) = self.model.table_at(anchor) else {
+            return;
+        };
         let st = self.table.as_ref().map(|t| t.state);
-        let out = fuchico_markdown::table::table_add_row(self.model.text(), &model, model.data(), st);
+        let out =
+            fuchico_markdown::table::table_add_row(self.model.text(), &model, model.data(), st);
         self.apply_table_outcome(out, cx);
     }
 
     pub fn table_add_column(&mut self, anchor: usize, cx: &mut Context<Self>) {
-        let Some((_, model)) = self.model.table_at(anchor) else { return };
+        let Some((_, model)) = self.model.table_at(anchor) else {
+            return;
+        };
         let st = self.table.as_ref().map(|t| t.state);
-        let out = fuchico_markdown::table::table_add_column(self.model.text(), &model, model.data(), st);
+        let out =
+            fuchico_markdown::table::table_add_column(self.model.text(), &model, model.data(), st);
         self.apply_table_outcome(out, cx);
     }
 
@@ -1140,7 +1358,8 @@ impl EditorView {
             _ => None,
         };
         if let Some(key) = key {
-            let out = fuchico_markdown::table::table_key(self.model.text(), &model, t.data, t.state, key);
+            let out =
+                fuchico_markdown::table::table_key(self.model.text(), &model, t.data, t.state, key);
             self.apply_table_outcome(out, cx);
             return true;
         }
@@ -1160,7 +1379,13 @@ impl EditorView {
         true
     }
 
-    fn table_set_cell(&mut self, model: TableModel, mut t: TableEdit, cell: String, cx: &mut Context<Self>) {
+    fn table_set_cell(
+        &mut self,
+        model: TableModel,
+        mut t: TableEdit,
+        cell: String,
+        cx: &mut Context<Self>,
+    ) {
         t.data.set_cell(t.state.row, t.state.col, cell);
         let edit = model.flush(self.model.text(), &t.data);
         self.suppress_completion = true;
@@ -1175,8 +1400,12 @@ impl EditorView {
 
     /// Text typed into the active table cell (input handler path).
     pub(crate) fn table_input(&mut self, text: &str, cx: &mut Context<Self>) -> bool {
-        let Some(t) = self.table.clone().filter(|t| t.state.editing) else { return false };
-        let Some(model) = self.table_model() else { return false };
+        let Some(t) = self.table.clone().filter(|t| t.state.editing) else {
+            return false;
+        };
+        let Some(model) = self.table_model() else {
+            return false;
+        };
         let mut cell = t.data.cell(t.state.row, t.state.col).to_string();
         cell.push_str(text);
         self.table_set_cell(model, t, cell, cx);
@@ -1185,14 +1414,29 @@ impl EditorView {
 
     // ---- language menu -----------------------------------------------------------
 
-    pub(crate) fn open_lang_menu(&mut self, toolbar: FenceToolbar, at: Point<Pixels>, cx: &mut Context<Self>) {
-        let selected = toolbar.options.iter().position(|o| *o == toolbar.language).unwrap_or(0);
-        self.lang_menu = Some(LangMenu { toolbar, at, selected });
+    pub(crate) fn open_lang_menu(
+        &mut self,
+        toolbar: FenceToolbar,
+        at: Point<Pixels>,
+        cx: &mut Context<Self>,
+    ) {
+        let selected = toolbar
+            .options
+            .iter()
+            .position(|o| *o == toolbar.language)
+            .unwrap_or(0);
+        self.lang_menu = Some(LangMenu {
+            toolbar,
+            at,
+            selected,
+        });
         cx.notify();
     }
 
     pub(crate) fn pick_language(&mut self, ix: usize, cx: &mut Context<Self>) {
-        let Some(menu) = self.lang_menu.take() else { return };
+        let Some(menu) = self.lang_menu.take() else {
+            return;
+        };
         if let Some(lang) = menu.toolbar.options.get(ix) {
             let e = menu.toolbar.set_language(lang);
             self.apply_md_edit(&e, cx);
@@ -1218,7 +1462,12 @@ impl EditorView {
 
     // ---- actions ------------------------------------------------------------------
 
-    fn act_toggle_checkbox(&mut self, _: &EditorToggleCheckbox, _: &mut Window, cx: &mut Context<Self>) {
+    fn act_toggle_checkbox(
+        &mut self,
+        _: &EditorToggleCheckbox,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if let Some(e) = commands::toggle_checkbox(self.model.text(), &self.heads_bytes()) {
             self.apply_command_edit(e, cx);
         }
@@ -1227,7 +1476,12 @@ impl EditorView {
         let s = commands::format_date(&Local::now().naive_local());
         self.insert_text_at_selections(&s, cx);
     }
-    fn act_insert_datetime(&mut self, _: &EditorInsertDateTime, _: &mut Window, cx: &mut Context<Self>) {
+    fn act_insert_datetime(
+        &mut self,
+        _: &EditorInsertDateTime,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let s = commands::format_date_time(&Local::now().naive_local());
         self.insert_text_at_selections(&s, cx);
     }
@@ -1236,38 +1490,39 @@ impl EditorView {
         let e = commands::insert_at_cursor(&self.ranges_bytes(), text);
         self.apply_command_edit(e, cx);
     }
-    fn act_insert_region(&mut self, _: &EditorInsertRegion, _: &mut Window, cx: &mut Context<Self>) {
-        let (s, e) = (self.options.fold_start_marker.clone(), self.options.fold_end_marker.clone());
-        // Normal mode: a 1-char block counts as "no selection".
-        let ranges: Vec<Range<usize>> = if self.mode() != ModeType::Insert {
-            self.engine
-                .selection()
-                .ranges()
-                .iter()
-                .map(|r| {
-                    if r.to() - r.from() <= 1 {
-                        let b = self.byte_of(r.head.min(r.anchor));
-                        let ls = self.model.text()[..b].rfind('\n').map_or(0, |i| i + 1);
-                        ls..ls
-                    } else {
-                        self.byte_of(r.from())..self.byte_of(r.to())
-                    }
-                })
-                .collect()
-        } else {
-            self.ranges_bytes()
-        };
+    fn act_insert_region(
+        &mut self,
+        _: &EditorInsertRegion,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let (s, e) = (
+            self.options.fold_start_marker.clone(),
+            self.options.fold_end_marker.clone(),
+        );
+        // Like the original: in normal mode the block cursor is a 1-char
+        // CodeMirror selection, so the current line gets wrapped.
+        let ranges = self.ranges_bytes();
         let edit = commands::insert_region(self.model.text(), &ranges, &s, &e);
         self.apply_command_edit(edit, cx);
     }
     fn act_insert_table(&mut self, _: &EditorInsertTable, _: &mut Window, cx: &mut Context<Self>) {
         let r = self.ranges_bytes()[self.engine.selection().main_index()].clone();
-        let r = if self.mode() != ModeType::Insert { r.start..r.start } else { r };
+        let r = if self.mode() != ModeType::Insert {
+            r.start..r.start
+        } else {
+            r
+        };
         let (edit, from) = commands::insert_table(self.model.text(), r);
         self.apply_command_edit(edit, cx);
         self.table_activate(from, 0, 0, true, cx);
     }
-    fn act_toggle_task(&mut self, _: &EditorToggleTaskLine, _: &mut Window, cx: &mut Context<Self>) {
+    fn act_toggle_task(
+        &mut self,
+        _: &EditorToggleTaskLine,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if let Some(e) = commands::toggle_task_line(self.model.text(), &self.ranges_bytes()) {
             self.apply_command_edit(e, cx);
         }
@@ -1305,8 +1560,14 @@ impl EditorView {
         self.synth_key("shift-tab", window, cx);
     }
     fn synth_key(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let Ok(keystroke) = Keystroke::parse(key) else { return };
-        let ev = KeyDownEvent { keystroke, is_held: false, prefer_character_input: false };
+        let Ok(keystroke) = Keystroke::parse(key) else {
+            return;
+        };
+        let ev = KeyDownEvent {
+            keystroke,
+            is_held: false,
+            prefer_character_input: false,
+        };
         self.on_key_down(&ev, window, cx);
     }
     fn act_find(&mut self, _: &OpenFind, _: &mut Window, cx: &mut Context<Self>) {
@@ -1336,9 +1597,13 @@ impl EditorView {
         // Keep the cursor out of folded ranges (they would reveal at once).
         let head = self.byte_of(self.engine.selection().main().head);
         if let Some(r) = self.folds.covering(head) {
-            let ls = self.model.text()[..r.start].rfind('\n').map_or(0, |i| i + 1);
+            let ls = self.model.text()[..r.start]
+                .rfind('\n')
+                .map_or(0, |i| i + 1);
             let c = self.char_of(ls);
-            let fx = self.engine.set_selection_from_pointer(Selection::single(c, c));
+            let fx = self
+                .engine
+                .set_selection_from_pointer(Selection::single(c, c));
             // The fold must survive this selection change.
             let keep = self.folds.clone();
             self.apply_effects(fx, cx);
@@ -1382,23 +1647,39 @@ impl EditorView {
 
     fn selected_text(&self) -> String {
         let d = self.engine.doc();
-        self.engine.selection().ranges().iter().map(|r| d.slice(r.from(), r.to())).collect::<Vec<_>>().join("\n")
+        self.engine
+            .selection()
+            .ranges()
+            .iter()
+            .map(|r| d.slice(r.from(), r.to()))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
     fn act_copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
         cx.write_to_clipboard(ClipboardItem::new_string(self.selected_text()));
     }
     fn act_cut(&mut self, _: &Cut, _: &mut Window, cx: &mut Context<Self>) {
         cx.write_to_clipboard(ClipboardItem::new_string(self.selected_text()));
-        let changes: Vec<Change> =
-            self.engine.selection().ranges().iter().map(|r| Change::new(r.from(), r.to(), "")).collect();
+        let changes: Vec<Change> = self
+            .engine
+            .selection()
+            .ranges()
+            .iter()
+            .map(|r| Change::new(r.from(), r.to(), ""))
+            .collect();
         let fx = self.engine.apply_changes(changes);
         self.apply_effects(fx, cx);
     }
     fn act_paste(&mut self, _: &Paste, _: &mut Window, cx: &mut Context<Self>) {
-        let Some(item) = cx.read_from_clipboard() else { return };
+        let Some(item) = cx.read_from_clipboard() else {
+            return;
+        };
         for e in item.entries() {
             if let ClipboardEntry::Image(img) = e {
-                cx.emit(EditorEvent::PasteImage { mime: img.format.mime_type().to_string(), bytes: img.bytes.clone() });
+                cx.emit(EditorEvent::PasteImage {
+                    mime: img.format.mime_type().to_string(),
+                    bytes: img.bytes.clone(),
+                });
                 return;
             }
         }
@@ -1407,8 +1688,13 @@ impl EditorView {
             let fx = self.engine.insert_text(&text);
             self.apply_effects(fx, cx);
         } else {
-            let changes: Vec<Change> =
-                self.engine.selection().ranges().iter().map(|r| Change::new(r.from(), r.to(), text.clone())).collect();
+            let changes: Vec<Change> = self
+                .engine
+                .selection()
+                .ranges()
+                .iter()
+                .map(|r| Change::new(r.from(), r.to(), text.clone()))
+                .collect();
             let fx = self.engine.apply_changes(changes);
             self.apply_effects(fx, cx);
         }
@@ -1427,12 +1713,16 @@ impl EditorView {
             }
         }
         self.completion = None;
-        let Some(frame) = self.frame.clone() else { return };
+        let Some(frame) = self.frame.clone() else {
+            return;
+        };
         if let Some(hit) = frame.hit_at(ev.position) {
             self.on_hit(hit, ev.position, cx);
             return;
         }
-        let Some(pos) = self.pos_at(&frame, ev.position) else { return };
+        let Some(pos) = self.pos_at(&frame, ev.position) else {
+            return;
+        };
         self.table = self.table.take().filter(|_| false);
         let anchor = if ev.modifiers.shift {
             // Extend from the anchor; a 1-char block cursor (normal mode)
@@ -1447,22 +1737,34 @@ impl EditorView {
             // Double click: the word under the pointer.
             let (a, b) = word_at(self.engine.doc(), pos);
             self.drag_anchor = Some(a);
-            let fx = self.engine.set_selection_from_pointer(Selection::single(a, b));
+            let fx = self
+                .engine
+                .set_selection_from_pointer(Selection::single(a, b));
             self.apply_effects(fx, cx);
             return;
         } else {
             pos
         };
         self.drag_anchor = Some(anchor);
-        let fx = self.engine.set_selection_from_pointer(Selection::single(anchor, pos));
+        let fx = self
+            .engine
+            .set_selection_from_pointer(Selection::single(anchor, pos));
         self.apply_effects(fx, cx);
     }
 
     fn on_mouse_move(&mut self, ev: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
-        let (Some(anchor), Some(MouseButton::Left)) = (self.drag_anchor, ev.pressed_button) else { return };
-        let Some(frame) = self.frame.clone() else { return };
-        let Some(pos) = self.pos_at(&frame, ev.position) else { return };
-        let fx = self.engine.set_selection_from_pointer(Selection::single(anchor, pos));
+        let (Some(anchor), Some(MouseButton::Left)) = (self.drag_anchor, ev.pressed_button) else {
+            return;
+        };
+        let Some(frame) = self.frame.clone() else {
+            return;
+        };
+        let Some(pos) = self.pos_at(&frame, ev.position) else {
+            return;
+        };
+        let fx = self
+            .engine
+            .set_selection_from_pointer(Selection::single(anchor, pos));
         self.apply_effects(fx, cx);
     }
 
@@ -1482,7 +1784,9 @@ impl EditorView {
         match hit {
             Hit::Checkbox(edit) => self.apply_md_edit(&edit, cx),
             Hit::Link(url) => cx.emit(EditorEvent::OpenLink(url)),
-            Hit::Wikilink { target, resolved } => cx.emit(EditorEvent::OpenWikilink { target, resolved }),
+            Hit::Wikilink { target, resolved } => {
+                cx.emit(EditorEvent::OpenWikilink { target, resolved })
+            }
             Hit::Tag(tag) => cx.emit(EditorEvent::TagClicked(tag)),
             Hit::FoldGutter(line) => self.toggle_fold_line(line, cx),
             Hit::RegionChevron(byte) => {
@@ -1498,7 +1802,9 @@ impl EditorView {
                 cx.write_to_clipboard(ClipboardItem::new_string(text));
                 self.copied_fence = Some(fence);
                 cx.spawn(async move |this, cx| {
-                    cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(1500))
+                        .await;
                     let _ = this.update(cx, |v, cx| {
                         v.copied_fence = None;
                         cx.notify();
@@ -1525,22 +1831,38 @@ impl EditorView {
     /// Debug/test view of the last frame: clickable regions as
     /// `(debug name, window bounds)` (e.g. `"FoldGutter(0)"`, `"Checkbox(..)"`).
     pub fn debug_hits(&self) -> Vec<(String, gpui_kit::Bounds<Pixels>)> {
-        self.frame.as_ref().map_or_else(Vec::new, |f| f.hits.iter().map(|(b, h)| (format!("{h:?}"), *b)).collect())
+        self.frame.as_ref().map_or_else(Vec::new, |f| {
+            f.hits.iter().map(|(b, h)| (format!("{h:?}"), *b)).collect()
+        })
     }
 
     /// Painted cursors of the last frame: (window bounds, primary).
     pub fn debug_cursors(&self) -> Vec<(gpui_kit::Bounds<Pixels>, bool)> {
-        self.frame.as_ref().map_or_else(Vec::new, |f| f.cursors.clone())
+        self.frame
+            .as_ref()
+            .map_or_else(Vec::new, |f| f.cursors.clone())
     }
 
     /// Gutter labels of the last frame: (0-based line, label).
     pub fn debug_gutter(&self) -> Vec<(usize, String)> {
-        self.frame.as_ref().map_or_else(Vec::new, |f| f.gutter.clone())
+        self.frame
+            .as_ref()
+            .map_or_else(Vec::new, |f| f.gutter.clone())
+    }
+
+    /// Window x of the rulers painted in the last frame, and the x of
+    /// the text column 0 (`(rulers, char width)`).
+    pub fn debug_rulers(&self) -> (Vec<Pixels>, Pixels) {
+        self.frame
+            .as_ref()
+            .map_or_else(|| (Vec::new(), px(0.)), |f| (f.rulers.clone(), f.char_w))
     }
 
     /// 0-based lines laid out in the last frame (only visible ones).
     pub fn debug_laid_out_lines(&self) -> Vec<usize> {
-        self.frame.as_ref().map_or_else(Vec::new, |f| f.lines.iter().map(|l| l.line).collect())
+        self.frame
+            .as_ref()
+            .map_or_else(Vec::new, |f| f.lines.iter().map(|l| l.line).collect())
     }
 
     /// Char offset at a window position (tests / host drag-and-drop).
@@ -1556,7 +1878,12 @@ impl EditorView {
 
     // ---- input handler (IME) ----------------------------------------------------------
 
-    pub(crate) fn ime_insert(&mut self, range_utf16: Option<Range<usize>>, text: &str, cx: &mut Context<Self>) {
+    pub(crate) fn ime_insert(
+        &mut self,
+        range_utf16: Option<Range<usize>>,
+        text: &str,
+        cx: &mut Context<Self>,
+    ) {
         if self.lang_menu.is_some() {
             return;
         }
@@ -1585,9 +1912,13 @@ impl EditorView {
         }
         if let Some(m) = self.marked.take() {
             // Commit: drop the composition, then type the final text.
-            let fx = self.engine.apply_changes(vec![Change::new(m.start, m.end, "")]);
+            let fx = self
+                .engine
+                .apply_changes(vec![Change::new(m.start, m.end, "")]);
             self.apply_effects(fx, cx);
-            let fx = self.engine.set_selection(Selection::single(m.start, m.start));
+            let fx = self
+                .engine
+                .set_selection(Selection::single(m.start, m.start));
             self.apply_effects(fx, cx);
         } else if let Some(r) = range_utf16
             && !r.is_empty()
@@ -1651,7 +1982,9 @@ pub(crate) fn find_matches(text: &str, query: &str) -> Vec<Range<usize>> {
     if query.is_empty() {
         return Vec::new();
     }
-    let re = regex::RegexBuilder::new(&regex::escape(query)).case_insensitive(true).build();
+    let re = regex::RegexBuilder::new(&regex::escape(query))
+        .case_insensitive(true)
+        .build();
     match re {
         Ok(re) => re.find_iter(text).take(10_000).map(|m| m.range()).collect(),
         Err(_) => Vec::new(),
@@ -1668,12 +2001,28 @@ fn word_at(doc: &fuchico_helix::Text, pos: usize) -> (usize, usize) {
     while doc.char_at(b).is_some_and(is_word) {
         b += 1;
     }
-    if a == b { (pos, (pos + 1).min(doc.len())) } else { (a, b) }
+    if a == b {
+        (pos, (pos + 1).min(doc.len()))
+    } else {
+        (a, b)
+    }
 }
 
 const NAMED: &[&str] = &[
-    "escape", "enter", "backspace", "delete", "tab", "up", "down", "left", "right", "home", "end", "pageup",
-    "pagedown", "insert",
+    "escape",
+    "enter",
+    "backspace",
+    "delete",
+    "tab",
+    "up",
+    "down",
+    "left",
+    "right",
+    "home",
+    "end",
+    "pageup",
+    "pagedown",
+    "insert",
 ];
 
 /// Printable text of a keystroke without ctrl/alt/cmd (typing).
@@ -1682,17 +2031,27 @@ pub(crate) fn typed_char(ks: &Keystroke) -> Option<String> {
     if m.control || m.alt || m.platform || m.function {
         return None;
     }
-    if NAMED.contains(&ks.key.as_str()) || (ks.key.starts_with('f') && ks.key.len() > 1 && ks.key[1..].parse::<u8>().is_ok()) {
+    if NAMED.contains(&ks.key.as_str())
+        || (ks.key.starts_with('f') && ks.key.len() > 1 && ks.key[1..].parse::<u8>().is_ok())
+    {
         return None;
     }
-    let s = ks.key_char.clone().or_else(|| (ks.key.chars().count() == 1).then(|| ks.key.clone()))?;
+    let s = ks
+        .key_char
+        .clone()
+        .or_else(|| (ks.key.chars().count() == 1).then(|| ks.key.clone()))?;
     (!s.is_empty() && !s.chars().any(char::is_control)).then_some(s)
 }
 
 /// gpui keystroke → fuchico-helix key event.
 pub(crate) fn to_helix(ks: &Keystroke) -> Option<KeyEvent> {
     let m = ks.modifiers;
-    let mods = HxMods { ctrl: m.control, alt: m.alt, shift: m.shift, meta: false };
+    let mods = HxMods {
+        ctrl: m.control,
+        alt: m.alt,
+        shift: m.shift,
+        meta: false,
+    };
     let key = match ks.key.as_str() {
         "escape" => Key::Escape,
         "enter" => Key::Enter,
@@ -1708,9 +2067,12 @@ pub(crate) fn to_helix(ks: &Keystroke) -> Option<KeyEvent> {
         "pageup" => Key::PageUp,
         "pagedown" => Key::PageDown,
         "space" => Key::Char(' '),
-        k if k.starts_with('f') && k.len() > 1 && k[1..].parse::<u8>().is_ok() => Key::F(k[1..].parse().ok()?),
+        k if k.starts_with('f') && k.len() > 1 && k[1..].parse::<u8>().is_ok() => {
+            Key::F(k[1..].parse().ok()?)
+        }
         k => {
-            if !m.control && !m.alt
+            if !m.control
+                && !m.alt
                 && let Some(s) = &ks.key_char
                 && let Some(c) = s.chars().next()
             {
@@ -1800,7 +2162,11 @@ impl Render for EditorView {
                     .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .child(format!("{}{}", self.chip_label(), {
                         let p = self.pending_status();
-                        if p.is_empty() { String::new() } else { format!(" {p}") }
+                        if p.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" {p}")
+                        }
                     })),
             );
         }
@@ -1814,7 +2180,11 @@ impl Render for EditorView {
                     .left(px(84.))
                     .bottom(px(4.))
                     .text_size(px(11.))
-                    .text_color(if *err { st.destructive } else { st.muted_foreground })
+                    .text_color(if *err {
+                        st.destructive
+                    } else {
+                        st.muted_foreground
+                    })
                     .child(msg.clone()),
             );
         }
@@ -1822,9 +2192,17 @@ impl Render for EditorView {
         match &self.overlay {
             Overlay::Prompt(p) => {
                 let label = prompt_label(p.kind);
-                let shown = if p.value.is_empty() { p.placeholder.clone().unwrap_or_default() } else { p.value.clone() };
+                let shown = if p.value.is_empty() {
+                    p.placeholder.clone().unwrap_or_default()
+                } else {
+                    p.value.clone()
+                };
                 let ghost = p.value.is_empty();
-                let mut list = div().flex().flex_col().max_h(px(8. * f32::from(lh))).overflow_hidden();
+                let mut list = div()
+                    .flex()
+                    .flex_col()
+                    .max_h(px(8. * f32::from(lh)))
+                    .overflow_hidden();
                 for (i, o) in p.completions.options.iter().take(8).enumerate() {
                     let sel = p.selected == Some(i);
                     list = list.child(
@@ -1851,7 +2229,11 @@ impl Render for EditorView {
                 }
                 if let Some(h) = &p.completions.help {
                     bar = bar.child(
-                        div().px(px(8.)).text_size(px(11.)).text_color(st.muted_foreground).child(h.clone()),
+                        div()
+                            .px(px(8.))
+                            .text_size(px(11.))
+                            .text_color(st.muted_foreground)
+                            .child(h.clone()),
                     );
                 }
                 bar = bar.child(
@@ -1865,7 +2247,15 @@ impl Render for EditorView {
                         .child(
                             div()
                                 .flex()
-                                .child(div().text_color(if ghost { st.muted_foreground } else { st.foreground }).child(shown))
+                                .child(
+                                    div()
+                                        .text_color(if ghost {
+                                            st.muted_foreground
+                                        } else {
+                                            st.foreground
+                                        })
+                                        .child(shown),
+                                )
                                 .child(div().w(px(1.5)).h(lh).bg(st.foreground)),
                         ),
                 );
@@ -1873,7 +2263,11 @@ impl Render for EditorView {
             }
             Overlay::Find(f) => {
                 let count = if f.matches.is_empty() {
-                    if f.query.is_empty() { String::new() } else { "No results".into() }
+                    if f.query.is_empty() {
+                        String::new()
+                    } else {
+                        "No results".into()
+                    }
                 } else {
                     format!("{} of {}", f.current + 1, f.matches.len())
                 };
@@ -1932,44 +2326,62 @@ impl Render for EditorView {
                                     v.outline_pick(row, cx);
                                 }),
                             )
-                            .child(div().text_color(st.muted_foreground).child(format!("H{}", h.level)))
+                            .child(
+                                div()
+                                    .text_color(st.muted_foreground)
+                                    .child(format!("H{}", h.level)),
+                            )
                             .child(h.text.clone()),
                     );
                 }
                 if o.filtered.is_empty() {
-                    list = list.child(div().px(px(10.)).text_color(st.muted_foreground).child("No headings"));
+                    list = list.child(
+                        div()
+                            .px(px(10.))
+                            .text_color(st.muted_foreground)
+                            .child("No headings"),
+                    );
                 }
                 root = root.child(
-                    div().absolute().top(px(40.)).left_0().right_0().flex().justify_center().child(
-                        div()
-                            .id("fuchico-editor-outline")
-                            .w(px(480.))
-                            .flex()
-                            .flex_col()
-                            .bg(st.card)
-                            .border_1()
-                            .border_color(st.border)
-                            .rounded(st.radius_md)
-                            .shadow_lg()
-                            .font_family(sans.clone())
-                            .text_size(px(13.))
-                            .on_mouse_down(MouseButton::Left, stop)
-                            .child(
-                                div()
-                                    .flex()
-                                    .px(px(10.))
-                                    .py(px(8.))
-                                    .border_b_1()
-                                    .border_color(st.border)
-                                    .child(if o.query.is_empty() {
-                                        div().text_color(st.muted_foreground).child("Go to header…")
-                                    } else {
-                                        div().child(o.query.clone())
-                                    })
-                                    .child(div().w(px(1.5)).h(px(16.)).bg(st.foreground)),
-                            )
-                            .child(list),
-                    ),
+                    div()
+                        .absolute()
+                        .top(px(40.))
+                        .left_0()
+                        .right_0()
+                        .flex()
+                        .justify_center()
+                        .child(
+                            div()
+                                .id("fuchico-editor-outline")
+                                .w(px(480.))
+                                .flex()
+                                .flex_col()
+                                .bg(st.card)
+                                .border_1()
+                                .border_color(st.border)
+                                .rounded(st.radius_md)
+                                .shadow_lg()
+                                .font_family(sans.clone())
+                                .text_size(px(13.))
+                                .on_mouse_down(MouseButton::Left, stop)
+                                .child(
+                                    div()
+                                        .flex()
+                                        .px(px(10.))
+                                        .py(px(8.))
+                                        .border_b_1()
+                                        .border_color(st.border)
+                                        .child(if o.query.is_empty() {
+                                            div()
+                                                .text_color(st.muted_foreground)
+                                                .child("Go to header…")
+                                        } else {
+                                            div().child(o.query.clone())
+                                        })
+                                        .child(div().w(px(1.5)).h(px(16.)).bg(st.foreground)),
+                                )
+                                .child(list),
+                        ),
                 );
             }
             Overlay::None => {}
@@ -1979,7 +2391,11 @@ impl Render for EditorView {
         if let Some(c) = &self.completion
             && let Some(at) = self.frame.as_ref().and_then(|f| f.cursor_anchor)
         {
-            let origin = self.frame.as_ref().map(|f| f.bounds.origin).unwrap_or_default();
+            let origin = self
+                .frame
+                .as_ref()
+                .map(|f| f.bounds.origin)
+                .unwrap_or_default();
             let mut list = div().flex().flex_col().py(px(2.));
             let first = c.selected.saturating_sub(9);
             for (i, o) in c.options.iter().enumerate().skip(first).take(10) {
@@ -2000,7 +2416,12 @@ impl Render for EditorView {
                     )
                     .child(o.label.clone());
                 if let Some(d) = &o.detail {
-                    row = row.child(div().text_color(st.muted_foreground).text_size(px(11.)).child(d.clone()));
+                    row = row.child(
+                        div()
+                            .text_color(st.muted_foreground)
+                            .text_size(px(11.))
+                            .child(d.clone()),
+                    );
                 }
                 list = list.child(row);
             }
@@ -2023,7 +2444,11 @@ impl Render for EditorView {
         }
 
         if let Some(m) = &self.lang_menu {
-            let origin = self.frame.as_ref().map(|f| f.bounds.origin).unwrap_or_default();
+            let origin = self
+                .frame
+                .as_ref()
+                .map(|f| f.bounds.origin)
+                .unwrap_or_default();
             let mut list = div().flex().flex_col().py(px(2.));
             for (i, o) in m.toolbar.options.iter().enumerate() {
                 list = list.child(
@@ -2038,7 +2463,11 @@ impl Render for EditorView {
                                 v.pick_language(i, cx);
                             }),
                         )
-                        .child(if o.is_empty() { "plain".to_string() } else { o.clone() }),
+                        .child(if o.is_empty() {
+                            "plain".to_string()
+                        } else {
+                            o.clone()
+                        }),
                 );
             }
             root = root.child(
@@ -2066,7 +2495,11 @@ impl Render for EditorView {
 /// Selected-row colours helper for overlay lists.
 trait WhenSel: Styled + Sized {
     fn when_sel(self, sel: bool, bg: gpui_kit::Hsla, fg: gpui_kit::Hsla) -> Self {
-        if sel { self.bg(bg).text_color(fg) } else { self }
+        if sel {
+            self.bg(bg).text_color(fg)
+        } else {
+            self
+        }
     }
 }
 impl<T: Styled> WhenSel for T {}

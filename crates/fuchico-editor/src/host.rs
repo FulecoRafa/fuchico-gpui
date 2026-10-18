@@ -30,11 +30,17 @@ pub struct SharedLayout {
 
 impl SharedLayout {
     fn is_hidden(&self, line: usize) -> bool {
-        self.hidden.get(line.wrapping_sub(1)).copied().unwrap_or(false)
+        self.hidden
+            .get(line.wrapping_sub(1))
+            .copied()
+            .unwrap_or(false)
     }
 
     fn rows_of(&self, doc: &Text, line: usize) -> Vec<usize> {
-        self.rows.get(&line).cloned().unwrap_or_else(|| vec![doc.line(line).from])
+        self.rows
+            .get(&line)
+            .cloned()
+            .unwrap_or_else(|| vec![doc.line(line).from])
     }
 
     /// Visual row containing `pos`: (line, row index, row start, row end).
@@ -107,19 +113,29 @@ impl VisualLines for ViewHost {
         let rows = s.rows_of(doc, line);
         let l = doc.line(line);
         let rs = rows[ix];
-        let re = rows.get(ix + 1).map_or(l.to, |&e| e.saturating_sub(1).max(rs));
+        let re = rows
+            .get(ix + 1)
+            .map_or(l.to, |&e| e.saturating_sub(1).max(rs));
         (rs + goal.min(re - rs), Some(goal))
     }
 
     fn lines_to_boundary(&mut self, doc: &Text, pos: usize, forward: bool) -> usize {
         let line = doc.line_at(pos).number;
-        if forward { doc.lines() - line } else { line - 1 }
+        if forward {
+            doc.lines() - line
+        } else {
+            line - 1
+        }
     }
 }
 
 impl Host for ViewHost {
     fn clipboard_read(&mut self) -> Result<String, String> {
-        self.shared.borrow().clipboard.clone().ok_or_else(|| "clipboard empty".to_string())
+        self.shared
+            .borrow()
+            .clipboard
+            .clone()
+            .ok_or_else(|| "clipboard empty".to_string())
     }
     fn clipboard_write(&mut self, text: &str) {
         let mut s = self.shared.borrow_mut();

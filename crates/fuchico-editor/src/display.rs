@@ -15,16 +15,36 @@ use fuchico_markdown::{
 /// What a display range stands for.
 #[derive(Debug, Clone, PartialEq)]
 pub enum WidgetKind {
-    Checkbox { checked: bool, toggle: MdEdit },
-    Link { url: String },
-    Wikilink { target: String, resolved: Option<String> },
-    Tag { tag: String },
-    CalloutHeader { kind: CalloutKind },
-    Image { alt: String, url: String },
-    RegionStart { line_from: usize },
+    Checkbox {
+        checked: bool,
+        toggle: MdEdit,
+    },
+    Link {
+        url: String,
+    },
+    Wikilink {
+        target: String,
+        resolved: Option<String>,
+    },
+    Tag {
+        tag: String,
+    },
+    CalloutHeader {
+        kind: CalloutKind,
+    },
+    Image {
+        alt: String,
+        url: String,
+    },
+    RegionStart {
+        line_from: usize,
+    },
     RegionEnd,
     /// A fold placeholder; `range` is the folded source range.
-    Fold { range: Range<usize>, region: bool },
+    Fold {
+        range: Range<usize>,
+        region: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,41 +111,85 @@ fn widget_label(w: &Widget, doc_slice: &str) -> Option<(String, SpanStyle, Widge
     let plain = SpanStyle::default();
     Some(match w {
         // Two cells: the 14px box is painted over them.
-        Widget::Checkbox { checked, toggle } => {
-            ("  ".into(), plain, WidgetKind::Checkbox { checked: *checked, toggle: toggle.clone() })
-        }
-        Widget::Link { text, url } => (
-            if text.is_empty() { url.clone() } else { text.clone() },
-            SpanStyle { color: Some(ColorToken::SyntaxFunction), underline: true, ..plain },
-            WidgetKind::Link { url: url.clone() },
+        Widget::Checkbox { checked, toggle } => (
+            "  ".into(),
+            plain,
+            WidgetKind::Checkbox {
+                checked: *checked,
+                toggle: toggle.clone(),
+            },
         ),
-        Widget::Wikilink { label, target, resolved, .. } => (
-            label.clone(),
+        Widget::Link { text, url } => (
+            if text.is_empty() {
+                url.clone()
+            } else {
+                text.clone()
+            },
             SpanStyle {
-                color: Some(if resolved.is_some() { ColorToken::SyntaxFunction } else { ColorToken::Muted }),
+                color: Some(ColorToken::SyntaxFunction),
+                underline: true,
                 ..plain
             },
-            WidgetKind::Wikilink { target: target.clone(), resolved: resolved.clone() },
+            WidgetKind::Link { url: url.clone() },
+        ),
+        Widget::Wikilink {
+            label,
+            target,
+            resolved,
+            ..
+        } => (
+            label.clone(),
+            SpanStyle {
+                color: Some(if resolved.is_some() {
+                    ColorToken::SyntaxFunction
+                } else {
+                    ColorToken::Muted
+                }),
+                ..plain
+            },
+            WidgetKind::Wikilink {
+                target: target.clone(),
+                resolved: resolved.clone(),
+            },
         ),
         Widget::Tag { tag, .. } => (
             format!("#{tag}"),
-            SpanStyle { color: Some(ColorToken::SyntaxKeyword), ..plain },
+            SpanStyle {
+                color: Some(ColorToken::SyntaxKeyword),
+                ..plain
+            },
             WidgetKind::Tag { tag: tag.clone() },
         ),
         Widget::CalloutHeader { kind, text } => (
             text.to_uppercase(),
-            SpanStyle { color: Some(kind.accent()), bold: true, ..plain },
+            SpanStyle {
+                color: Some(kind.accent()),
+                bold: true,
+                ..plain
+            },
             WidgetKind::CalloutHeader { kind: *kind },
         ),
         Widget::Image { alt, url } => (
             format!("🖼 {}", if alt.is_empty() { url } else { alt }),
-            SpanStyle { color: Some(ColorToken::Muted), ..plain },
-            WidgetKind::Image { alt: alt.clone(), url: url.clone() },
+            SpanStyle {
+                color: Some(ColorToken::Muted),
+                ..plain
+            },
+            WidgetKind::Image {
+                alt: alt.clone(),
+                url: url.clone(),
+            },
         ),
         Widget::RegionStart { name, line_from } => (
             format!("▾ 📁 {name}"),
-            SpanStyle { color: Some(ColorToken::SyntaxFunction), bold: true, ..plain },
-            WidgetKind::RegionStart { line_from: *line_from },
+            SpanStyle {
+                color: Some(ColorToken::SyntaxFunction),
+                bold: true,
+                ..plain
+            },
+            WidgetKind::RegionStart {
+                line_from: *line_from,
+            },
         ),
         Widget::RegionEnd => ("      ".into(), plain, WidgetKind::RegionEnd),
         Widget::RegionMarkerHidden => return None,
@@ -134,13 +198,26 @@ fn widget_label(w: &Widget, doc_slice: &str) -> Option<(String, SpanStyle, Widge
             match p {
                 FoldPlaceholder::Ellipsis => (
                     " … ".into(),
-                    SpanStyle { color: Some(ColorToken::Muted), ..plain },
-                    WidgetKind::Fold { range: 0..0, region: false },
+                    SpanStyle {
+                        color: Some(ColorToken::Muted),
+                        ..plain
+                    },
+                    WidgetKind::Fold {
+                        range: 0..0,
+                        region: false,
+                    },
                 ),
                 FoldPlaceholder::Region { name, .. } => (
                     format!(" ▸ 📁 {name}  {} ", p.count_label().unwrap_or_default()),
-                    SpanStyle { color: Some(ColorToken::SyntaxFunction), bold: true, ..plain },
-                    WidgetKind::Fold { range: 0..0, region: true },
+                    SpanStyle {
+                        color: Some(ColorToken::SyntaxFunction),
+                        bold: true,
+                        ..plain
+                    },
+                    WidgetKind::Fold {
+                        range: 0..0,
+                        region: true,
+                    },
                 ),
             }
         }
@@ -158,18 +235,29 @@ impl DisplayLine {
         let mut widgets: Vec<InlineWidget> = Vec::new();
 
         // Text pieces: split src range by style runs.
-        let push_text = |from: usize, to: usize, text: &mut String, spans: &mut Vec<Span>, segs: &mut Vec<Segment>| {
+        let push_text = |from: usize,
+                         to: usize,
+                         text: &mut String,
+                         spans: &mut Vec<Span>,
+                         segs: &mut Vec<Segment>| {
             if from >= to {
                 return;
             }
             let d0 = text.len();
             text.push_str(&doc[from..to]);
-            segs.push(Segment { src: from..to, disp: d0..text.len(), text: true });
+            segs.push(Segment {
+                src: from..to,
+                disp: d0..text.len(),
+                text: true,
+            });
             for run in &dec.styles {
                 let s = run.range.start.max(from);
                 let e = run.range.end.min(to);
                 if s < e {
-                    spans.push(Span { disp: d0 + (s - from)..d0 + (e - from), style: style_of(run.styles.resolve()) });
+                    spans.push(Span {
+                        disp: d0 + (s - from)..d0 + (e - from),
+                        style: style_of(run.styles.resolve()),
+                    });
                 }
             }
         };
@@ -189,19 +277,43 @@ impl DisplayLine {
                     *range = rep.range.clone();
                 }
                 text.push_str(&label);
-                spans.push(Span { disp: d0..text.len(), style });
-                widgets.push(InlineWidget { disp: d0..text.len(), src: rs..src_end, kind });
+                spans.push(Span {
+                    disp: d0..text.len(),
+                    style,
+                });
+                widgets.push(InlineWidget {
+                    disp: d0..text.len(),
+                    src: rs..src_end,
+                    kind,
+                });
             }
-            segments.push(Segment { src: rs..src_end, disp: d0..text.len(), text: false });
+            segments.push(Segment {
+                src: rs..src_end,
+                disp: d0..text.len(),
+                text: false,
+            });
             pos = rep.range.end.max(rs);
         }
         if pos < src.end {
             push_text(pos, src.end, &mut text, &mut spans, &mut segments);
         }
         if segments.is_empty() {
-            segments.push(Segment { src: src.start..src.start, disp: 0..0, text: true });
+            segments.push(Segment {
+                src: src.start..src.start,
+                disp: 0..0,
+                text: true,
+            });
         }
-        DisplayLine { line: dec.line, src, text, spans, segments, widgets, line_end: dec.line_end.clone(), metrics }
+        DisplayLine {
+            line: dec.line,
+            src,
+            text,
+            spans,
+            segments,
+            widgets,
+            line_end: dec.line_end.clone(),
+            metrics,
+        }
     }
 
     /// Display byte of a source byte. Inside an atomic piece: its start
@@ -226,6 +338,15 @@ impl DisplayLine {
 
     /// Source byte of a display byte.
     pub fn src_of(&self, disp: usize) -> usize {
+        // A display byte inside (or at the start of) a text segment maps into
+        // it, so a boundary next to hidden markers lands after them.
+        if let Some(seg) = self
+            .segments
+            .iter()
+            .find(|s| s.text && s.disp.start <= disp && disp < s.disp.end)
+        {
+            return seg.src.start + (disp - seg.disp.start);
+        }
         for seg in &self.segments {
             if disp < seg.disp.end || (disp == seg.disp.end && seg.text) {
                 if disp < seg.disp.start {
@@ -246,7 +367,9 @@ impl DisplayLine {
     }
 
     pub fn widget_at(&self, disp: usize) -> Option<&InlineWidget> {
-        self.widgets.iter().find(|w| w.disp.start <= disp && disp < w.disp.end)
+        self.widgets
+            .iter()
+            .find(|w| w.disp.start <= disp && disp < w.disp.end)
     }
 }
 
@@ -287,7 +410,11 @@ mod tests {
     fn checkbox_widget() {
         let doc = "- [ ] task\n\nz";
         let d = line(doc, 0, Some(2));
-        let w = d.widgets.iter().find(|w| matches!(w.kind, WidgetKind::Checkbox { .. })).unwrap();
+        let w = d
+            .widgets
+            .iter()
+            .find(|w| matches!(w.kind, WidgetKind::Checkbox { .. }))
+            .unwrap();
         assert_eq!(&d.text[w.disp.clone()], "  ");
     }
 

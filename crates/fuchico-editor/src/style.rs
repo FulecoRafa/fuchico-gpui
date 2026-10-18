@@ -66,10 +66,20 @@ pub fn oklch(l: f32, c: f32, h_deg: f32, alpha: f32) -> Hsla {
     let g = -1.268_438 * l3 + 2.609_757_4 * m3 - 0.341_319_38 * s3;
     let b = -0.004_196_086_3 * l3 - 0.703_418_6 * m3 + 1.707_614_7 * s3;
     let gamma = |x: f32| {
-        let v = if x >= 0.003_130_8 { 1.055 * x.powf(1. / 2.4) - 0.055 } else { 12.92 * x };
+        let v = if x >= 0.003_130_8 {
+            1.055 * x.powf(1. / 2.4) - 0.055
+        } else {
+            12.92 * x
+        };
         v.clamp(0., 1.)
     };
-    Rgba { r: gamma(r), g: gamma(g), b: gamma(b), a: alpha.clamp(0., 1.) }.into()
+    Rgba {
+        r: gamma(r),
+        g: gamma(g),
+        b: gamma(b),
+        a: alpha.clamp(0., 1.),
+    }
+    .into()
 }
 
 /// `color-mix(in oklch, c p%, transparent)`: the colour at `p` opacity.
@@ -242,9 +252,9 @@ mod tests {
 
     #[test]
     fn ayu_dark_background_matches_screenshot() {
-        // The original screenshot's editor background is #0b0e10-ish.
+        // globals.css `.dark --background: oklch(0.148 0.004 228.8)`.
         let s = EditorStyle::ayu_dark();
-        assert_eq!(hex(s.background), "#0a0e10");
+        assert_eq!(hex(s.background), "#090b0c");
         assert_eq!(hex(EditorStyle::ayu_light().background), "#ffffff");
     }
 

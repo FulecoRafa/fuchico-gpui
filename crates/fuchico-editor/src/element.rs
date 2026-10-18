@@ -9,15 +9,15 @@ use std::rc::Rc;
 
 use fuchico_helix::{ModeType, Scroll, ScrollAlign};
 use fuchico_markdown::{
-    BlockWidget, DecorationContext, FenceToolbar, Hidden, LineClass, LineDecoration, LineEndWidget, TableModel,
-    TextEdit as MdEdit,
+    BlockWidget, DecorationContext, FenceToolbar, Hidden, LineClass, LineDecoration, LineEndWidget,
+    TableModel, TextEdit as MdEdit,
 };
 use gpui_kit::{
-    App, Bounds, BorderStyle, Context, CursorStyle, Element, ElementId, ElementInputHandler, Entity,
-    EntityInputHandler, Font, FontFeatures, FontStyle, FontWeight, GlobalElementId, Hitbox, HitboxBehavior, Hsla,
-    InspectorElementId, IntoElement, LayoutId, PaintQuad, PathBuilder, Pixels, Point, ShapedLine, SharedString,
-    StrikethroughStyle, Style, TextAlign, TextRun, UTF16Selection, UnderlineStyle, Window, WrappedLine, fill,
-    point, px, quad, relative, size,
+    App, BorderStyle, Bounds, Context, CursorStyle, Element, ElementId, ElementInputHandler,
+    Entity, EntityInputHandler, Font, FontFeatures, FontStyle, FontWeight, GlobalElementId, Hitbox,
+    HitboxBehavior, Hsla, InspectorElementId, IntoElement, LayoutId, PaintQuad, PathBuilder,
+    Pixels, Point, ShapedLine, SharedString, StrikethroughStyle, Style, TextAlign, TextRun,
+    UTF16Selection, UnderlineStyle, Window, WrappedLine, fill, point, px, quad, relative, size,
 };
 
 use crate::display::{DisplayLine, SpanStyle, WidgetKind};
@@ -29,7 +29,10 @@ use crate::view::{EditorView, InsertCursor, LineNumbers, Overlay};
 pub(crate) enum Hit {
     Checkbox(MdEdit),
     Link(String),
-    Wikilink { target: String, resolved: Option<String> },
+    Wikilink {
+        target: String,
+        resolved: Option<String>,
+    },
     Tag(String),
     /// Fold chevron of a 0-based line.
     FoldGutter(usize),
@@ -37,20 +40,50 @@ pub(crate) enum Hit {
     RegionChevron(usize),
     /// Fold placeholder (folded byte range).
     FoldPill(Range<usize>),
-    Copy { fence: usize, text: String },
+    Copy {
+        fence: usize,
+        text: String,
+    },
     Lang(FenceToolbar),
-    Mermaid { anchor: usize },
-    TableCell { anchor: usize, row: usize, col: usize },
-    TableAddRow { anchor: usize },
-    TableAddCol { anchor: usize },
+    Mermaid {
+        anchor: usize,
+    },
+    TableCell {
+        anchor: usize,
+        row: usize,
+        col: usize,
+    },
+    TableAddRow {
+        anchor: usize,
+    },
+    TableAddCol {
+        anchor: usize,
+    },
 }
 
+#[allow(clippy::large_enum_variant)] // a short-lived per-frame paint list
 pub(crate) enum Prim {
     Quad(PaintQuad),
-    Text { line: Rc<WrappedLine>, origin: Point<Pixels>, lh: Pixels },
-    Shaped { line: ShapedLine, origin: Point<Pixels>, lh: Pixels },
-    Path { points: Vec<Point<Pixels>>, width: Pixels, color: Hsla },
-    Underline { origin: Point<Pixels>, width: Pixels, style: UnderlineStyle },
+    Text {
+        line: Rc<WrappedLine>,
+        origin: Point<Pixels>,
+        lh: Pixels,
+    },
+    Shaped {
+        line: ShapedLine,
+        origin: Point<Pixels>,
+        lh: Pixels,
+    },
+    Path {
+        points: Vec<Point<Pixels>>,
+        width: Pixels,
+        color: Hsla,
+    },
+    Underline {
+        origin: Point<Pixels>,
+        width: Pixels,
+        style: UnderlineStyle,
+    },
 }
 
 /// A laid-out visible line.
@@ -69,7 +102,9 @@ pub(crate) struct FrameLine {
 
 impl FrameLine {
     fn ux(&self, i: usize) -> Pixels {
-        self.layout.as_ref().map_or(px(0.), |l| l.unwrapped_layout.x_for_index(i))
+        self.layout
+            .as_ref()
+            .map_or(px(0.), |l| l.unwrapped_layout.x_for_index(i))
     }
     fn row_of(&self, i: usize) -> usize {
         self.row_starts.iter().rposition(|&s| s <= i).unwrap_or(0)
@@ -77,7 +112,10 @@ impl FrameLine {
     /// Position (relative to the line origin) of display byte `i`.
     pub fn pos(&self, i: usize) -> Point<Pixels> {
         let r = self.row_of(i);
-        point(self.ux(i) - self.ux(self.row_starts[r]), self.row_h * r as f32)
+        point(
+            self.ux(i) - self.ux(self.row_starts[r]),
+            self.row_h * r as f32,
+        )
     }
     fn len(&self) -> usize {
         self.disp.text.len()
@@ -107,7 +145,10 @@ impl FrameLine {
             }
             let x0 = self.ux(s) - self.ux(rs);
             let x1 = self.ux(e) - self.ux(rs);
-            out.push(Bounds { origin: point(x0, self.row_h * r as f32), size: size(x1 - x0, self.row_h) });
+            out.push(Bounds {
+                origin: point(x0, self.row_h * r as f32),
+                size: size(x1 - x0, self.row_h),
+            });
         }
         out
     }
@@ -125,11 +166,17 @@ pub(crate) struct Frame {
     pub cursors: Vec<(Bounds<Pixels>, bool)>,
     /// Gutter labels: (0-based line, text).
     pub gutter: Vec<(usize, String)>,
+    /// Window x of each painted ruler.
+    pub rulers: Vec<Pixels>,
 }
 
 impl Frame {
     pub fn hit_at(&self, p: Point<Pixels>) -> Option<Hit> {
-        self.hits.iter().rev().find(|(b, _)| b.contains(&p)).map(|(_, h)| h.clone())
+        self.hits
+            .iter()
+            .rev()
+            .find(|(b, _)| b.contains(&p))
+            .map(|(_, h)| h.clone())
     }
 
     fn line_at_y(&self, y: Pixels) -> Option<&FrameLine> {
@@ -138,7 +185,11 @@ impl Frame {
         if y < first.top {
             return Some(first);
         }
-        lines.iter().copied().find(|l| y < l.top + l.height).or(lines.last().copied())
+        lines
+            .iter()
+            .copied()
+            .find(|l| y < l.top + l.height)
+            .or(lines.last().copied())
     }
 
     /// Source byte under a window point (and its 0-based line).
@@ -154,7 +205,10 @@ impl Frame {
         let rs = fl.row_starts[r];
         let layout = fl.layout.as_ref().unwrap();
         let x = fl.ux(rs) + (p.x - fl.x).max(px(0.));
-        let mut i = layout.unwrapped_layout.closest_index_for_x(x).clamp(rs, fl.len());
+        let mut i = layout
+            .unwrapped_layout
+            .closest_index_for_x(x)
+            .clamp(rs, fl.len());
         if block && i > rs && fl.ux(i) > x {
             i -= 1;
             while i > rs && !fl.disp.text.is_char_boundary(i) {
@@ -175,11 +229,17 @@ impl Frame {
     }
 
     pub fn char_bounds(&self, byte: usize, _text: &str) -> Option<Bounds<Pixels>> {
-        let fl = self.lines.iter().find(|l| l.height > px(0.) && l.disp.src.start <= byte && byte <= l.disp.src.end)?;
+        let fl = self
+            .lines
+            .iter()
+            .find(|l| l.height > px(0.) && l.disp.src.start <= byte && byte <= l.disp.src.end)?;
         let d = fl.disp.disp_of(byte);
         let p = fl.pos(d);
         let w = fl.advance(d, self.char_w);
-        Some(Bounds { origin: point(fl.x + p.x, fl.top + p.y), size: size(w, fl.row_h) })
+        Some(Bounds {
+            origin: point(fl.x + p.x, fl.top + p.y),
+            size: size(w, fl.row_h),
+        })
     }
 }
 
@@ -190,18 +250,45 @@ fn font(family: &SharedString, bold: bool, italic: bool) -> Font {
         family: family.clone(),
         features: FontFeatures::default(),
         fallbacks: None,
-        weight: if bold { FontWeight::BOLD } else { FontWeight::NORMAL },
-        style: if italic { FontStyle::Italic } else { FontStyle::Normal },
+        weight: if bold {
+            FontWeight::BOLD
+        } else {
+            FontWeight::NORMAL
+        },
+        style: if italic {
+            FontStyle::Italic
+        } else {
+            FontStyle::Normal
+        },
     }
 }
 
 fn run(len: usize, font: Font, color: Hsla) -> TextRun {
-    TextRun { len, font, color, background_color: None, underline: None, strikethrough: None }
+    TextRun {
+        len,
+        font,
+        color,
+        background_color: None,
+        underline: None,
+        strikethrough: None,
+    }
 }
 
-fn shape(window: &Window, text: &str, family: &SharedString, size: Pixels, color: Hsla, bold: bool) -> ShapedLine {
+fn shape(
+    window: &Window,
+    text: &str,
+    family: &SharedString,
+    size: Pixels,
+    color: Hsla,
+    bold: bool,
+) -> ShapedLine {
     let s: SharedString = text.to_string().into();
-    window.text_system().shape_line(s, size, &[run(text.len(), font(family, bold, false), color)], None)
+    window.text_system().shape_line(
+        s,
+        size,
+        &[run(text.len(), font(family, bold, false), color)],
+        None,
+    )
 }
 
 fn with_alpha(c: Hsla, a: f32) -> Hsla {
@@ -228,7 +315,11 @@ fn runs_for(st: &EditorStyle, d: &DisplayLine) -> Vec<TextRun> {
             continue;
         }
         let mut sty = SpanStyle::default();
-        for s in d.spans.iter().filter(|s| s.disp.start <= a && b <= s.disp.end) {
+        for s in d
+            .spans
+            .iter()
+            .filter(|s| s.disp.start <= a && b <= s.disp.end)
+        {
             let o = s.style;
             sty.color = o.color.or(sty.color);
             sty.bold |= o.bold;
@@ -241,12 +332,23 @@ fn runs_for(st: &EditorStyle, d: &DisplayLine) -> Vec<TextRun> {
         if let Some(o) = sty.opacity {
             color = with_alpha(color, o);
         }
-        let mut r = run(b - a, font(&st.mono_family, m.bold || sty.bold, sty.italic), color);
+        let mut r = run(
+            b - a,
+            font(&st.mono_family, m.bold || sty.bold, sty.italic),
+            color,
+        );
         if sty.underline {
-            r.underline = Some(UnderlineStyle { thickness: px(1.), color: Some(with_alpha(color, 0.6)), wavy: false });
+            r.underline = Some(UnderlineStyle {
+                thickness: px(1.),
+                color: Some(with_alpha(color, 0.6)),
+                wavy: false,
+            });
         }
         if sty.strikethrough {
-            r.strikethrough = Some(StrikethroughStyle { thickness: px(1.), color: Some(color) });
+            r.strikethrough = Some(StrikethroughStyle {
+                thickness: px(1.),
+                color: Some(color),
+            });
         }
         runs.push(r);
     }
@@ -255,9 +357,17 @@ fn runs_for(st: &EditorStyle, d: &DisplayLine) -> Vec<TextRun> {
 
 fn chevron(x: Pixels, y: Pixels, open: bool) -> Vec<Point<Pixels>> {
     if open {
-        vec![point(x, y - px(2.)), point(x + px(3.5), y + px(1.5)), point(x + px(7.), y - px(2.))]
+        vec![
+            point(x, y - px(2.)),
+            point(x + px(3.5), y + px(1.5)),
+            point(x + px(7.), y - px(2.)),
+        ]
     } else {
-        vec![point(x + px(1.5), y - px(4.)), point(x + px(5.), y - px(0.5)), point(x + px(1.5), y + px(3.))]
+        vec![
+            point(x + px(1.5), y - px(4.)),
+            point(x + px(5.), y - px(0.5)),
+            point(x + px(1.5), y + px(3.)),
+        ]
     }
 }
 
@@ -297,7 +407,11 @@ impl EditorView {
             }
         }
         for t in &self.model.parsed().tables {
-            for h in hidden.iter_mut().take((t.last_line + 1).min(n)).skip(t.first_line + 1) {
+            for h in hidden
+                .iter_mut()
+                .take((t.last_line + 1).min(n))
+                .skip(t.first_line + 1)
+            {
                 *h = true;
             }
         }
@@ -317,7 +431,8 @@ impl EditorView {
         let hidden = self.hidden_lines();
         let n = hidden.len();
         let body = f32::from(self.style.line_height_px());
-        let mut table_first: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+        let mut table_first: std::collections::HashMap<usize, usize> =
+            std::collections::HashMap::new();
         for t in &self.model.parsed().tables {
             table_first.insert(t.first_line, t.last_line - t.first_line);
         }
@@ -396,11 +511,20 @@ impl EditorView {
             }
         }
         let max = (total - vh * 0.5).max(0.).max(total - vh);
-        let max = if total <= vh { 0. } else { max.min(total - vh * 0.25) };
+        let max = if total <= vh {
+            0.
+        } else {
+            max.min(total - vh * 0.25)
+        };
         self.scroll_y = self.scroll_y.clamp(0., max.max(0.));
     }
 
-    pub(crate) fn layout_frame(&mut self, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut Context<Self>) -> Rc<Frame> {
+    pub(crate) fn layout_frame(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Rc<Frame> {
         let st = self.style.clone();
         let fs = st.font_size;
         let body = f32::from(st.line_height_px());
@@ -412,12 +536,19 @@ impl EditorView {
 
         // Gutter: [pad][numbers][gap][chevron][pad]
         let digits = n.to_string().len().max(2);
-        let num_w = if self.options.line_numbers == LineNumbers::Off { px(0.) } else { char_w * digits as f32 };
+        let num_w = if self.options.line_numbers == LineNumbers::Off {
+            px(0.)
+        } else {
+            char_w * digits as f32
+        };
         let gutter_w = px(10.) + num_w + px(6.) + px(10.) + px(6.);
         let text_x = bounds.origin.x + gutter_w + px(4.);
         let right = bounds.origin.x + bounds.size.width;
 
-        let wrap = self.options.soft_wrap.then(|| f32::from(bounds.size.width - gutter_w) - 24.);
+        let wrap = self
+            .options
+            .soft_wrap
+            .then(|| f32::from(bounds.size.width - gutter_w) - 24.);
         if wrap != self.wrap_width {
             self.wrap_width = wrap;
             self.wrap_rows.clear();
@@ -432,7 +563,9 @@ impl EditorView {
 
         // Visible range.
         let lc = self.model.line_count();
-        let mut first = self.offsets[1..].partition_point(|&o| o <= self.scroll_y).min(lc.saturating_sub(1));
+        let mut first = self.offsets[1..]
+            .partition_point(|&o| o <= self.scroll_y)
+            .min(lc.saturating_sub(1));
         let mut last = first;
         while last + 1 < lc && self.offsets[last + 1] < self.scroll_y + vh {
             last += 1;
@@ -464,7 +597,17 @@ impl EditorView {
                 let row_h = px(self.row_h_of(l));
                 let x = text_x + px(14. * dec.quote_depth as f32);
                 if matches!(dec.block, Some(BlockWidget::Table { .. })) {
-                    lines.push(FrameLine { line: l, top, height, row_h, x, disp, layout: None, row_starts: vec![0], table: true });
+                    lines.push(FrameLine {
+                        line: l,
+                        top,
+                        height,
+                        row_h,
+                        x,
+                        disp,
+                        layout: None,
+                        row_starts: vec![0],
+                        table: true,
+                    });
                     continue;
                 }
                 let line_fs = fs * disp.metrics.font_scale;
@@ -474,11 +617,22 @@ impl EditorView {
                     .text_system()
                     .shape_text(disp.text.clone().into(), line_fs, &runs, ww, None)
                     .ok()
-                    .and_then(|mut v| if v.is_empty() { None } else { Some(Rc::new(v.remove(0))) });
+                    .and_then(|mut v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(Rc::new(v.remove(0)))
+                        }
+                    });
                 let mut row_starts = vec![0];
                 if let Some(lay) = &layout {
                     for b in lay.wrap_boundaries() {
-                        if let Some(g) = lay.unwrapped_layout.runs.get(b.run_ix).and_then(|r| r.glyphs.get(b.glyph_ix)) {
+                        if let Some(g) = lay
+                            .unwrapped_layout
+                            .runs
+                            .get(b.run_ix)
+                            .and_then(|r| r.glyphs.get(b.glyph_ix))
+                        {
                             row_starts.push(g.index);
                         }
                     }
@@ -490,14 +644,26 @@ impl EditorView {
                         wrap_changed = true;
                     }
                 }
-                lines.push(FrameLine { line: l, top, height, row_h, x, disp, layout, row_starts, table: false });
+                lines.push(FrameLine {
+                    line: l,
+                    top,
+                    height,
+                    row_h,
+                    x,
+                    disp,
+                    layout,
+                    row_starts,
+                    table: false,
+                });
             }
             if !wrap_changed {
                 break;
             }
             self.recompute_offsets(f32::from(char_w));
             self.apply_scroll(vh);
-            first = self.offsets[1..].partition_point(|&o| o <= self.scroll_y).min(lc.saturating_sub(1));
+            first = self.offsets[1..]
+                .partition_point(|&o| o <= self.scroll_y)
+                .min(lc.saturating_sub(1));
             last = first;
             while last + 1 < lc && self.offsets[last + 1] < self.scroll_y + vh {
                 last += 1;
@@ -511,8 +677,11 @@ impl EditorView {
             let doc = self.engine.doc();
             for fl in &lines {
                 if fl.row_starts.len() > 1 {
-                    let starts =
-                        fl.row_starts.iter().map(|&d| doc.byte_to_char(fl.disp.src_of(d).min(self.model.text().len()))).collect();
+                    let starts = fl
+                        .row_starts
+                        .iter()
+                        .map(|&d| doc.byte_to_char(fl.disp.src_of(d).min(self.model.text().len())))
+                        .collect();
                     s.rows.insert(fl.line + 1, starts);
                 }
             }
@@ -525,6 +694,7 @@ impl EditorView {
         let mut prims: Vec<Prim> = Vec::new();
         let mut cursors: Vec<(Bounds<Pixels>, bool)> = Vec::new();
         let mut gutter: Vec<(usize, String)> = Vec::new();
+        let mut rulers: Vec<Pixels> = Vec::new();
         let mut hits: Vec<(Bounds<Pixels>, Hit)> = Vec::new();
         let text_right = right - px(16.);
 
@@ -539,19 +709,31 @@ impl EditorView {
         let dec_of = |l: usize| -> Option<&LineDecoration> { decs.get(l) };
         for fl in &lines {
             let Some(dec) = dec_of(fl.line) else { continue };
-            let row = Bounds { origin: point(bounds.origin.x, fl.top), size: size(bounds.size.width, fl.height) };
+            let row = Bounds {
+                origin: point(bounds.origin.x, fl.top),
+                size: size(bounds.size.width, fl.height),
+            };
             if fl.line == cursor_line && !fl.table {
                 prims.push(Prim::Quad(fill(row, st.active_line())));
                 prims.push(Prim::Quad(fill(
-                    Bounds { origin: row.origin, size: size(gutter_w, fl.height) },
+                    Bounds {
+                        origin: row.origin,
+                        size: size(gutter_w, fl.height),
+                    },
                     st.active_gutter(),
                 )));
             }
             let has = |c: LineClass| dec.classes.contains(&c);
             let box_x = text_x - px(6.);
-            let box_b = Bounds { origin: point(box_x, fl.top), size: size(text_right - box_x, fl.height) };
+            let box_b = Bounds {
+                origin: point(box_x, fl.top),
+                size: size(text_right - box_x, fl.height),
+            };
             let r = st.radius_sm;
-            if has(LineClass::FenceHeader) || has(LineClass::FenceBody) || has(LineClass::FenceFooter) {
+            if has(LineClass::FenceHeader)
+                || has(LineClass::FenceBody)
+                || has(LineClass::FenceFooter)
+            {
                 let (tl, bl) = (has(LineClass::FenceHeader), has(LineClass::FenceFooter));
                 let corners = gpui_kit::Corners {
                     top_left: if tl { r } else { px(0.) },
@@ -565,7 +747,14 @@ impl EditorView {
                     left: px(1.),
                     right: px(1.),
                 };
-                prims.push(Prim::Quad(quad(box_b, corners, mix(st.secondary, 0.6), borders, st.border, BorderStyle::Solid)));
+                prims.push(Prim::Quad(quad(
+                    box_b,
+                    corners,
+                    mix(st.secondary, 0.6),
+                    borders,
+                    st.border,
+                    BorderStyle::Solid,
+                )));
             }
             if has(LineClass::FrontmatterLine) || has(LineClass::FrontmatterFence) {
                 prims.push(Prim::Quad(fill(box_b, mix(st.foreground, 0.04))));
@@ -574,34 +763,52 @@ impl EditorView {
                 let acc = st.callout_accent(c.kind);
                 prims.push(Prim::Quad(fill(box_b, mix(acc, 0.08))));
                 prims.push(Prim::Quad(fill(
-                    Bounds { origin: box_b.origin, size: size(px(3.), fl.height) },
+                    Bounds {
+                        origin: box_b.origin,
+                        size: size(px(3.), fl.height),
+                    },
                     acc,
                 )));
             } else if dec.quote_depth > 0 {
                 for i in 0..dec.quote_depth {
                     prims.push(Prim::Quad(fill(
-                        Bounds { origin: point(text_x + px(14. * i as f32), fl.top), size: size(px(3.), fl.height) },
+                        Bounds {
+                            origin: point(text_x + px(14. * i as f32), fl.top),
+                            size: size(px(3.), fl.height),
+                        },
                         st.border,
                     )));
                 }
             }
-            if has(LineClass::RegionBody) || has(LineClass::RegionStart) || has(LineClass::RegionEnd) {
+            if has(LineClass::RegionBody)
+                || has(LineClass::RegionStart)
+                || has(LineClass::RegionEnd)
+            {
                 prims.push(Prim::Quad(fill(
-                    Bounds { origin: point(box_x, fl.top), size: size(px(2.), fl.height) },
+                    Bounds {
+                        origin: point(box_x, fl.top),
+                        size: size(px(2.), fl.height),
+                    },
                     mix(st.syntax_function, 0.4),
                 )));
             }
             if has(LineClass::HorizontalRule) && fl.line != cursor_line {
                 let y = fl.top + fl.height / 2.;
                 prims.push(Prim::Quad(fill(
-                    Bounds { origin: point(text_x, y), size: size(text_right - text_x, px(1.)) },
+                    Bounds {
+                        origin: point(text_x, y),
+                        size: size(text_right - text_x, px(1.)),
+                    },
                     st.border,
                 )));
             }
             for &col in &dec.indent_guides {
                 let gx = fl.x + char_w * col as f32;
                 prims.push(Prim::Quad(fill(
-                    Bounds { origin: point(gx, fl.top), size: size(px(1.), fl.height) },
+                    Bounds {
+                        origin: point(gx, fl.top),
+                        size: size(px(1.), fl.height),
+                    },
                     mix(st.border, 0.7),
                 )));
             }
@@ -619,7 +826,11 @@ impl EditorView {
                 continue;
             }
             let (a, b) = (to_b(r.from()), to_b(r.to()));
-            let color = if i == main_ix { st.selection() } else { st.selection_secondary() };
+            let color = if i == main_ix {
+                st.selection()
+            } else {
+                st.selection_secondary()
+            };
             for fl in lines.iter().filter(|fl| !fl.table) {
                 let (ls, le) = (fl.disp.src.start, fl.disp.src.end);
                 if b < ls || a > le || (b == ls && a < ls) {
@@ -648,7 +859,9 @@ impl EditorView {
                     break;
                 }
                 let color = st.search_match(k == f.current);
-                for fl in lines.iter().filter(|fl| !fl.table && fl.disp.src.start <= m.end && m.start <= fl.disp.src.end) {
+                for fl in lines.iter().filter(|fl| {
+                    !fl.table && fl.disp.src.start <= m.end && m.start <= fl.disp.src.end
+                }) {
                     let da = fl.disp.disp_of(m.start.max(fl.disp.src.start));
                     let db = fl.disp.disp_of(m.end.min(fl.disp.src.end));
                     for rc in fl.rects(da, db) {
@@ -662,13 +875,17 @@ impl EditorView {
         for fl in lines.iter().filter(|fl| !fl.table) {
             for w in &fl.disp.widgets {
                 let rects = fl.rects(w.disp.start, w.disp.end);
-                let abs: Vec<Bounds<Pixels>> = rects.iter().map(|r| *r + point(fl.x, fl.top)).collect();
+                let abs: Vec<Bounds<Pixels>> =
+                    rects.iter().map(|r| *r + point(fl.x, fl.top)).collect();
                 match &w.kind {
                     WidgetKind::Tag { tag } => {
                         for b in &abs {
                             let b = b.dilate(px(1.));
                             prims.push(Prim::Quad(quad(
-                                Bounds { origin: point(b.origin.x, b.origin.y + px(2.)), size: size(b.size.width, b.size.height - px(4.)) },
+                                Bounds {
+                                    origin: point(b.origin.x, b.origin.y + px(2.)),
+                                    size: size(b.size.width, b.size.height - px(4.)),
+                                },
                                 px(4.),
                                 mix(st.syntax_keyword, 0.12),
                                 px(0.),
@@ -681,7 +898,10 @@ impl EditorView {
                     WidgetKind::Fold { range, .. } => {
                         for b in &abs {
                             prims.push(Prim::Quad(quad(
-                                Bounds { origin: point(b.origin.x, b.origin.y + px(2.)), size: size(b.size.width, b.size.height - px(4.)) },
+                                Bounds {
+                                    origin: point(b.origin.x, b.origin.y + px(2.)),
+                                    size: size(b.size.width, b.size.height - px(4.)),
+                                },
                                 px(4.),
                                 mix(st.muted_foreground, 0.15),
                                 px(0.),
@@ -707,15 +927,28 @@ impl EditorView {
                             prims.push(Prim::Underline {
                                 origin: point(b.origin.x, y),
                                 width: b.size.width,
-                                style: UnderlineStyle { thickness: px(1.), color: Some(color), wavy: false },
+                                style: UnderlineStyle {
+                                    thickness: px(1.),
+                                    color: Some(color),
+                                    wavy: false,
+                                },
                             });
-                            hits.push((*b, Hit::Wikilink { target: target.clone(), resolved: resolved.clone() }));
+                            hits.push((
+                                *b,
+                                Hit::Wikilink {
+                                    target: target.clone(),
+                                    resolved: resolved.clone(),
+                                },
+                            ));
                         }
                     }
                     WidgetKind::RegionStart { line_from } => {
                         if let Some(b) = abs.first() {
                             hits.push((
-                                Bounds { origin: b.origin, size: size(char_w * 2., b.size.height) },
+                                Bounds {
+                                    origin: b.origin,
+                                    size: size(char_w * 2., b.size.height),
+                                },
                                 Hit::RegionChevron(*line_from),
                             ));
                         }
@@ -728,7 +961,11 @@ impl EditorView {
         // ---- text ---------------------------------------------------------------
         for fl in &lines {
             if let Some(l) = &fl.layout {
-                prims.push(Prim::Text { line: l.clone(), origin: point(fl.x, fl.top), lh: fl.row_h });
+                prims.push(Prim::Text {
+                    line: l.clone(),
+                    origin: point(fl.x, fl.top),
+                    lh: fl.row_h,
+                });
             }
         }
 
@@ -740,9 +977,19 @@ impl EditorView {
                     let sz = px(14.);
                     let bx = fl.x + p.x + (char_w * 2. - sz) / 2.;
                     let by = fl.top + p.y + (fl.row_h - sz) / 2.;
-                    let b = Bounds { origin: point(bx, by), size: size(sz, sz) };
+                    let b = Bounds {
+                        origin: point(bx, by),
+                        size: size(sz, sz),
+                    };
                     if *checked {
-                        prims.push(Prim::Quad(quad(b, px(3.), st.primary, px(1.), st.primary, BorderStyle::Solid)));
+                        prims.push(Prim::Quad(quad(
+                            b,
+                            px(3.),
+                            st.primary,
+                            px(1.),
+                            st.primary,
+                            BorderStyle::Solid,
+                        )));
                         prims.push(Prim::Path {
                             points: vec![
                                 point(bx + px(3.), by + px(7.)),
@@ -771,30 +1018,103 @@ impl EditorView {
                 match le {
                     LineEndWidget::FenceToolbar(tb) => {
                         let copied = self.copied_fence == Some(tb.fence);
-                        let copy = shape(window, if copied { "Copied" } else { "Copy" }, &sans, px(11.), st.muted_foreground, false);
-                        let lang_label = if tb.language.is_empty() { "plain".to_string() } else { tb.language.clone() };
-                        let lang = shape(window, &format!("{lang_label} ▾"), &sans, px(11.), st.muted_foreground, false);
+                        let copy = shape(
+                            window,
+                            if copied { "Copied" } else { "Copy" },
+                            &sans,
+                            px(11.),
+                            st.muted_foreground,
+                            false,
+                        );
+                        let lang_label = if tb.language.is_empty() {
+                            "plain".to_string()
+                        } else {
+                            tb.language.clone()
+                        };
+                        let lang = shape(
+                            window,
+                            &format!("{lang_label} ▾"),
+                            &sans,
+                            px(11.),
+                            st.muted_foreground,
+                            false,
+                        );
                         let y = fl.top + (fl.row_h - px(16.)) / 2.;
                         let cw = copy.width() + px(12.);
-                        let cb = Bounds { origin: point(ex - cw, y), size: size(cw, px(16.)) };
-                        prims.push(Prim::Quad(quad(cb, px(3.), st.background, px(1.), st.border, BorderStyle::Solid)));
-                        prims.push(Prim::Shaped { line: copy, origin: point(cb.origin.x + px(6.), y), lh: px(16.) });
-                        hits.push((cb, Hit::Copy { fence: tb.fence, text: tb.copy_text.clone() }));
+                        let cb = Bounds {
+                            origin: point(ex - cw, y),
+                            size: size(cw, px(16.)),
+                        };
+                        prims.push(Prim::Quad(quad(
+                            cb,
+                            px(3.),
+                            st.background,
+                            px(1.),
+                            st.border,
+                            BorderStyle::Solid,
+                        )));
+                        prims.push(Prim::Shaped {
+                            line: copy,
+                            origin: point(cb.origin.x + px(6.), y),
+                            lh: px(16.),
+                        });
+                        hits.push((
+                            cb,
+                            Hit::Copy {
+                                fence: tb.fence,
+                                text: tb.copy_text.clone(),
+                            },
+                        ));
                         ex = cb.origin.x - px(6.);
                         let lw = lang.width() + px(12.);
-                        let lb = Bounds { origin: point(ex - lw, y), size: size(lw, px(16.)) };
-                        prims.push(Prim::Quad(quad(lb, px(3.), st.background, px(1.), st.border, BorderStyle::Solid)));
-                        prims.push(Prim::Shaped { line: lang, origin: point(lb.origin.x + px(6.), y), lh: px(16.) });
+                        let lb = Bounds {
+                            origin: point(ex - lw, y),
+                            size: size(lw, px(16.)),
+                        };
+                        prims.push(Prim::Quad(quad(
+                            lb,
+                            px(3.),
+                            st.background,
+                            px(1.),
+                            st.border,
+                            BorderStyle::Solid,
+                        )));
+                        prims.push(Prim::Shaped {
+                            line: lang,
+                            origin: point(lb.origin.x + px(6.), y),
+                            lh: px(16.),
+                        });
                         hits.push((lb, Hit::Lang(tb.clone())));
                         ex = lb.origin.x - px(6.);
                     }
                     LineEndWidget::MermaidButton { anchor, .. } => {
-                        let label = shape(window, "▶ Preview diagram", &sans, px(11.), st.primary, false);
+                        let label = shape(
+                            window,
+                            "▶ Preview diagram",
+                            &sans,
+                            px(11.),
+                            st.primary,
+                            false,
+                        );
                         let y = fl.top + (fl.row_h - px(16.)) / 2.;
                         let w = label.width() + px(12.);
-                        let b = Bounds { origin: point(ex - w, y), size: size(w, px(16.)) };
-                        prims.push(Prim::Quad(quad(b, px(3.), mix(st.primary, 0.1), px(1.), mix(st.primary, 0.4), BorderStyle::Solid)));
-                        prims.push(Prim::Shaped { line: label, origin: point(b.origin.x + px(6.), y), lh: px(16.) });
+                        let b = Bounds {
+                            origin: point(ex - w, y),
+                            size: size(w, px(16.)),
+                        };
+                        prims.push(Prim::Quad(quad(
+                            b,
+                            px(3.),
+                            mix(st.primary, 0.1),
+                            px(1.),
+                            mix(st.primary, 0.4),
+                            BorderStyle::Solid,
+                        )));
+                        prims.push(Prim::Shaped {
+                            line: label,
+                            origin: point(b.origin.x + px(6.), y),
+                            lh: px(16.),
+                        });
                         hits.push((b, Hit::Mermaid { anchor: *anchor }));
                         ex = b.origin.x - px(6.);
                     }
@@ -805,7 +1125,9 @@ impl EditorView {
         // ---- tables -------------------------------------------------------------
         for fl in lines.iter().filter(|fl| fl.table) {
             let Some(dec) = dec_of(fl.line) else { continue };
-            let Some(BlockWidget::Table { model, edit, .. }) = &dec.block else { continue };
+            let Some(BlockWidget::Table { model, edit, .. }) = &dec.block else {
+                continue;
+            };
             self.paint_table(window, &st, fl, model, *edit, char_w, &mut prims, &mut hits);
         }
 
@@ -815,14 +1137,31 @@ impl EditorView {
             let lh = fl.row_h.min(fl.height);
             if self.options.line_numbers != LineNumbers::Off {
                 let num = match self.options.line_numbers {
-                    LineNumbers::Relative if fl.line != cursor_line => fl.line.abs_diff(cursor_line),
+                    LineNumbers::Relative if fl.line != cursor_line => {
+                        fl.line.abs_diff(cursor_line)
+                    }
                     _ => fl.line + 1,
                 };
-                let color = if fl.line == cursor_line { st.foreground } else { mix(st.muted_foreground, 0.8) };
+                let color = if fl.line == cursor_line {
+                    st.foreground
+                } else {
+                    mix(st.muted_foreground, 0.8)
+                };
                 gutter.push((fl.line, num.to_string()));
-                let s = shape(window, &num.to_string(), &mono, fs.min(px(13.)), color, false);
+                let s = shape(
+                    window,
+                    &num.to_string(),
+                    &mono,
+                    fs.min(px(13.)),
+                    color,
+                    false,
+                );
                 let nx = bounds.origin.x + px(10.) + num_w - s.width();
-                prims.push(Prim::Shaped { line: s, origin: point(nx, y), lh });
+                prims.push(Prim::Shaped {
+                    line: s,
+                    origin: point(nx, y),
+                    lh,
+                });
             }
             if !fl.table && self.model.foldable(fl.line).is_some() {
                 let folded = self
@@ -831,9 +1170,16 @@ impl EditorView {
                     .is_some_and(|r| self.folds.ranges().iter().any(|f| f.start == r.start));
                 let cx0 = bounds.origin.x + px(10.) + num_w + px(6.);
                 let cy = y + lh / 2.;
-                prims.push(Prim::Path { points: chevron(cx0, cy, !folded), width: px(1.2), color: st.muted_foreground });
+                prims.push(Prim::Path {
+                    points: chevron(cx0, cy, !folded),
+                    width: px(1.2),
+                    color: st.muted_foreground,
+                });
                 hits.push((
-                    Bounds { origin: point(cx0 - px(3.), y), size: size(px(14.), lh) },
+                    Bounds {
+                        origin: point(cx0 - px(3.), y),
+                        size: size(px(14.), lh),
+                    },
                     Hit::FoldGutter(fl.line),
                 ));
             }
@@ -843,8 +1189,12 @@ impl EditorView {
         for &col in self.model.rulers() {
             let x = text_x + char_w * col as f32;
             if x < right {
+                rulers.push(x);
                 prims.push(Prim::Quad(fill(
-                    Bounds { origin: point(x, bounds.origin.y), size: size(px(1.), bounds.size.height) },
+                    Bounds {
+                        origin: point(x, bounds.origin.y),
+                        size: size(px(1.), bounds.size.height),
+                    },
                     st.ruler(),
                 )));
             }
@@ -853,13 +1203,20 @@ impl EditorView {
         // ---- IME marked text ------------------------------------------------------
         if let Some(m) = &self.marked {
             let (a, b) = (to_b(m.start), to_b(m.end));
-            for fl in lines.iter().filter(|fl| !fl.table && fl.disp.src.start <= a && b <= fl.disp.src.end) {
+            for fl in lines
+                .iter()
+                .filter(|fl| !fl.table && fl.disp.src.start <= a && b <= fl.disp.src.end)
+            {
                 for rc in fl.rects(fl.disp.disp_of(a), fl.disp.disp_of(b)) {
                     let rc = rc + point(fl.x, fl.top);
                     prims.push(Prim::Underline {
                         origin: point(rc.origin.x, rc.origin.y + rc.size.height - px(3.)),
                         width: rc.size.width,
-                        style: UnderlineStyle { thickness: px(1.), color: Some(st.foreground), wavy: false },
+                        style: UnderlineStyle {
+                            thickness: px(1.),
+                            color: Some(st.foreground),
+                            wavy: false,
+                        },
                     });
                 }
             }
@@ -872,7 +1229,10 @@ impl EditorView {
         if self.table.is_none() {
             for (i, &h) in heads.iter().enumerate() {
                 let hb = to_b(h).min(text_len);
-                let Some(fl) = lines.iter().find(|fl| !fl.table && fl.disp.src.start <= hb && hb <= fl.disp.src.end) else {
+                let Some(fl) = lines
+                    .iter()
+                    .find(|fl| !fl.table && fl.disp.src.start <= hb && hb <= fl.disp.src.end)
+                else {
                     continue;
                 };
                 let d = fl.disp.disp_of(hb);
@@ -881,13 +1241,20 @@ impl EditorView {
                 let primary = i == main_ix;
                 if block {
                     let w = fl.advance(d, char_w);
-                    let b = Bounds { origin, size: size(w, fl.row_h) };
+                    let b = Bounds {
+                        origin,
+                        size: size(w, fl.row_h),
+                    };
                     cursors.push((b, primary));
                     if primary {
                         prims.push(Prim::Quad(quad(
                             b,
                             px(1.),
-                            if focused { st.block_cursor() } else { gpui_kit::transparent_black() },
+                            if focused {
+                                st.block_cursor()
+                            } else {
+                                gpui_kit::transparent_black()
+                            },
                             px(1.),
                             st.block_cursor_outline(focused),
                             BorderStyle::Solid,
@@ -896,9 +1263,25 @@ impl EditorView {
                         prims.push(Prim::Quad(fill(b, st.block_cursor_secondary())));
                     }
                 } else {
-                    let color = if primary { st.foreground } else { mix(st.foreground, 0.5) };
-                    cursors.push((Bounds { origin, size: size(px(2.), fl.row_h) }, primary));
-                    prims.push(Prim::Quad(fill(Bounds { origin, size: size(px(2.), fl.row_h) }, color)));
+                    let color = if primary {
+                        st.foreground
+                    } else {
+                        mix(st.foreground, 0.5)
+                    };
+                    cursors.push((
+                        Bounds {
+                            origin,
+                            size: size(px(2.), fl.row_h),
+                        },
+                        primary,
+                    ));
+                    prims.push(Prim::Quad(fill(
+                        Bounds {
+                            origin,
+                            size: size(px(2.), fl.row_h),
+                        },
+                        color,
+                    )));
                 }
                 if primary {
                     cursor_anchor = Some(point(origin.x, origin.y + fl.row_h));
@@ -907,7 +1290,17 @@ impl EditorView {
         }
         let _ = (cx, &sans);
 
-        Rc::new(Frame { bounds, char_w, lines, hits, prims, cursor_anchor, cursors, gutter })
+        Rc::new(Frame {
+            bounds,
+            char_w,
+            lines,
+            hits,
+            prims,
+            cursor_anchor,
+            cursors,
+            gutter,
+            rulers,
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -938,11 +1331,29 @@ impl EditorView {
         let x0 = fl.x;
         let y0 = fl.top + px(TABLE_PAD);
         let total_w: Pixels = widths.iter().fold(px(0.), |a, &w| a + w);
-        let grid = Bounds { origin: point(x0, y0), size: size(total_w, cell_h * rows as f32) };
-        prims.push(Prim::Quad(quad(grid, px(4.), st.background, px(1.), st.border, BorderStyle::Solid)));
+        let grid = Bounds {
+            origin: point(x0, y0),
+            size: size(total_w, cell_h * rows as f32),
+        };
         prims.push(Prim::Quad(quad(
-            Bounds { origin: grid.origin, size: size(total_w, cell_h) },
-            gpui_kit::Corners { top_left: px(4.), top_right: px(4.), bottom_left: px(0.), bottom_right: px(0.) },
+            grid,
+            px(4.),
+            st.background,
+            px(1.),
+            st.border,
+            BorderStyle::Solid,
+        )));
+        prims.push(Prim::Quad(quad(
+            Bounds {
+                origin: grid.origin,
+                size: size(total_w, cell_h),
+            },
+            gpui_kit::Corners {
+                top_left: px(4.),
+                top_right: px(4.),
+                bottom_left: px(0.),
+                bottom_right: px(0.),
+            },
             mix(st.secondary, 0.8),
             px(0.),
             gpui_kit::transparent_black(),
@@ -953,17 +1364,29 @@ impl EditorView {
         for r in 0..rows {
             let y = y0 + cell_h * r as f32;
             if r > 0 {
-                prims.push(Prim::Quad(fill(Bounds { origin: point(x0, y), size: size(total_w, px(1.)) }, st.border)));
+                prims.push(Prim::Quad(fill(
+                    Bounds {
+                        origin: point(x0, y),
+                        size: size(total_w, px(1.)),
+                    },
+                    st.border,
+                )));
             }
             let mut x = x0;
             for (c, &w) in widths.iter().enumerate() {
                 if c > 0 && r == 0 {
                     prims.push(Prim::Quad(fill(
-                        Bounds { origin: point(x, y0), size: size(px(1.), cell_h * rows as f32) },
+                        Bounds {
+                            origin: point(x, y0),
+                            size: size(px(1.), cell_h * rows as f32),
+                        },
                         st.border,
                     )));
                 }
-                let cb = Bounds { origin: point(x, y), size: size(w, cell_h) };
+                let cb = Bounds {
+                    origin: point(x, y),
+                    size: size(w, cell_h),
+                };
                 let text = data.cell(r, c);
                 let line = shape(window, text, &sans, fsz, st.foreground, r == 0);
                 let tw = line.width();
@@ -972,7 +1395,11 @@ impl EditorView {
                     Some(fuchico_markdown::Align::Center) => x + (w - tw) / 2.,
                     _ => x + px(10.),
                 };
-                prims.push(Prim::Shaped { line, origin: point(tx, y + px(4.)), lh: cell_h - px(8.) });
+                prims.push(Prim::Shaped {
+                    line,
+                    origin: point(tx, y + px(4.)),
+                    lh: cell_h - px(8.),
+                });
                 if let Some(e) = edit
                     && e.row == r
                     && e.col == c
@@ -987,22 +1414,48 @@ impl EditorView {
                     )));
                     if e.editing {
                         prims.push(Prim::Quad(fill(
-                            Bounds { origin: point(tx + tw + px(1.), y + px(5.)), size: size(px(1.5), cell_h - px(10.)) },
+                            Bounds {
+                                origin: point(tx + tw + px(1.), y + px(5.)),
+                                size: size(px(1.5), cell_h - px(10.)),
+                            },
                             st.foreground,
                         )));
                     }
                 }
-                hits.push((cb, Hit::TableCell { anchor, row: r, col: c }));
+                hits.push((
+                    cb,
+                    Hit::TableCell {
+                        anchor,
+                        row: r,
+                        col: c,
+                    },
+                ));
                 x += w;
             }
         }
         // "+" affordances: add row (below) / add column (right).
-        let plus_row = Bounds { origin: point(x0, y0 + cell_h * rows as f32 + px(2.)), size: size(total_w, px(14.)) };
-        let plus_col = Bounds { origin: point(x0 + total_w + px(2.), y0), size: size(px(14.), cell_h * rows as f32) };
-        for (b, h) in [(plus_row, Hit::TableAddRow { anchor }), (plus_col, Hit::TableAddCol { anchor })] {
+        let plus_row = Bounds {
+            origin: point(x0, y0 + cell_h * rows as f32 + px(2.)),
+            size: size(total_w, px(14.)),
+        };
+        let plus_col = Bounds {
+            origin: point(x0 + total_w + px(2.), y0),
+            size: size(px(14.), cell_h * rows as f32),
+        };
+        for (b, h) in [
+            (plus_row, Hit::TableAddRow { anchor }),
+            (plus_col, Hit::TableAddCol { anchor }),
+        ] {
             let l = shape(window, "+", &sans, px(11.), st.muted_foreground, false);
-            let o = point(b.origin.x + (b.size.width - l.width()) / 2., b.origin.y + (b.size.height - px(14.)) / 2.);
-            prims.push(Prim::Shaped { line: l, origin: o, lh: px(14.) });
+            let o = point(
+                b.origin.x + (b.size.width - l.width()) / 2.,
+                b.origin.y + (b.size.height - px(14.)) / 2.,
+            );
+            prims.push(Prim::Shaped {
+                line: l,
+                origin: o,
+                lh: px(14.),
+            });
             hits.push((b, h));
         }
     }
@@ -1076,9 +1529,20 @@ impl Element for EditorElement {
     ) {
         let (frame, hitbox) = state;
         let focus = self.view.read(cx).focus.clone();
-        window.handle_input(&focus, ElementInputHandler::new(bounds, self.view.clone()), cx);
+        window.handle_input(
+            &focus,
+            ElementInputHandler::new(bounds, self.view.clone()),
+            cx,
+        );
         let over_hit = frame.hit_at(window.mouse_position()).is_some();
-        window.set_cursor_style(if over_hit { CursorStyle::PointingHand } else { CursorStyle::IBeam }, hitbox);
+        window.set_cursor_style(
+            if over_hit {
+                CursorStyle::PointingHand
+            } else {
+                CursorStyle::IBeam
+            },
+            hitbox,
+        );
         window.with_content_mask(Some(gpui_kit::ContentMask { bounds }), |window| {
             for p in &frame.prims {
                 match p {
@@ -1089,7 +1553,11 @@ impl Element for EditorElement {
                     Prim::Shaped { line, origin, lh } => {
                         let _ = line.paint(*origin, *lh, TextAlign::Left, None, window, cx);
                     }
-                    Prim::Path { points, width, color } => {
+                    Prim::Path {
+                        points,
+                        width,
+                        color,
+                    } => {
                         let mut b = PathBuilder::stroke(*width);
                         if let Some((f, rest)) = points.split_first() {
                             b.move_to(*f);
@@ -1101,7 +1569,11 @@ impl Element for EditorElement {
                             window.paint_path(path, *color);
                         }
                     }
-                    Prim::Underline { origin, width, style } => window.paint_underline(*origin, *width, style),
+                    Prim::Underline {
+                        origin,
+                        width,
+                        style,
+                    } => window.paint_underline(*origin, *width, style),
                 }
             }
         });
@@ -1129,27 +1601,50 @@ impl EntityInputHandler for EditorView {
         _: &mut Window,
         _: &mut Context<Self>,
     ) -> Option<String> {
-        let (a, b) = (self.utf16_to_char(range.start), self.utf16_to_char(range.end));
+        let (a, b) = (
+            self.utf16_to_char(range.start),
+            self.utf16_to_char(range.end),
+        );
         *adjusted = Some(self.char_to_utf16(a)..self.char_to_utf16(b));
         Some(self.engine.doc().slice(a, b))
     }
 
-    fn selected_text_range(&mut self, _: bool, _: &mut Window, _: &mut Context<Self>) -> Option<UTF16Selection> {
+    fn selected_text_range(
+        &mut self,
+        _: bool,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<UTF16Selection> {
         let r = self.engine.selection().main();
-        let (a, h) = if self.mode() == ModeType::Insert { (r.anchor, r.head) } else { (r.head, r.head) };
+        let (a, h) = if self.mode() == ModeType::Insert {
+            (r.anchor, r.head)
+        } else {
+            (r.head, r.head)
+        };
         let (s, e) = (a.min(h), a.max(h));
-        Some(UTF16Selection { range: self.char_to_utf16(s)..self.char_to_utf16(e), reversed: h < a })
+        Some(UTF16Selection {
+            range: self.char_to_utf16(s)..self.char_to_utf16(e),
+            reversed: h < a,
+        })
     }
 
     fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> {
-        self.marked.as_ref().map(|m| self.char_to_utf16(m.start)..self.char_to_utf16(m.end))
+        self.marked
+            .as_ref()
+            .map(|m| self.char_to_utf16(m.start)..self.char_to_utf16(m.end))
     }
 
     fn unmark_text(&mut self, _: &mut Window, _: &mut Context<Self>) {
         self.marked = None;
     }
 
-    fn replace_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, _: &mut Window, cx: &mut Context<Self>) {
+    fn replace_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.ime_insert(range, text, cx);
     }
 
@@ -1175,7 +1670,12 @@ impl EntityInputHandler for EditorView {
         self.bounds_for_char(c)
     }
 
-    fn character_index_for_point(&mut self, p: Point<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<usize> {
+    fn character_index_for_point(
+        &mut self,
+        p: Point<Pixels>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<usize> {
         let c = self.position_for_point(p)?;
         Some(self.char_to_utf16(c))
     }

@@ -48,7 +48,9 @@ pub fn toggle_checkbox(doc: &str, heads: &[usize]) -> Option<CommandEdit> {
     let mut changes: Vec<(Range<usize>, String)> = Vec::new();
     for &h in heads {
         let line = line_bounds(doc, h);
-        let Some(c) = CHECKBOX_RE.captures(&doc[line.clone()]) else { continue };
+        let Some(c) = CHECKBOX_RE.captures(&doc[line.clone()]) else {
+            continue;
+        };
         let m = c.get(0).unwrap();
         let from = line.start + m.start();
         let checked = matches!(c.get(1).unwrap().as_str(), "x" | "X");
@@ -61,7 +63,10 @@ pub fn toggle_checkbox(doc: &str, heads: &[usize]) -> Option<CommandEdit> {
         return None;
     }
     changes.sort_by_key(|(r, _)| r.start);
-    Some(CommandEdit { changes, selection: Vec::new() })
+    Some(CommandEdit {
+        changes,
+        selection: Vec::new(),
+    })
 }
 
 /// `formatDate`: `YYYY-MM-DD`.
@@ -103,7 +108,10 @@ pub fn insert_region(doc: &str, ranges: &[Range<usize>], start: &str, end: &str)
         let shift = |p: usize, d: isize| (p as isize + d) as usize;
         if r.is_empty() {
             let insert = format!("{start} Region\n{end}\n");
-            selection.push((shift(r.start, delta) + start.len() + 1, shift(r.start, delta) + start.len() + 1));
+            selection.push((
+                shift(r.start, delta) + start.len() + 1,
+                shift(r.start, delta) + start.len() + 1,
+            ));
             delta += insert.len() as isize;
             changes.push((r.start..r.start, insert));
         } else {
@@ -136,16 +144,28 @@ pub fn insert_table(doc: &str, range: Range<usize>) -> (CommandEdit, usize) {
         if trail { "\n" } else { "" }
     );
     let table_from = range.start + usize::from(lead);
-    (CommandEdit { changes: vec![(range, insert)], selection: vec![(table_from + 1, table_from + 1)] }, table_from)
+    (
+        CommandEdit {
+            changes: vec![(range, insert)],
+            selection: vec![(table_from + 1, table_from + 1)],
+        },
+        table_from,
+    )
 }
 
 /// `toggleTaskLine` (Mod-Shift-Enter).
 pub fn toggle_task_line(doc: &str, ranges: &[Range<usize>]) -> Option<CommandEdit> {
     let sel: Vec<(usize, usize)> = ranges.iter().map(|r| (r.start, r.end)).collect();
     let changes = task_helpers::toggle_task_line(doc, &sel)?;
-    let mut changes: Vec<(Range<usize>, String)> = changes.into_iter().map(|c| (c.from..c.to, c.insert)).collect();
+    let mut changes: Vec<(Range<usize>, String)> = changes
+        .into_iter()
+        .map(|c| (c.from..c.to, c.insert))
+        .collect();
     changes.sort_by_key(|(r, _)| r.start);
-    Some(CommandEdit { changes, selection: Vec::new() })
+    Some(CommandEdit {
+        changes,
+        selection: Vec::new(),
+    })
 }
 
 /// Which picker [`pick_token`] opens.
@@ -168,21 +188,31 @@ pub fn pick_token(doc: &str, head: usize, kind: TokenKind) -> CommandEdit {
     if let Some(c) = re.captures(text) {
         let v = c.get(1).unwrap();
         let at = line.start + v.end();
-        return CommandEdit { changes: Vec::new(), selection: vec![(at, at)] };
+        return CommandEdit {
+            changes: Vec::new(),
+            selection: vec![(at, at)],
+        };
     }
     let trimmed = text.trim_end().len();
     let insert = format!("{}{emoji} ", if trimmed > 0 { " " } else { "" });
     let at = line.start + trimmed + insert.len();
-    CommandEdit { changes: vec![(line.start + trimmed..line.end, insert)], selection: vec![(at, at)] }
+    CommandEdit {
+        changes: vec![(line.start + trimmed..line.end, insert)],
+        selection: vec![(at, at)],
+    }
 }
 
 #[cfg(test)]
+#[allow(clippy::single_range_in_vec_init)]
 mod tests {
     use super::*;
     use chrono::NaiveDate;
 
     fn now() -> NaiveDateTime {
-        NaiveDate::from_ymd_opt(2026, 8, 27).unwrap().and_hms_opt(9, 5, 7).unwrap()
+        NaiveDate::from_ymd_opt(2026, 8, 27)
+            .unwrap()
+            .and_hms_opt(9, 5, 7)
+            .unwrap()
     }
 
     #[test]
