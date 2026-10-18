@@ -29,6 +29,7 @@ mod ui_tests;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
 
 use fuchico_core::attachments::{image_link, save_image};
@@ -281,6 +282,19 @@ fn same_dir(a: &str, b: &str) -> bool {
 
 /// Markdown files and tags of the vault (wikilink resolution and
 /// completion). Blocking.
+/// `[[Note#heading` completion reads the target note from disk (the
+/// original's `fs_read_file`); relative vault paths resolve against `root`.
+fn read_note(root: Option<&str>, path: &str) -> Option<String> {
+    let full = match root {
+        Some(r) if !Path::new(path).is_absolute() => format!("{r}/{path}"),
+        _ => path.to_string(),
+    };
+    match fs_read_file(full) {
+        Ok(ReadResult::Text { content, .. }) => Some(content),
+        _ => None,
+    }
+}
+
 fn scan_vault(root: &str) -> (Vec<String>, Vec<String>) {
     let files = fuchico_core::fs::tree::fs_list_markdown_files(root.to_string()).unwrap_or_default();
     let tags = fuchico_core::tags::tags_scan(root.to_string())
@@ -412,6 +426,8 @@ impl EditorPane {
         let style = style_for(AppTheme::get(cx));
         let had_focus = self.focus.is_focused(window);
         let view = cx.new(|cx| EditorView::new(&content, options, style, window, cx));
+        let root = self.pcx.root.clone();
+        view.update(cx, |v, _| v.set_note_reader(Some(Rc::new(move |p: &str| read_note(root.as_deref(), p)))));
         self.disk_text = view.read(cx).text();
         self.stats = compute_doc_stats(&self.disk_text);
         self._view_subs = vec![cx.subscribe_in(&view, window, |this, _, ev, window, cx| this.on_editor(ev, window, cx))];

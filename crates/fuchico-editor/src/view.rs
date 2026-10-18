@@ -45,6 +45,9 @@ pub enum LineNumbers {
     Off,
 }
 
+/// Reads a vault note's text by path (`None` when it is not text).
+pub type NoteReader = Rc<dyn Fn(&str) -> Option<String>>;
+
 /// Cursor shape in insert mode (normal/select always draw a block).
 /// cm-helix draws a block in insert mode too unless configured otherwise
 /// (the original does not override it).
@@ -278,6 +281,8 @@ pub struct EditorView {
     pub(crate) viewport: (f32, f32),
     pub(crate) frame: Option<Rc<Frame>>,
     _blur: Subscription,
+    /// Host reader of other vault notes (`[[Note#heading` completion).
+    note_reader: Option<NoteReader>,
 
     // overlays
     pub(crate) overlay: Overlay,
@@ -362,6 +367,7 @@ impl EditorView {
             options,
             focus,
             _blur: blur,
+            note_reader: None,
             scroll_y: 0.,
             pending_scroll: None,
             prompt_scroll_start: 0.,
@@ -629,6 +635,12 @@ impl EditorView {
         let current = self.options.path.clone().unwrap_or_default();
         let text = fuchico_core::attachments::drop_insert_text(paths, &current, before);
         self.insert_at_main(&text, cx);
+    }
+
+    /// Sets how the view reads another vault note (by its `vault_files`
+    /// path) for `[[Note#heading` completion; `None` = no such completions.
+    pub fn set_note_reader(&mut self, reader: Option<NoteReader>) {
+        self.note_reader = reader;
     }
 
     /// Inserts a (pasted image) markdown link at the main cursor.
@@ -1418,7 +1430,8 @@ impl EditorView {
         if trigger && self.completion.is_none() && !should_open_completion(before, false) {
             return;
         }
-        let read = |_: &str| -> Option<String> { None };
+        let reader = self.note_reader.clone();
+        let read = move |p: &str| reader.as_ref().and_then(|r| r(p));
         let ctx = CompletionContext {
             pos: head,
             vault_files: &self.options.vault_files,

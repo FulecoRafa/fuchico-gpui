@@ -512,3 +512,21 @@ async fn reload_to_binary_or_missing_file_switches_the_view(cx: &mut TestAppCont
     ui2.wait("error", |cx| matches!(pane2.read(cx).state, State::Failed(_))).await;
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[gpui_kit::test]
+async fn wikilink_heading_completion_reads_the_other_note(cx: &mut TestAppContext) {
+    cx.update(test_ui::init_shell);
+    let dir = test_ui::temp_dir("editor-heading-complete");
+    let root = dir.to_string_lossy().to_string();
+    std::fs::write(dir.join("Other.md"), "# Alpha\n\ntext\n\n## Beta\n").unwrap();
+    let path = dir.join("n.md").to_string_lossy().to_string();
+    std::fs::write(&path, "\n").unwrap();
+    let (mut ui, pane, _) = open_pane(cx, &path, PaneContext { root: Some(root), ..Default::default() }).await;
+    ui.wait("vault scanned", |cx| pane.read(cx).vault.0.iter().any(|f| f.ends_with("Other.md"))).await;
+    ui.press("i");
+    ui.type_text("[[Other#");
+    let labels = ui.cx.read(|cx| pane.read(cx).view().unwrap().read(cx).completion_labels()).unwrap_or_default();
+    assert!(labels.iter().any(|l| l.contains("Alpha")), "{labels:?}");
+    assert!(labels.iter().any(|l| l.contains("Beta")), "{labels:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
