@@ -237,4 +237,20 @@ mod tests {
         assert_eq!(percent_decode("/v/100%"), "/v/100%");
         assert!(paths_from_urls(&["https://x".into(), "file:///definitely/missing.md".into()]).is_empty());
     }
+
+    /// Finder "Open With" / double-click on a `.md` (CFBundleDocumentTypes):
+    /// AppKit hands the files to `application:openURLs:` as `file://` URLs,
+    /// which `main` routes through `paths_from_urls` → `push_open_requests`.
+    #[test]
+    fn finder_open_urls_reach_the_open_queue() {
+        let dir = crate::test_ui::temp_dir("open-urls");
+        let note = dir.join("my note.md");
+        std::fs::write(&note, "# hi\n").unwrap();
+        let url = format!("file://{}", note.to_string_lossy().replace(' ', "%20"));
+        let paths = paths_from_urls(&[url, format!("file://{}", dir.to_string_lossy())]);
+        assert_eq!(paths, vec![note.to_string_lossy().into_owned()]);
+        let queue = OpenRequests::default();
+        queue.push(&*crate::bus::sink(), paths.clone());
+        assert_eq!(queue.take(), paths);
+    }
 }
