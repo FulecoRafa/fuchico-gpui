@@ -7,3 +7,12 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 gpui-kit.workspace = true
+fuchico-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+log.workspace = true
+chrono.workspace = true
+futures = "0.3"
+sys-locale = "0.3"
+rand = "0.9"
