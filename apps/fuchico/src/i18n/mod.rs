@@ -170,7 +170,7 @@ mod tests {
     fn key_sets_are_equal_and_unique() {
         let keys: HashSet<_> = Msg::ALL.iter().map(|m| m.key()).collect();
         assert_eq!(keys.len(), Msg::ALL.len());
-        assert_eq!(Msg::ALL.len(), 300);
+        assert_eq!(Msg::ALL.len(), 302);
     }
 
     #[test]

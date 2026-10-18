@@ -608,6 +608,10 @@ pub enum Msg {
     ShortcutActionPickRecurrenceLabel,
     /// `shortcutAction.pickRecurrence.desc`
     ShortcutActionPickRecurrenceDesc,
+    /// `explorer.openWithFailed` (native port; the original hardcoded it)
+    ExplorerOpenWithFailed,
+    /// `explorer.theDefaultApp` (native port; the original hardcoded it)
+    ExplorerTheDefaultApp,
 }
 
 impl Msg {
@@ -913,6 +917,8 @@ impl Msg {
         Msg::ShortcutActionPickDueDateDesc,
         Msg::ShortcutActionPickRecurrenceLabel,
         Msg::ShortcutActionPickRecurrenceDesc,
+        Msg::ExplorerOpenWithFailed,
+        Msg::ExplorerTheDefaultApp,
     ];
 
     /// The original dotted key, e.g. `"common.loading"`.
@@ -1218,6 +1224,8 @@ impl Msg {
             Msg::ShortcutActionPickDueDateDesc => "shortcutAction.pickDueDate.desc",
             Msg::ShortcutActionPickRecurrenceLabel => "shortcutAction.pickRecurrence.label",
             Msg::ShortcutActionPickRecurrenceDesc => "shortcutAction.pickRecurrence.desc",
+            Msg::ExplorerOpenWithFailed => "explorer.openWithFailed",
+            Msg::ExplorerTheDefaultApp => "explorer.theDefaultApp",
         }
     }
 }
@@ -1525,6 +1533,8 @@ pub fn en(m: Msg) -> &'static str {
         Msg::ShortcutActionPickDueDateDesc => "Add or change the 📅 due date on the current line via a quick-pick list.",
         Msg::ShortcutActionPickRecurrenceLabel => "Set recurrence…",
         Msg::ShortcutActionPickRecurrenceDesc => "Add or change the 🔁 repeat rule on the current line via a quick-pick list.",
+        Msg::ExplorerOpenWithFailed => "Could not open with {app}: {error}",
+        Msg::ExplorerTheDefaultApp => "the default app",
     }
 }
 
@@ -1831,5 +1841,7 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ShortcutActionPickDueDateDesc => "Adiciona ou altera a data 📅 de prazo na linha atual por uma lista de escolha rápida.",
         Msg::ShortcutActionPickRecurrenceLabel => "Definir recorrência…",
         Msg::ShortcutActionPickRecurrenceDesc => "Adiciona ou altera a regra 🔁 de repetição na linha atual por uma lista de escolha rápida.",
+        Msg::ExplorerOpenWithFailed => "Não foi possível abrir com {app}: {error}",
+        Msg::ExplorerTheDefaultApp => "o app padrão",
     }
 }
