@@ -86,6 +86,8 @@ pub struct Workspace {
     watcher: Option<VaultWatcher>,
     focus: FocusHandle,
     _subs: Vec<Subscription>,
+    /// Command palette / quick switcher overlays.
+    pub palette: palette::PaletteHost,
 }
 
 impl Focusable for Workspace {
@@ -125,6 +127,7 @@ impl Workspace {
             watcher: None,
             focus,
             _subs: subs,
+            palette: Default::default(),
         };
         this.restore_vault(window, cx);
         this
@@ -293,6 +296,18 @@ impl Workspace {
         cx.notify();
     }
 
+    /// Focuses the mounted pane (editor-targeted palette commands dispatch
+    /// from there). False without one.
+    pub fn focus_active_pane(&self, window: &mut Window, cx: &mut App) -> bool {
+        match &self.pane {
+            Some(p) => {
+                p.handle.focus(window, cx);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Mounts the active tab's pane (remounting when the active path
     /// changed) and pushes the active file to the explorer and backlinks.
     fn sync_pane(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -332,7 +347,7 @@ impl Workspace {
             PaneEvent::OpenMermaid { block_key, initial_text } => {
                 self.open_mermaid(block_key.clone(), crate::t!(AppDiagram), Some(initial_text.clone()), window, cx)
             }
-            PaneEvent::OpenCommandPalette(q) => palette::open(PaletteKind::Commands { query: q.clone() }, window, cx),
+            PaneEvent::OpenCommandPalette(q) => palette::open(self, PaletteKind::Commands { query: q.clone() }, window, cx),
             PaneEvent::Close => self.close_tab(&path, window, cx),
         }
     }
@@ -528,10 +543,10 @@ impl Workspace {
                     p.handle.save(w, cx);
                 }
             }))
-            .on_action(cx.listener(|_, _: &CommandPalette, w, cx| {
-                palette::open(PaletteKind::Commands { query: String::new() }, w, cx)
+            .on_action(cx.listener(|this, _: &CommandPalette, w, cx| {
+                palette::open(this, PaletteKind::Commands { query: String::new() }, w, cx)
             }))
-            .on_action(cx.listener(|_, _: &QuickOpen, w, cx| palette::open(PaletteKind::QuickOpen, w, cx)))
+            .on_action(cx.listener(|this, _: &QuickOpen, w, cx| palette::open(this, PaletteKind::QuickOpen, w, cx)))
     }
 
     // ----- rendering -------------------------------------------------------
@@ -654,6 +669,7 @@ impl Render for Workspace {
             .id("workspace")
             .key_context("Workspace")
             .track_focus(&self.focus)
+            .relative()
             .size_full()
             .flex()
             .bg(th.colors.background)
@@ -686,6 +702,7 @@ impl Render for Workspace {
                 .child(div().flex_1().min_w_0().h_full().overflow_hidden().child(main))
                 .children(self.render_dock(cx)),
         )
+        .children(palette::render_overlays(self))
     }
 }
 
