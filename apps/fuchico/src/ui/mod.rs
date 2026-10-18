@@ -12,4 +12,5 @@ pub use context_menu::{MenuEntry, build_menu};
 pub use dialog::{ConfirmOptions, confirm};
 pub use style::u;
 pub use toast::toast_info;
+#[allow(unused_imports)] // Segment/segmented: shared, currently unused here.
 pub use widgets::{Segment, empty_state, icon_button, placeholder_view, segmented};

@@ -14,6 +14,7 @@ gpui_kit::assets::icon_assets!(
     [
         AppWindow, CalendarClock, Files, FilePlus, FolderPlus, Hash, PenTool, Pencil, Scissors, Trash, X,
         Link, Workflow, Download, Upload, Keyboard, Languages, Type, ListChecks, Clock, CircleDot,
+        Unlink, RotateCcw,
     ]
 );
 
