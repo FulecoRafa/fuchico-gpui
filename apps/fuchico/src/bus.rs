@@ -116,3 +116,9 @@ pub fn subscribe_in<V: 'static>(
     let bus = cx.global::<BusGlobal>().0.clone();
     cx.subscribe_in(&bus, window, move |this, _, ev, window, cx| f(this, ev, window, cx))
 }
+
+/// App-level subscription (no view), e.g. background services.
+pub fn subscribe_app(cx: &mut App, mut f: impl FnMut(&AppEvent, &mut App) + 'static) -> Subscription {
+    let bus = cx.global::<BusGlobal>().0.clone();
+    cx.subscribe(&bus, move |_, ev, cx| f(ev, cx))
+}
