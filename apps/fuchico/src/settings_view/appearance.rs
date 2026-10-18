@@ -422,7 +422,12 @@ impl SettingsView {
                 .bg(th.colors.background)
                 .text_size(u(12.))
                 .font_family(th.mono_font.clone())
-                .child(Editor::new(&st.css).h(u(240.)).bordered(false));
+                .child(
+                    Editor::new(&st.css)
+                        .text_size(u(12.))
+                        .h(u(theme_editor::editor_height(st.css.read(cx).value().matches('\n').count() + 1)))
+                        .bordered(false),
+                );
             let hint_el = hint(cx)
                 .child(crate::t!(SettingsThemeCustomCssHintPrefix))
                 .child(code("[data-palette=\"custom\"]", cx))

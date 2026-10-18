@@ -8,6 +8,7 @@
 //! setting is written through [`SettingsStore::update`](crate::settings::SettingsStore::update).
 
 mod appearance;
+mod css_data;
 mod editor;
 mod integrations;
 mod search;
