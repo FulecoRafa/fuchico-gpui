@@ -24,6 +24,25 @@ pub fn init(cx: &mut App) {
     bus::init(cx);
 }
 
+/// The main window's globals, like `main` (persisted stores load from this
+/// test thread's scratch config dir), English, and the global key bindings.
+pub fn init_shell(cx: &mut App) {
+    gpui_kit::init(cx);
+    crate::assets::register_fonts(cx);
+    crate::settings::SettingsStore::init(crate::settings::SettingsStore::load(), cx);
+    crate::i18n::set_locale(crate::i18n::Locale::En);
+    cx.set_global(crate::settings::ui_state::UiState::load());
+    cx.set_global(crate::windows::geometry::WindowStates::load());
+    bus::init(cx);
+    crate::theme::init(cx);
+    crate::keymap::bind_global_keys(cx);
+}
+
+/// Opens a 1200×800 test window holding a fresh [`crate::workspace::Workspace`].
+pub fn open_workspace(cx: &mut TestAppContext) -> (Ui, Entity<crate::workspace::Workspace>) {
+    open(cx, (1200., 800.), crate::workspace::Workspace::new)
+}
+
 pub fn temp_dir(tag: &str) -> PathBuf {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     let dir = std::env::temp_dir().join(format!("fuchico-{tag}-test-{}-{nanos}", std::process::id()));

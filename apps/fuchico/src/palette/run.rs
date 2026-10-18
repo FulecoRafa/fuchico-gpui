@@ -1,26 +1,18 @@
 //! Executes a [`CommandAction`] against the workspace (the `run` closures of
 //! `buildAppCommands`). The overlay is already closed and focus restored.
 
-use gpui_kit::{Action, AppContext, Context, Focusable, Window};
+use gpui_kit::{Action, AppContext, Context, Window};
 
 use super::commands::CommandAction;
 use super::{PaletteKind, open};
 use crate::actions::{GoToLine, Save, ToggleTheme, editor_action_for};
 use crate::settings::{PaletteId, SettingsStore};
-use crate::workspace::{MainViewKind, Workspace};
+use crate::workspace::Workspace;
 
 pub fn run(ws: &mut Workspace, action: CommandAction, window: &mut Window, cx: &mut Context<Workspace>) {
     use CommandAction as A;
     match action {
-        A::SetView(v) => {
-            ws.set_view(v, window, cx);
-            // `set_view` leaves focus on the unmounted pane for non-editor
-            // views, which would drop the `Workspace` key context (and with
-            // it Mod-P / Mod-Shift-P); park it on the workspace instead.
-            if v != MainViewKind::Editor {
-                window.focus(&ws.focus_handle(cx), cx);
-            }
-        }
+        A::SetView(v) => ws.set_view(v, window, cx),
         A::EditorAction(id) => {
             if let Some(a) = editor_action_for(id) {
                 to_editor(ws, a, window, cx);

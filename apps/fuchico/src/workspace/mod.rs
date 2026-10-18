@@ -420,6 +420,13 @@ impl Workspace {
             MainViewKind::Editor => {}
         }
         self.view = view;
+        // Focus may sit in the editor pane, which unmounts now; a focus
+        // outside the rendered tree drops the `Workspace` key context (and
+        // with it Mod-P / Mod-Shift-P). Park it on the workspace root, which
+        // every main view renders inside.
+        if view != MainViewKind::Editor {
+            window.focus(&self.focus, cx);
+        }
         let root = self.root.clone();
         let sub = match view {
             MainViewKind::Editor => {
@@ -435,6 +442,10 @@ impl Workspace {
             MainViewKind::Settings => ensure(&mut self.settings, root, window, cx, SettingsView::new),
         };
         self._subs.extend(sub);
+        // The search panel autofocuses its query input on mount.
+        if let (MainViewKind::Search, Some(search)) = (view, self.search.clone()) {
+            search.update(cx, |s, cx| s.focus_input(window, cx));
+        }
         cx.notify();
     }
 

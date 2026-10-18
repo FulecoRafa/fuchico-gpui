@@ -17,7 +17,7 @@ use gpui_kit::{
 use crate::actions::{EditorInsertDate, GoToLine};
 use crate::settings::SettingsStore;
 use crate::settings::ui_state::UiState;
-use crate::workspace::Workspace;
+use crate::workspace::{MainViewKind, Workspace};
 
 fn temp_vault() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
@@ -272,4 +272,51 @@ fn shortcuts_recorder(cx: &mut TestAppContext) {
     assert_eq!(shortcut(&mut cx), "Mod-Shift-k");
     // Restore the default.
     cx.update(|_, cx| SettingsStore::set_shortcut(cx, "insertDate", "Mod-Shift-d"));
+}
+
+/// Regression: `set_view` to a non-editor view used to leave focus on the
+/// unmounted editor pane, dropping the `Workspace` key context, so Mod-P
+/// stopped opening the Quick Switcher. Covers activity-bar clicks and the
+/// keyboard-only palette "Go to …" commands.
+#[gpui_kit::test]
+async fn activity_bar_view_switch_keeps_workspace_keys(cx: &mut TestAppContext) {
+    let vault = temp_vault();
+    let root = vault.to_string_lossy().to_string();
+    cx.update(crate::test_ui::init_shell);
+    let (mut ui, ws) = crate::test_ui::open_workspace(cx);
+    ui.cx.update(|window, cx| ws.update(cx, |ws, cx| ws.set_root(Some(root.clone()), window, cx)));
+    ui.frame();
+    // An open note with the editor pane focused (as after typing in it).
+    let launch = format!("{root}/project-launch.md");
+    ui.cx.update(|window, cx| ws.update(cx, |ws, cx| ws.open_file(launch.clone(), None, window, cx)));
+    ui.sleep(50).await;
+    let focus_pane = |ui: &mut crate::test_ui::Ui| {
+        ui.cx.update(|window, cx| assert!(ws.update(cx, |ws, cx| ws.focus_active_pane(window, cx)), "pane mounted"));
+        ui.frame();
+    };
+
+    for (i, view) in [(1, MainViewKind::Agenda), (2, MainViewKind::Search), (3, MainViewKind::Tags), (4, MainViewKind::Settings)] {
+        focus_pane(&mut ui);
+        ui.click(&format!("activity:{i}"));
+        assert_eq!(cx.update(|cx| ws.read(cx).main_view()), view);
+        ui.press("cmd-p");
+        assert!(cx.update(|cx| ws.read(cx).palette.quick_switcher().is_some()), "Mod-P after switching to {view:?}");
+        ui.press("escape");
+        assert!(cx.update(|cx| ws.read(cx).palette.quick_switcher().is_none()));
+        // Back to the editor, so the next switch starts from the pane again.
+        ui.click("activity:0");
+    }
+
+    for (query, view) in [("agenda", MainViewKind::Agenda), ("go to search", MainViewKind::Search), ("settings", MainViewKind::Settings)] {
+        focus_pane(&mut ui);
+        ui.press("cmd-shift-p");
+        ui.type_text(query);
+        ui.press("enter");
+        assert_eq!(cx.update(|cx| ws.read(cx).main_view()), view);
+        ui.press("cmd-p");
+        assert!(cx.update(|cx| ws.read(cx).palette.quick_switcher().is_some()), "Mod-P after palette {query:?}");
+        ui.press("escape");
+        ui.click("activity:0");
+    }
+    let _ = std::fs::remove_dir_all(&vault);
 }
