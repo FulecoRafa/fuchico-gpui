@@ -29,6 +29,11 @@ impl SnapTheme {
     pub const AYU_LIGHT: SnapTheme = SnapTheme { palette: PaletteId::Ayu, mode: ModePref::Light };
     pub const AYU_DARK: SnapTheme = SnapTheme { palette: PaletteId::Ayu, mode: ModePref::Dark };
     pub const DRACULA: SnapTheme = SnapTheme { palette: PaletteId::Dracula, mode: ModePref::Dark };
+
+    /// The default palette in light or dark mode.
+    pub fn default_mode(dark: bool) -> SnapTheme {
+        SnapTheme { palette: PaletteId::default(), mode: if dark { ModePref::Dark } else { ModePref::Light } }
+    }
 }
 
 /// The real platform text system. On macOS it is built directly because
@@ -68,6 +73,8 @@ pub fn init_app(theme: SnapTheme, cx: &mut App) {
         s.palette = theme.palette;
         s.mode = theme.mode;
     });
+    // Compare against the original's (English) screenshots.
+    crate::i18n::set_locale(crate::i18n::Locale::En);
     cx.set_global(crate::settings::ui_state::UiState::load());
     cx.set_global(crate::windows::geometry::WindowStates::load());
     crate::bus::init(cx);

@@ -21,7 +21,6 @@ use fuchico_core::search::{ReplaceResult, SearchMatch, group_by_file, search_fil
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Icon, IconName};
-use gpui_kit::TestSupportExt;
 use gpui_kit::prelude::*;
 use gpui_kit::{
     AnyElement, App, Context, Entity, EventEmitter, FontWeight, HighlightStyle, SharedString, StyledText, Subscription,
@@ -261,7 +260,7 @@ impl SearchView {
                 this.replace_open = !this.replace_open;
                 cx.notify();
             }))
-            .test_support();
+            .debug_selector(|| "search-replace-toggle".into());
         div()
             .flex()
             .flex_none()
@@ -301,7 +300,7 @@ impl SearchView {
                     .hover(move |s| s.bg(hover))
                     .on_click(cx.listener(|this, _, window, cx| this.run_replace(None, window, cx)))
             })
-            .test_support();
+            .debug_selector(|| "search-replace-btn".into());
         div()
             .flex()
             .flex_none()
@@ -405,7 +404,7 @@ fn render_group(
         .on_click(move |_, _, cx| {
             v1.update(cx, |this, cx| this.open(&f1, first_line, cx)).ok();
         })
-        .test_support();
+        .debug_selector(|| format!("search-file:{gi}"));
     let header = with_context_menu(("search-file-menu", gi), header, move |menu, _, cx| {
         let items = v2.update(cx, |this, cx| this.row_menu(&f2, first_line, cx)).unwrap_or_default();
         build_menu(menu, items)
@@ -455,7 +454,7 @@ fn render_group(
             .on_click(move |_, _, cx| {
                 v1.update(cx, |this, cx| this.open(&f1, line, cx)).ok();
             })
-            .test_support();
+            .debug_selector(|| format!("search-row-{gi}-{ri}"));
         with_context_menu(SharedString::from(format!("search-row-menu-{gi}-{ri}")), row, move |menu, _, cx| {
             let items = v2.update(cx, |this, cx| this.row_menu(&f2, line, cx)).unwrap_or_default();
             build_menu(menu, items)
@@ -629,12 +628,11 @@ mod ui_tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    use gpui_kit as gpui;
     use gpui_kit::component::WindowExt;
-    use gpui_kit::{AppContext, Keystroke, TestAppContext};
+    use gpui_kit::TestAppContext;
 
     use super::{SearchState, SearchView};
-    use crate::ui::test_harness::{self as h, click, render, try_find, type_text};
+    use crate::test_ui;
     use crate::workspace::view::ViewEvent;
 
     fn vault() -> (tempfile::TempDir, String) {
@@ -654,43 +652,35 @@ mod ui_tests {
         }
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     async fn search_types_debounces_opens_and_replaces(cx: &mut TestAppContext) {
-        h::init(cx);
+        cx.update(test_ui::init);
         let (_dir, root) = vault();
-        let (win, view) = h::open(cx, |window, cx| cx.new(|cx| SearchView::new(Some(root.clone()), window, cx)));
+        let (mut ui, view) = test_ui::open(cx, (900., 640.), |window, cx| SearchView::new(Some(root.clone()), window, cx));
         let events: Rc<RefCell<Vec<ViewEvent>>> = Rc::default();
         let ev = events.clone();
         cx.update(|cx| cx.subscribe(&view, move |_, e: &ViewEvent, _| ev.borrow_mut().push(e.clone())).detach());
 
         // Idle placeholder, then typing goes Loading immediately.
-        cx.update_window(win, |_, window, cx| {
-            render(window, cx);
-            assert!(matches!(view.read(cx).state(), SearchState::Idle));
-            let input = view.read(cx).query_input.clone();
-            input.update(cx, |s, cx| s.focus(window, cx));
-            type_text(window, "hel", cx);
-        })
-        .unwrap();
-        // Subscriptions run once the update's effects flush.
+        ui.frame();
+        cx.update(|cx| assert!(matches!(view.read(cx).state(), SearchState::Idle)));
+        let input = cx.update(|cx| view.read(cx).query_input.clone());
+        ui.cx.update(|window, cx| input.update(cx, |s, cx| s.focus(window, cx)));
+        ui.cx.simulate_input("hel");
         cx.update(|cx| {
             assert_eq!(view.read(cx).query_input.read(cx).value().as_ref(), "hel");
             assert_eq!(view.read(cx).query, "hel");
             assert!(matches!(view.read(cx).state(), SearchState::Loading));
         });
-        cx.update_window(win, |_, window, cx| type_text(window, "lo", cx)).unwrap();
+        ui.type_text("lo");
         let v = view.clone();
-        h::wait_for(cx, win, "results", move |_, cx| loaded(v.read(cx)).is_some()).await;
-        cx.update_window(win, |_, window, cx| {
-            render(window, cx);
-            // 3 matching lines in 2 files, grouped in walk order.
-            assert_eq!(loaded(view.read(cx)), Some((2, 3)));
-            assert!(try_find(window, ("search-file", 0usize)).is_some());
-            assert!(try_find(window, "search-row-0-0").is_some());
-            // Row click opens at that line.
-            click(window, "search-row-0-0", cx);
-        })
-        .unwrap();
+        ui.wait("results", move |cx| loaded(v.read(cx)).is_some()).await;
+        // 3 matching lines in 2 files, grouped in walk order.
+        cx.update(|cx| assert_eq!(loaded(view.read(cx)), Some((2, 3))));
+        assert!(ui.has("search-file:0"));
+        assert!(ui.has("search-row-0-0"));
+        // Row click opens at that line.
+        ui.click("search-row-0-0");
         {
             let evs = events.borrow();
             let ViewEvent::OpenFile { path, line } = evs.last().expect("open event") else { panic!() };
@@ -699,43 +689,31 @@ mod ui_tests {
         }
 
         // Whitespace-only query is idle.
-        cx.update_window(win, |_, window, cx| {
-            window.dispatch_keystroke(Keystroke::parse("cmd-a").unwrap(), cx);
-            type_text(window, "   ", cx);
-        })
-        .unwrap();
+        ui.cx.update(|window, cx| input.update(cx, |s, cx| s.focus(window, cx)));
+        ui.press("cmd-a");
+        ui.type_text("   ");
         cx.update(|cx| assert!(matches!(view.read(cx).state(), SearchState::Idle)));
-        cx.update_window(win, |_, window, cx| {
-            window.dispatch_keystroke(Keystroke::parse("cmd-a").unwrap(), cx);
-            type_text(window, "HeLLo", cx);
-        })
-        .unwrap();
+        ui.press("cmd-a");
+        ui.type_text("HeLLo");
         let v = view.clone();
-        h::wait_for(cx, win, "results again", move |_, cx| loaded(v.read(cx)) == Some((2, 3))).await;
+        ui.wait("results again", move |cx| loaded(v.read(cx)) == Some((2, 3))).await;
 
         // Toggle replace row, type a replacement, confirm.
-        cx.update_window(win, |_, window, cx| {
-            assert!(try_find(window, "search-replace-btn").is_none());
-            click(window, "search-replace-toggle", cx);
-            assert!(view.read(cx).replace_open);
-            assert!(try_find(window, "search-replace-btn").is_some());
-            let input = view.read(cx).replace_input.clone();
-            input.update(cx, |s, cx| s.focus(window, cx));
-            type_text(window, "Bye", cx);
-        })
-        .unwrap();
+        assert!(!ui.has("search-replace-btn"));
+        ui.click("search-replace-toggle");
+        cx.update(|cx| assert!(view.read(cx).replace_open));
+        assert!(ui.has("search-replace-btn"));
+        let rinput = cx.update(|cx| view.read(cx).replace_input.clone());
+        ui.cx.update(|window, cx| rinput.update(cx, |s, cx| s.focus(window, cx)));
+        ui.type_text("Bye");
         cx.update(|cx| assert_eq!(view.read(cx).replacement, "Bye"));
-        cx.update_window(win, |_, window, cx| {
-            click(window, "search-replace-btn", cx);
-            assert!(window.has_active_dialog(cx), "confirm dialog shown");
-            window.dispatch_keystroke(Keystroke::parse("enter").unwrap(), cx);
-            render(window, cx);
-        })
-        .unwrap();
+        ui.click("search-replace-btn");
+        assert!(ui.cx.update(|window, cx| window.has_active_dialog(cx)), "confirm dialog shown");
+        ui.press("enter");
         let v = view.clone();
-        h::wait_for(cx, win, "replace notice", move |_, cx| v.read(cx).notice.is_some()).await;
+        ui.wait("replace notice", move |cx| v.read(cx).notice.is_some()).await;
         let v = view.clone();
-        h::wait_for(cx, win, "rerun", move |_, cx| loaded(v.read(cx)) == Some((0, 0))).await;
+        ui.wait("rerun", move |cx| loaded(v.read(cx)) == Some((0, 0))).await;
         let notice = cx.update(|cx| view.read(cx).notice.clone().unwrap());
         assert_eq!(notice, "Replaced 3 occurrences in 2 files.");
         let a = std::fs::read_to_string(format!("{root}/a.md")).unwrap();
@@ -744,12 +722,11 @@ mod ui_tests {
         assert_eq!(b, "say Bye again\n");
 
         // Leaving the view resets component-local state.
-        cx.update_window(win, |_, window, cx| {
+        ui.cx.update(|window, cx| {
             view.update(cx, |v, cx| crate::workspace::view::MainView::on_hide(v, window, cx));
             let v = view.read(cx);
             assert!(v.query.is_empty() && v.notice.is_none() && !v.replace_open);
             assert!(matches!(v.state(), SearchState::Idle));
-        })
-        .unwrap();
+        });
     }
 }

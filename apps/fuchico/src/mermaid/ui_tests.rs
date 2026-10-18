@@ -3,11 +3,12 @@
 
 use fuchico_mermaid::{BlockStatus, MermaidEvent};
 use gpui_kit::prelude::*;
-use gpui_kit::{AppContext, Context, Entity, Point, Subscription, TestAppContext, Window, div, px};
+use gpui_kit::{AppContext, Context, Entity, Point, Subscription, TestAppContext, Window, div, px, size};
 
 use super::window::{MermaidWindow, is_open};
 use super::{MermaidPane, close_block, is_tracked, open_block, update_block};
 use crate::bus::AppEvent;
+use crate::snapshot::SnapTheme;
 use crate::test_ui::{self, Ui};
 use crate::workspace::view::DockEvent;
 
@@ -206,12 +207,12 @@ async fn dock_debounce_request_popout_and_redock(cx: &mut TestAppContext) {
 fn snapshots() {
     for dark in [false, true] {
         let name = if dark { "mermaid-pane-dark" } else { "mermaid-pane-light" };
-        test_ui::snapshot(name, (380., 420.), dark, |_| {}, |window, cx| {
-            MermaidPane::new("snap".into(), "Diagram".into(), Some(B.into()), window, cx)
+        crate::snapshot::snapshot(name, size(px(380.), px(420.)), SnapTheme::default_mode(dark), |window, cx| {
+            cx.new(|cx| MermaidPane::new("snap".into(), "Diagram".into(), Some(B.into()), window, cx))
         });
         let name = if dark { "mermaid-window-dark" } else { "mermaid-window-light" };
-        test_ui::snapshot(name, (720., 560.), dark, |_| {}, |window, cx| {
-            MermaidWindow::new("snap".into(), "Diagram".into(), Some(B.into()), window, cx)
+        crate::snapshot::snapshot(name, size(px(720.), px(560.)), SnapTheme::default_mode(dark), |window, cx| {
+            cx.new(|cx| MermaidWindow::new("snap".into(), "Diagram".into(), Some(B.into()), window, cx))
         });
     }
 }

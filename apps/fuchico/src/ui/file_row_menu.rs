@@ -30,7 +30,7 @@ pub fn file_row_menu(
 
 /// A full-width box owning `row`'s right-click menu. The row itself (the
 /// click target) stays a plain stateful element so UI tests can observe it
-/// with `.test_support()`, which cannot wrap a context-menu element.
+/// with `.debug_selector(..)`, which a context-menu element does not take.
 pub fn with_context_menu(
     id: impl Into<ElementId>,
     row: impl IntoElement,

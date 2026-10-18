@@ -16,7 +16,6 @@ use fuchico_core::events::CoreEvent;
 use fuchico_core::tags::{TagEntry, tags_scan};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::Icon;
-use gpui_kit::TestSupportExt;
 use gpui_kit::prelude::*;
 use gpui_kit::{AnyElement, Context, EventEmitter, SharedString, Subscription, Window, div};
 
@@ -185,7 +184,7 @@ impl TagsView {
                             .on_click(move |_, _, cx| {
                                 view.update(cx, |this, cx| this.toggle(&tag, cx)).ok();
                             })
-                            .test_support()
+                            .debug_selector(|| format!("tag-chip:{i}"))
                             .into_any_element(),
                     );
                 }
@@ -260,7 +259,7 @@ impl TagsView {
                             .on_click(move |_, _, cx| {
                                 v1.update(cx, |this, cx| this.open(&f1, cx)).ok();
                             })
-                            .test_support();
+                            .debug_selector(|| format!("tag-file:{i}"));
                     children.push(with_context_menu(("tag-file-menu", i), row, move |menu, _, _| {
                         let (v, f) = (v2.clone(), f2.clone());
                         let open = move |_: &mut Window, cx: &mut gpui_kit::App| {
@@ -366,12 +365,11 @@ mod ui_tests {
     use std::rc::Rc;
 
     use fuchico_core::events::CoreEvent;
-    use gpui_kit as gpui;
-    use gpui_kit::{AppContext, TestAppContext};
+    use gpui_kit::TestAppContext;
 
     use super::{TagIndex, TagsView};
     use crate::bus::{self, AppEvent};
-    use crate::ui::test_harness::{self as h, click, render, try_find};
+    use crate::test_ui;
     use crate::workspace::view::ViewEvent;
 
     fn tags(v: &TagsView) -> Option<Vec<(String, usize)>> {
@@ -381,64 +379,53 @@ mod ui_tests {
         }
     }
 
-    #[gpui::test]
+    #[gpui_kit::test]
     async fn chips_toggle_list_files_and_rescan(cx: &mut TestAppContext) {
-        h::init(cx);
+        cx.update(test_ui::init);
         let dir = tempfile::tempdir().unwrap();
         let root = std::fs::canonicalize(dir.path()).unwrap();
         std::fs::write(root.join("a.md"), "# A\n#alpha #beta\n").unwrap();
         std::fs::write(root.join("b.md"), "---\ntags: [alpha]\n---\nbody #alpha\n").unwrap();
         let root_s = root.to_string_lossy().into_owned();
-        let (win, view) = h::open(cx, |window, cx| cx.new(|cx| TagsView::new(Some(root_s.clone()), window, cx)));
+        let (mut ui, view) = test_ui::open(cx, (900., 640.), |window, cx| TagsView::new(Some(root_s.clone()), window, cx));
         let events: Rc<RefCell<Vec<ViewEvent>>> = Rc::default();
         let ev = events.clone();
         cx.update(|cx| cx.subscribe(&view, move |_, e: &ViewEvent, _| ev.borrow_mut().push(e.clone())).detach());
 
         let v = view.clone();
-        h::wait_for(cx, win, "tag index", move |_, cx| tags(v.read(cx)).is_some()).await;
+        ui.wait("tag index", move |cx| tags(v.read(cx)).is_some()).await;
         let list = cx.update(|cx| tags(view.read(cx)).unwrap());
         assert_eq!(list[0].0, "alpha");
         assert!(list.iter().any(|(t, _)| t == "beta"));
 
-        cx.update_window(win, |_, window, cx| {
-            render(window, cx);
-            assert!(try_find(window, ("tag-file", 0usize)).is_none(), "no selection yet");
-            click(window, ("tag-chip", 0usize), cx);
-            assert_eq!(view.read(cx).active(), Some("alpha"));
-            render(window, cx);
-            assert!(try_find(window, ("tag-file", 0usize)).is_some());
-            assert!(try_find(window, ("tag-file", 1usize)).is_some());
-            click(window, ("tag-file", 0usize), cx);
-            // Clicking the active chip clears it.
-            click(window, ("tag-chip", 0usize), cx);
-            assert_eq!(view.read(cx).active(), None);
-        })
-        .unwrap();
+        assert!(!ui.has("tag-file:0"), "no selection yet");
+        ui.click("tag-chip:0");
+        cx.update(|cx| assert_eq!(view.read(cx).active(), Some("alpha")));
+        assert!(ui.has("tag-file:0"));
+        assert!(ui.has("tag-file:1"));
+        ui.click("tag-file:0");
+        // Clicking the active chip clears it.
+        ui.click("tag-chip:0");
+        cx.update(|cx| assert_eq!(view.read(cx).active(), None));
         {
             let evs = events.borrow();
             assert!(matches!(evs.last(), Some(ViewEvent::OpenFile { line: None, .. })));
         }
 
         // `selectedTag` from elsewhere; re-applied after the view is hidden.
-        cx.update_window(win, |_, window, cx| {
-            view.update(cx, |v, cx| v.select_tag("beta".into(), 1, cx));
-            assert_eq!(view.read(cx).active(), Some("beta"));
-            click(window, ("tag-chip", 0usize), cx);
+        cx.update(|cx| view.update(cx, |v, cx| v.select_tag("beta".into(), 1, cx)));
+        cx.update(|cx| assert_eq!(view.read(cx).active(), Some("beta")));
+        ui.click("tag-chip:0");
+        ui.cx.update(|window, cx| {
             view.update(cx, |v, cx| crate::workspace::view::MainView::on_hide(v, window, cx));
             assert_eq!(view.read(cx).active(), Some("beta"));
-        })
-        .unwrap();
+        });
 
         // fs:file-written triggers a rescan.
         std::fs::write(root.join("c.md"), "#gamma\n").unwrap();
         let path = root.join("c.md").to_string_lossy().into_owned();
-        cx.update(|cx| {
-            bus::emit(cx, AppEvent::Core(CoreEvent::FileWritten { path, source: None }))
-        });
+        cx.update(|cx| bus::emit(cx, AppEvent::Core(CoreEvent::FileWritten { path, source: None })));
         let v = view.clone();
-        h::wait_for(cx, win, "rescan", move |_, cx| {
-            tags(v.read(cx)).is_some_and(|t| t.iter().any(|(t, _)| t == "gamma"))
-        })
-        .await;
+        ui.wait("rescan", move |cx| tags(v.read(cx)).is_some_and(|t| t.iter().any(|(t, _)| t == "gamma"))).await;
     }
 }

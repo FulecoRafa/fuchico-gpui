@@ -6,10 +6,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use fuchico_core::events::CoreEvent;
-use gpui_kit::{Entity, Point, TestAppContext, px};
+use gpui_kit::{AppContext, Entity, Point, TestAppContext, px};
 
 use super::{ExcalidrawPane, create_drawing};
 use crate::bus::{self, AppEvent};
+use crate::snapshot::SnapTheme;
 use crate::test_ui;
 use crate::workspace::pane::{PaneContext, PaneEvent};
 
@@ -111,7 +112,6 @@ async fn draw_autosave_dirty_and_external_reload(cx: &mut TestAppContext) {
 
 #[test]
 fn snapshots() {
-    let Some(_) = std::env::var_os("FUCHICO_SNAPSHOT_DIR") else { return };
     let dir = test_ui::temp_dir("excalidraw-snap");
     let path = dir.join("Snap.excalidraw");
     std::fs::write(&path, SAMPLE).unwrap();
@@ -119,8 +119,8 @@ fn snapshots() {
     for dark in [false, true] {
         let name = if dark { "excalidraw-dark" } else { "excalidraw-light" };
         let p = p.clone();
-        test_ui::snapshot(name, (900., 600.), dark, |cx| cx.run_until_parked(), move |window, cx| {
-            ExcalidrawPane::new(p, PaneContext { root: None }, window, cx)
+        crate::snapshot::snapshot(name, gpui_kit::size(px(900.), px(600.)), SnapTheme::default_mode(dark), move |window, cx| {
+            cx.new(|cx| ExcalidrawPane::new(p, PaneContext { root: None }, window, cx))
         });
     }
 }

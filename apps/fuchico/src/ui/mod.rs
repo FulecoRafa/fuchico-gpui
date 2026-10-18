@@ -6,8 +6,6 @@ pub mod context_menu;
 pub mod dialog;
 pub mod file_row_menu;
 pub mod style;
-#[cfg(test)]
-pub mod test_harness;
 pub mod toast;
 pub mod widgets;
 

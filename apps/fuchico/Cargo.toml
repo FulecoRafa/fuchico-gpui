@@ -35,8 +35,6 @@ gpui-pre = { version = "=0.3.9", features = ["test-support"] }
 # Offscreen snapshots (src/snapshot.rs): headless Metal renderer + PNG output.
 gpui-pre-platform = { version = "=0.3.9", features = ["test-support"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
-gpui-base = { version = "0.7", features = ["test-support"] }
-gpui-component = { version = "0.7", features = ["test-support"] }
 tempfile = "3"
 
 # Snapshot text system off the main thread (MacPlatform::new requires the

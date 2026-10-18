@@ -1,11 +1,9 @@
 //! Test-only helpers for headless UI tests (`#[gpui_kit::test]`): app
 //! setup, element lookup by `debug_selector`, real pointer / key dispatch
-//! through hit-testing, a bus recorder, and offscreen PNG snapshots
-//! (`HeadlessAppContext` + the Metal headless renderer — no NSWindow ever
-//! appears, nothing takes focus).
+//! through hit-testing and a bus recorder. Offscreen PNG snapshots live in
+//! [`crate::snapshot`].
 
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
 
 use gpui_kit::{
@@ -20,6 +18,8 @@ pub fn init(cx: &mut App) {
     gpui_kit::init(cx);
     crate::assets::register_fonts(cx);
     crate::settings::SettingsStore::init(crate::settings::SettingsStore::with(Default::default()), cx);
+    // The default `System` language follows the OS; tests assert English.
+    crate::i18n::set_locale(crate::i18n::Locale::En);
     crate::theme::apply::apply(crate::theme::resolve(&crate::settings::Settings::default(), true), cx);
     bus::init(cx);
 }
@@ -107,6 +107,13 @@ impl Ui {
         self.frame();
     }
 
+    /// Types `text` into the focused element.
+    pub fn type_text(&mut self, text: &str) {
+        self.cx.simulate_input(text);
+        self.cx.run_until_parked();
+        self.frame();
+    }
+
     pub fn press(&mut self, keys: &str) {
         self.cx.simulate_keystrokes(keys);
         self.cx.run_until_parked();
@@ -156,70 +163,4 @@ pub fn record(cx: &mut TestAppContext, keep: impl Fn(&AppEvent) -> bool + 'stati
             }),
         })
     })
-}
-
-/// Renders `build`'s view offscreen and writes `<FUCHICO_SNAPSHOT_DIR>/<name>.png`.
-/// A no-op unless `FUCHICO_SNAPSHOT_DIR` is set (snapshots are for humans).
-#[cfg(target_os = "macos")]
-pub fn snapshot<V: Render + 'static>(
-    name: &str,
-    (w, h): (f32, f32),
-    dark: bool,
-    settle: impl Fn(&mut gpui_kit::HeadlessAppContext),
-    build: impl FnOnce(&mut Window, &mut Context<V>) -> V,
-) {
-    let Some(dir) = std::env::var_os("FUCHICO_SNAPSHOT_DIR").map(PathBuf::from) else { return };
-    let mut cx = gpui_kit::HeadlessAppContext::with_platform(
-        Arc::new(gpui_apple::AppleTextSystem::new()),
-        Arc::new(crate::assets::Assets),
-        gpui_platform::current_headless_renderer,
-    );
-    cx.update(|cx| {
-        gpui_kit::init(cx);
-        crate::assets::register_fonts(cx);
-        let mode = if dark { crate::settings::ModePref::Dark } else { crate::settings::ModePref::Light };
-        let s = crate::settings::Settings { mode, ..Default::default() };
-        crate::settings::SettingsStore::init(crate::settings::SettingsStore::with(s.clone()), cx);
-        crate::theme::apply::apply(crate::theme::resolve(&s, dark), cx);
-        bus::init(cx);
-    });
-    let handle = cx
-        .open_window(size(px(w), px(h)), |window, cx| {
-            let th = crate::theme::AppTheme::get(cx).clone();
-            let inner = cx.new(|cx| build(window, cx));
-            cx.new(|_| Backdrop { inner: inner.into(), bg: th.colors.background, fg: th.colors.foreground })
-        })
-        .expect("headless window");
-    cx.run_until_parked();
-    settle(&mut cx);
-    for _ in 0..3 {
-        cx.run_until_parked();
-        cx.update_window(handle.into(), |_, window, _| window.refresh()).ok();
-    }
-    let img = cx.capture_screenshot(handle.into()).expect("capture");
-    std::fs::create_dir_all(&dir).unwrap();
-    img.save(dir.join(format!("{name}.png"))).expect("save png");
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn snapshot<V: Render + 'static>(
-    _: &str,
-    _: (f32, f32),
-    _: bool,
-    _: impl Fn(&mut gpui_kit::HeadlessAppContext),
-    _: impl FnOnce(&mut Window, &mut Context<V>) -> V,
-) {
-}
-
-struct Backdrop {
-    inner: gpui_kit::AnyView,
-    bg: gpui_kit::Hsla,
-    fg: gpui_kit::Hsla,
-}
-
-impl Render for Backdrop {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        use gpui_kit::prelude::*;
-        div().size_full().flex().bg(self.bg).text_color(self.fg).child(self.inner.clone())
-    }
 }
