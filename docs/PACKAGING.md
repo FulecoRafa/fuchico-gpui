@@ -76,3 +76,9 @@ deleted and a new one starts.
   - the save dialogs pre-fill a name with the right extension;
   - a missing `.html` or `.css` extension is added after the dialog returns;
   - theme import rejects files that are not `.css`, with an error.
+- **Zoom keys and the numpad:** the original matched physical keys (`e.code`: `Equal` /
+  `NumpadAdd`, `Minus` / `NumpadSubtract`, `Digit0` / `Numpad0`) with `ctrlKey || metaKey`.
+  gpui reports characters, not key codes. Numpad- and Numpad0 arrive as `-` and `0`, so
+  they work. But on macOS, Cmd+Numpad+ arrives as `cmd-+`, the same keystroke as
+  Cmd-Shift-=. It therefore zooms the UI, not the editor font. Ctrl works as Mod on
+  macOS as in the original.

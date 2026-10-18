@@ -1,5 +1,6 @@
 //! The macOS application menu (other platforms get the same actions via
-//! key bindings only).
+//! key bindings only). It extends the original's default Tauri menu
+//! (App / File / Edit / View / Window) with the port's own entries.
 
 use gpui_kit::{App, Menu, MenuItem, SystemMenuType};
 
@@ -26,6 +27,7 @@ pub fn app_menus() -> Vec<Menu> {
             MenuItem::separator(),
             MenuItem::action("Close Window", CloseWindow),
         ]),
+        super::edit_menu::menu(),
         Menu::new("View").items([
             MenuItem::action("Command Palette", CommandPalette),
             MenuItem::action("Go to File", QuickOpen),
@@ -40,8 +42,16 @@ pub fn app_menus() -> Vec<Menu> {
             MenuItem::action("Zoom Out", EditorZoomOut),
             MenuItem::action("Actual Size", EditorZoomReset),
             MenuItem::action("Toggle Light/Dark", ToggleTheme),
+            // AppKit appends "Enter Full Screen" to the View menu itself
+            // (the original's Fullscreen item).
         ]),
-        Menu::new("Window").items([MenuItem::action("Minimize", Minimize), MenuItem::action("Zoom", Zoom)]),
+        // The original's Window menu: Minimize, Maximize, separator, Close Window.
+        Menu::new("Window").items([
+            MenuItem::action("Minimize", Minimize),
+            MenuItem::action("Zoom", Zoom),
+            MenuItem::separator(),
+            MenuItem::action("Close Window", CloseWindow),
+        ]),
     ]
 }
 

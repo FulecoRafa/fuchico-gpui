@@ -327,7 +327,9 @@ pub fn bind_global_keys(cx: &mut App) {
     let m = if IS_MAC { "cmd" } else { "ctrl" };
     let k = |s: &str| s.replace("MOD", m);
     let mut bindings = vec![
-        // Editor font size: Mod = / - / 0 (and numpad).
+        // Editor font size: Mod = / - / 0. gpui reports characters, not
+        // physical keys, so Numpad- / Numpad0 arrive as `-` / `0` and match
+        // these; Numpad+ arrives as `+` (see docs/PACKAGING.md).
         KeyBinding::new(&k("MOD-="), EditorZoomIn, None),
         KeyBinding::new(&k("MOD--"), EditorZoomOut, None),
         KeyBinding::new(&k("MOD-0"), EditorZoomReset, None),
@@ -352,6 +354,16 @@ pub fn bind_global_keys(cx: &mut App) {
             KeyBinding::new("cmd-+", UiZoomIn, None),
             KeyBinding::new("cmd-_", UiZoomOut, None),
             KeyBinding::new("cmd-)", UiZoomReset, None),
+            // The original's zoom listener takes `ctrlKey || metaKey`.
+            KeyBinding::new("ctrl-=", EditorZoomIn, None),
+            KeyBinding::new("ctrl--", EditorZoomOut, None),
+            KeyBinding::new("ctrl-0", EditorZoomReset, None),
+            KeyBinding::new("ctrl-shift-=", UiZoomIn, None),
+            KeyBinding::new("ctrl-+", UiZoomIn, None),
+            KeyBinding::new("ctrl-shift--", UiZoomOut, None),
+            KeyBinding::new("ctrl-_", UiZoomOut, None),
+            KeyBinding::new("ctrl-shift-0", UiZoomReset, None),
+            KeyBinding::new("ctrl-)", UiZoomReset, None),
             KeyBinding::new("cmd-q", Quit, None),
             KeyBinding::new("cmd-h", Hide, None),
             KeyBinding::new("cmd-alt-h", HideOthers, None),

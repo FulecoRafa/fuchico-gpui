@@ -1,10 +1,13 @@
 //! Windows: the main window, single-file editor windows, geometry, the app
 //! menu, single-instance forwarding and the OS open-file queue.
 
+pub mod edit_menu;
 pub mod editor_window;
 pub mod geometry;
 pub mod menu;
 pub mod single_instance;
+#[cfg(test)]
+mod ui_tests;
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -174,6 +177,7 @@ pub fn register_global_actions(cx: &mut App) {
     cx.on_action(|_: &Minimize, cx| with_active(cx, |w, _| w.minimize_window()));
     cx.on_action(|_: &Zoom, cx| with_active(cx, |w, _| w.zoom_window()));
     cx.on_action(|_: &CloseWindow, cx| with_active(cx, |w, _| w.remove_window()));
+    edit_menu::register(cx);
     cx.on_action(|_: &About, cx| {
         with_active(cx, |w, cx| {
             crate::ui::toast_info(w, cx, format!("Fuchico {}", env!("CARGO_PKG_VERSION")))

@@ -43,6 +43,13 @@ gpui_kit::actions!(
         ToggleDock,
         // Editor
         Save,
+        // Edit menu (forwarded to the focused editor / input)
+        MenuUndo,
+        MenuRedo,
+        MenuCut,
+        MenuCopy,
+        MenuPaste,
+        MenuSelectAll,
     ]
 );
 
