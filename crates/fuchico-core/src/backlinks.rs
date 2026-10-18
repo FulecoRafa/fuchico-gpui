@@ -16,8 +16,8 @@ pub struct BacklinkGroup {
 }
 
 /// Groups every link that resolves to `target_path` by the note it lives in.
-/// Groups are sorted by path (JS `localeCompare` approximated by a
-/// case-insensitive compare with a byte-order tiebreak).
+/// Groups are sorted by path with JS `localeCompare` semantics (see
+/// [`crate::collate`]); the sort is stable, like `Array.prototype.sort`.
 pub fn backlinks_for<S: AsRef<str>>(refs: &[LinkRef], target_path: &str, vault_files: &[S]) -> Vec<BacklinkGroup> {
     let mut groups: Vec<BacklinkGroup> = Vec::new();
     for r in refs {
@@ -43,7 +43,7 @@ pub fn backlinks_for<S: AsRef<str>>(refs: &[LinkRef], target_path: &str, vault_f
             list.push(Backlink { line: r.line, context: r.context.clone() });
         }
     }
-    groups.sort_by(|a, b| a.path.to_lowercase().cmp(&b.path.to_lowercase()).then_with(|| a.path.cmp(&b.path)));
+    groups.sort_by(|a, b| crate::collate::locale_compare(&a.path, &b.path));
     groups
 }
 
@@ -73,5 +73,14 @@ mod tests {
                 BacklinkGroup { path: "/v/c.md".into(), refs: vec![Backlink { line: 1, context: "y".into() }] },
             ]
         );
+    }
+
+    #[test]
+    fn groups_sort_like_js_locale_compare() {
+        let files = ["/v/t.md"];
+        let sources = ["/v/eb.md", "/v/~x.md", "/v/A.md", "/v/éa.md", "/v/a.md", "/v/B.md"];
+        let refs: Vec<_> = sources.iter().map(|p| lr(p, 1, "t", LinkKind::Wiki, "")).collect();
+        let order: Vec<_> = backlinks_for(&refs, "/v/t.md", &files).into_iter().map(|g| g.path).collect();
+        assert_eq!(order, vec!["/v/~x.md", "/v/a.md", "/v/A.md", "/v/B.md", "/v/éa.md", "/v/eb.md"]);
     }
 }

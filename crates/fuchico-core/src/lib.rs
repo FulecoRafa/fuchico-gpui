@@ -5,6 +5,7 @@ pub mod agenda;
 pub mod attachments;
 pub mod backlinks;
 pub mod caldav;
+pub mod collate;
 pub mod doc_stats;
 pub mod editor_window;
 pub mod events;
