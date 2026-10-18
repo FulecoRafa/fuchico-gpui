@@ -2347,6 +2347,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
+ "dirs 6.0.0",
  "fuchico-core",
  "fuchico-editor",
  "fuchico-excalidraw",
