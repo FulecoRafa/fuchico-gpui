@@ -147,6 +147,11 @@ impl Workspace {
         self.view
     }
 
+    #[cfg(test)]
+    pub fn explorer(&self) -> &Entity<Explorer> {
+        &self.explorer
+    }
+
     // ----- vault lifecycle -------------------------------------------------
 
     /// `fs_stat(lastRootPath)` off the UI thread; renders an empty layout
@@ -188,7 +193,9 @@ impl Workspace {
         }
         self.root = root.clone();
         self.watcher = None;
-        if let Some(dir) = root.clone() {
+        // No watcher under `cargo test`: its thread would trip gpui's
+        // deterministic test scheduler (tests emit fs:changed themselves).
+        if let Some(dir) = root.clone().filter(|_| !cfg!(test)) {
             let start = cx.background_spawn(async move {
                 let res = VaultWatcher::start(&dir, bus::sink());
                 (dir, res)
@@ -589,7 +596,22 @@ impl Workspace {
             None => area.child(crate::ui::empty_state(crate::t!(AppNoFileOpen), cx)),
             Some(p) => {
                 let view = p.handle.view();
-                area.child(self.render_tab_bar(cx)).child(div().flex_1().min_h_0().child(view))
+                // Explorer rows dropped on the editor insert links.
+                let drop_bg = crate::theme::alpha(AppTheme::get(cx).colors.accent, 0.25);
+                let drop = cx.listener(|this, paths: &crate::explorer::DraggedPaths, window, cx| {
+                    if let Some(p) = &this.pane {
+                        p.handle.insert_dropped_paths(&paths.0, window, cx);
+                    }
+                });
+                area.child(self.render_tab_bar(cx)).child(
+                    div()
+                        .id("editor-drop")
+                        .flex_1()
+                        .min_h_0()
+                        .drag_over::<crate::explorer::DraggedPaths>(move |s, _, _, _| s.bg(drop_bg))
+                        .on_drop(drop)
+                        .child(view),
+                )
             }
         }
     }

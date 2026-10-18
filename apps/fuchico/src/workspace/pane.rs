@@ -49,6 +49,9 @@ pub trait PaneItem: Render + Focusable + EventEmitter<PaneEvent> + Sized + 'stat
     fn is_dirty(&self) -> bool {
         false
     }
+    /// Explorer paths dropped onto the pane (`PATH_DRAG_TYPE`): the editor
+    /// inserts links via `attachments::drop_insert_text`. Default: ignored.
+    fn insert_dropped_paths(&mut self, _paths: &[String], _window: &mut Window, _cx: &mut Context<Self>) {}
 }
 
 trait ErasedPane {
@@ -59,6 +62,7 @@ trait ErasedPane {
     fn reveal_line(&self, line: u32, window: &mut Window, cx: &mut App);
     fn save(&self, window: &mut Window, cx: &mut App);
     fn is_dirty(&self, cx: &App) -> bool;
+    fn insert_dropped_paths(&self, paths: &[String], window: &mut Window, cx: &mut App);
 }
 
 impl<T: PaneItem> ErasedPane for Entity<T> {
@@ -82,6 +86,9 @@ impl<T: PaneItem> ErasedPane for Entity<T> {
     }
     fn is_dirty(&self, cx: &App) -> bool {
         self.read(cx).is_dirty()
+    }
+    fn insert_dropped_paths(&self, paths: &[String], window: &mut Window, cx: &mut App) {
+        self.update(cx, |p, cx| p.insert_dropped_paths(paths, window, cx));
     }
 }
 
@@ -123,6 +130,9 @@ impl PaneHandle {
     }
     pub fn is_dirty(&self, cx: &App) -> bool {
         self.inner.is_dirty(cx)
+    }
+    pub fn insert_dropped_paths(&self, paths: &[String], window: &mut Window, cx: &mut App) {
+        self.inner.insert_dropped_paths(paths, window, cx);
     }
 }
 
