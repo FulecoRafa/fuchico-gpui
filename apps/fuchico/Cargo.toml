@@ -1,0 +1,9 @@
+[package]
+name = "fuchico"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+gpui-kit.workspace = true

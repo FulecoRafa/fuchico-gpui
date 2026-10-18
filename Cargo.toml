@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = ["apps/*", "crates/*"]
+default-members = ["apps/fuchico"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+fuchico-core = { path = "crates/fuchico-core" }
+fuchico-helix = { path = "crates/fuchico-helix" }
+fuchico-markdown = { path = "crates/fuchico-markdown" }
+gpui-kit = "0.7"
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ropey = "1.6"
+regex = "1"
+log = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
