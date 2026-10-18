@@ -439,10 +439,10 @@ impl CalDavClient {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
-    const PRINCIPAL_RESPONSE: &str = r#"<?xml version="1.0" encoding="utf-8"?>
+    pub(crate) const PRINCIPAL_RESPONSE: &str = r#"<?xml version="1.0" encoding="utf-8"?>
 <multistatus xmlns="DAV:">
   <response>
     <href>/1234567/principal/</href>
@@ -457,7 +457,7 @@ mod tests {
   </response>
 </multistatus>"#;
 
-    const HOME_SET_RESPONSE: &str = r#"<?xml version="1.0" encoding="utf-8"?>
+    pub(crate) const HOME_SET_RESPONSE: &str = r#"<?xml version="1.0" encoding="utf-8"?>
 <multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
   <response>
     <href>/1234567/principal/</href>
@@ -472,7 +472,7 @@ mod tests {
   </response>
 </multistatus>"#;
 
-    const CALENDAR_LIST_RESPONSE: &str = r#"<?xml version="1.0" encoding="utf-8"?>
+    pub(crate) const CALENDAR_LIST_RESPONSE: &str = r#"<?xml version="1.0" encoding="utf-8"?>
 <multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
   <response>
     <href>/1234567/calendars/</href>
