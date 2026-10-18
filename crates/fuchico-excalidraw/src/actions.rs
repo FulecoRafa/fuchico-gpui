@@ -834,7 +834,8 @@ impl ExcalidrawView {
     }
 }
 
-/// Excalidraw's colour palette (open-color shades 0/2/4/6/8 per hue).
+/// Excalidraw's colour palette (open-color shades 0/2/4/6/8 per hue), in
+/// the stock picker's grid order (top picks, then `COMMON_ELEMENT_SHADES`).
 pub const PALETTE: [(&str, [&str; 5]); 15] = [
     ("transparent", ["transparent"; 5]),
     ("white", ["#ffffff"; 5]),
@@ -848,36 +849,32 @@ pub const PALETTE: [(&str, [&str; 5]); 15] = [
         ["#f8f1ee", "#eaddd7", "#d2bab0", "#a18072", "#846358"],
     ),
     (
-        "red",
-        ["#fff5f5", "#ffc9c9", "#ff8787", "#fa5252", "#e03131"],
-    ),
-    (
-        "pink",
-        ["#fff0f6", "#fcc2d7", "#f783ac", "#e64980", "#c2255c"],
-    ),
-    (
-        "grape",
-        ["#f8f0fc", "#eebefa", "#da77f2", "#be4bdb", "#9c36b5"],
-    ),
-    (
-        "violet",
-        ["#f3f0ff", "#d0bfff", "#9775fa", "#7950f2", "#6741d9"],
+        "cyan",
+        ["#e3fafc", "#99e9f2", "#3bc9db", "#15aabf", "#0c8599"],
     ),
     (
         "blue",
         ["#e7f5ff", "#a5d8ff", "#4dabf7", "#228be6", "#1971c2"],
     ),
     (
-        "cyan",
-        ["#e3fafc", "#99e9f2", "#3bc9db", "#15aabf", "#0c8599"],
+        "violet",
+        ["#f3f0ff", "#d0bfff", "#9775fa", "#7950f2", "#6741d9"],
     ),
     (
-        "teal",
-        ["#e6fcf5", "#96f2d7", "#38d9a9", "#12b886", "#099268"],
+        "grape",
+        ["#f8f0fc", "#eebefa", "#da77f2", "#be4bdb", "#9c36b5"],
+    ),
+    (
+        "pink",
+        ["#fff0f6", "#fcc2d7", "#f783ac", "#e64980", "#c2255c"],
     ),
     (
         "green",
         ["#ebfbee", "#b2f2bb", "#69db7c", "#40c057", "#2f9e44"],
+    ),
+    (
+        "teal",
+        ["#e6fcf5", "#96f2d7", "#38d9a9", "#12b886", "#099268"],
     ),
     (
         "yellow",
@@ -886,6 +883,10 @@ pub const PALETTE: [(&str, [&str; 5]); 15] = [
     (
         "orange",
         ["#fff4e6", "#ffd8a8", "#ffa94d", "#fd7e14", "#e8590c"],
+    ),
+    (
+        "red",
+        ["#fff5f5", "#ffc9c9", "#ff8787", "#fa5252", "#e03131"],
     ),
 ];
 

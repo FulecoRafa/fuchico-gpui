@@ -2785,7 +2785,9 @@ impl ExcalidrawView {
                 );
             }
             Tool::Image => {
-                return Some("Click to place the image, or click and drag to set its size manually");
+                return Some(
+                    "Click to place the image, or click and drag to set its size manually",
+                );
             }
             Tool::Eraser => return None,
             Tool::Hand | Tool::Rectangle | Tool::Diamond | Tool::Ellipse | Tool::Frame => {

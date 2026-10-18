@@ -332,7 +332,9 @@ fn colour_picker_palette_shades_hex(cx: &mut TestAppContext) {
     assert_eq!(h.of("rectangle")[0]["strokeColor"], "#ffc9c9");
     h.button("pk-shade-4");
     assert_eq!(h.of("rectangle")[0]["strokeColor"], "#fa5252");
-    h.press("f"); // violet (q w e r t / a s d f g / z x c v b)
+    h.press("f"); // grape (stock order: q w e r t / a s d f g / z x c v b)
+    assert_eq!(h.of("rectangle")[0]["strokeColor"], "#9c36b5");
+    h.press("d"); // violet
     assert_eq!(h.of("rectangle")[0]["strokeColor"], "#6741d9");
     assert_eq!(
         h.cx.update(|_, cx| h.view.read(cx).tool()),
