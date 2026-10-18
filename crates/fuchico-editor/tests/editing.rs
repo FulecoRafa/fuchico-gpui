@@ -30,7 +30,10 @@ async fn typing_modes_and_pending(cx: &mut TestAppContext) {
     // Undo is helix `u`.
     ui.press("u");
     assert_eq!(ui.text(), "hello\nworld\n");
-    let changed = ui.events().iter().any(|e| matches!(e, EditorEvent::Changed { dirty: true }));
+    let changed = ui
+        .events()
+        .iter()
+        .any(|e| matches!(e, EditorEvent::Changed { dirty: true }));
     assert!(changed);
 }
 
@@ -39,10 +42,16 @@ async fn block_cursor_in_normal_bar_in_insert(cx: &mut TestAppContext) {
     let mut ui = open(cx, "hello\n", EditorOptions::default());
     let c = ui.read(|v, _| v.debug_cursors());
     assert_eq!(c.len(), 1);
-    assert!(c[0].0.size.width > px(4.), "block cursor in normal mode: {c:?}");
+    assert!(
+        c[0].0.size.width > px(4.),
+        "block cursor in normal mode: {c:?}"
+    );
     ui.press("i");
     let c = ui.read(|v, _| v.debug_cursors());
-    assert!(c[0].0.size.width <= px(2.), "bar cursor in insert mode: {c:?}");
+    assert!(
+        c[0].0.size.width <= px(2.),
+        "bar cursor in insert mode: {c:?}"
+    );
     // Option: block in insert mode too.
     ui.update(|v, _, cx| {
         let mut o = v.options().clone();
@@ -69,7 +78,11 @@ async fn multiple_selections_type_everywhere(cx: &mut TestAppContext) {
 
 #[gpui_kit::test]
 async fn click_drag_and_shift_click(cx: &mut TestAppContext) {
-    let mut ui = open(cx, "alpha beta gamma\nsecond line\n", EditorOptions::default());
+    let mut ui = open(
+        cx,
+        "alpha beta gamma\nsecond line\n",
+        EditorOptions::default(),
+    );
     // Normal mode is block-cursor: the clicked char is selected (6..7).
     let p = ui.char_point(6);
     ui.click(p, Modifiers::none());
@@ -98,7 +111,9 @@ async fn ime_marked_text_then_commit(cx: &mut TestAppContext) {
     ui.press("i");
     ui.update(|v, w, cx| {
         let end = 4;
-        let fx = v.engine_mut().set_selection(fuchico_helix::Selection::single(end, end));
+        let fx = v
+            .engine_mut()
+            .set_selection(fuchico_helix::Selection::single(end, end));
         v.apply_effects(fx, cx);
         v.replace_and_mark_text_in_range(None, "´", None, w, cx);
     });
@@ -121,7 +136,11 @@ async fn ime_marked_text_then_commit(cx: &mut TestAppContext) {
 
 #[gpui_kit::test]
 async fn set_text_keeps_selection_and_marks_saved(cx: &mut TestAppContext) {
-    let mut ui = open(cx, "line one\nline two\nline three\n", EditorOptions::default());
+    let mut ui = open(
+        cx,
+        "line one\nline two\nline three\n",
+        EditorOptions::default(),
+    );
     ui.update(|v, _, cx| v.set_selection(14, 14, cx));
     ui.press("i");
     ui.type_text("X");
@@ -130,5 +149,9 @@ async fn set_text_keeps_selection_and_marks_saved(cx: &mut TestAppContext) {
     ui.update(|v, _, cx| v.set_text("PREFIX\nline one\nline two\nline three\n", cx));
     assert!(!ui.read(|v, _| v.is_dirty()));
     assert_eq!(ui.head(), 14 + 7);
-    assert!(ui.events().iter().any(|e| matches!(e, EditorEvent::DirtyChanged(false))));
+    assert!(
+        ui.events()
+            .iter()
+            .any(|e| matches!(e, EditorEvent::DirtyChanged(false)))
+    );
 }
