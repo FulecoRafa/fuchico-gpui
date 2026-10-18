@@ -30,7 +30,6 @@ use gpui_kit::{AnyElement, Context, Entity, FocusHandle, Focusable, Subscription
 pub use command_palette::CommandPalette;
 pub use commands::{CommandAction, CommandContext};
 pub use quick_switcher::QuickSwitcher;
-#[allow(unused_imports)] // Embedded by the settings view's Shortcuts section.
 pub use shortcuts::ShortcutsList;
 
 use crate::workspace::Workspace;

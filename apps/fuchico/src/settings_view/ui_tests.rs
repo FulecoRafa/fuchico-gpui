@@ -188,6 +188,8 @@ async fn settings_nav_search_toggles_rulers_themes_and_caldav(cx: &mut TestAppCo
     // ---- shortcuts slot / about ------------------------------------------------
     ui.click("settings-nav-shortcuts");
     assert!(ui.has("settings-shortcuts-slot"));
+    // The palette's ShortcutsList is mounted there, with its rebindable chips.
+    assert!(ui.has("shortcut-key-insertTable"));
     ui.click("settings-nav-about");
     assert!(ui.has("settings-about-github"));
 }

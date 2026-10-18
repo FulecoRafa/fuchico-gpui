@@ -64,6 +64,7 @@ pub struct SettingsView {
     editor: editor::State,
     vault: vault::State,
     caldav: integrations::State,
+    shortcuts: Entity<crate::palette::ShortcutsList>,
     _subs: Vec<Subscription>,
 }
 
@@ -79,7 +80,8 @@ impl SettingsView {
         let editor = editor::State::new(window, cx, &mut subs);
         let vault = vault::State::new(window, cx, &mut subs);
         let caldav = integrations::State::new(root.clone(), window, cx, &mut subs);
-        let mut view = SettingsView { root, query, appearance, editor, vault, caldav, _subs: subs };
+        let shortcuts = cx.new(|cx| crate::palette::ShortcutsList::new(window, cx));
+        let mut view = SettingsView { root, query, appearance, editor, vault, caldav, shortcuts, _subs: subs };
         view.load_fonts(window, cx);
         view.refresh_caldav(cx);
         view
