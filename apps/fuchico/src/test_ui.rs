@@ -177,8 +177,8 @@ pub fn snapshot<V: Render + 'static>(
     cx.update(|cx| {
         gpui_kit::init(cx);
         crate::assets::register_fonts(cx);
-        let mut s = crate::settings::Settings::default();
-        s.mode = if dark { crate::settings::ModePref::Dark } else { crate::settings::ModePref::Light };
+        let mode = if dark { crate::settings::ModePref::Dark } else { crate::settings::ModePref::Light };
+        let s = crate::settings::Settings { mode, ..Default::default() };
         crate::settings::SettingsStore::init(crate::settings::SettingsStore::with(s.clone()), cx);
         crate::theme::apply::apply(crate::theme::resolve(&s, dark), cx);
         bus::init(cx);

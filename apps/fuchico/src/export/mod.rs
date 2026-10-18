@@ -146,12 +146,13 @@ fn outcome(window: &mut Window, cx: &mut App, res: &Result<PathBuf, String>, off
                 })
                 .detach();
             } else {
-                let _ = window.prompt(PromptLevel::Info, &msg, None, &["OK"], cx);
+                // The answer is irrelevant; the dialog stays up until dismissed.
+                drop(window.prompt(PromptLevel::Info, &msg, None, &["OK"], cx));
             }
         }
         Err(e) => {
             let msg = t!(ExportFailed, message = e);
-            let _ = window.prompt(PromptLevel::Critical, &msg, None, &["OK"], cx);
+            drop(window.prompt(PromptLevel::Critical, &msg, None, &["OK"], cx));
         }
     }
 }

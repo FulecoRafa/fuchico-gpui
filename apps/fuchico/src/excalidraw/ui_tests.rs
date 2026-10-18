@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use fuchico_core::events::CoreEvent;
-use gpui_kit::{AppContext, Entity, Point, TestAppContext, px};
+use gpui_kit::{Entity, Point, TestAppContext, px};
 
 use super::{ExcalidrawPane, create_drawing};
 use crate::bus::{self, AppEvent};

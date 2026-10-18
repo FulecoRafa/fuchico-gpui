@@ -166,7 +166,7 @@ impl ExcalidrawPane {
                                 this.save_failed = true;
                                 this.set_dirty(true, cx);
                             });
-                            let _ = cx.update(|cx| {
+                            cx.update(|cx| {
                                 if let Some(w) = cx.active_window() {
                                     let _ = w.update(cx, |_, window, cx| {
                                         crate::ui::toast::toast_error(
