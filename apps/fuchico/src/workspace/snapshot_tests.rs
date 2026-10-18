@@ -13,7 +13,15 @@ use crate::snapshot::{SnapTheme, copy_vault, snapshot_with};
 const DEMO_NOTES: &str = "/Users/fuleco/Documents/Dev/obsidian-helix/demo-notes";
 
 /// Same logical size as the original screenshots (3600x2260 @2x).
-fn shot(name: &str, prepare: impl FnOnce(&mut Workspace, String, &mut gpui_kit::Window, &mut gpui_kit::Context<Workspace>) + 'static) {
+fn shot(
+    name: &str,
+    prepare: impl FnOnce(
+        &mut Workspace,
+        String,
+        &mut gpui_kit::Window,
+        &mut gpui_kit::Context<Workspace>,
+    ) + 'static,
+) {
     let src = std::path::Path::new(DEMO_NOTES);
     if !src.is_dir() {
         eprintln!("skipping {name}: {DEMO_NOTES} not found");
@@ -22,7 +30,10 @@ fn shot(name: &str, prepare: impl FnOnce(&mut Workspace, String, &mut gpui_kit::
     // Nested so the explorer header reads "demo-notes" like the original.
     let vault = copy_vault(src, &format!("{name}/demo-notes"));
     // The demo notes carry no tags; give the copy a couple so Tags has content.
-    for (file, tags) in [("project-launch.md", "#launch #planning"), ("personal.md", "#personal #planning")] {
+    for (file, tags) in [
+        ("project-launch.md", "#launch #planning"),
+        ("personal.md", "#personal #planning"),
+    ] {
         let p = vault.join(file);
         let text = std::fs::read_to_string(&p).unwrap_or_default();
         std::fs::write(&p, format!("{text}\n{tags}\n")).unwrap();
@@ -65,19 +76,30 @@ fn snapshot_tags_selected() {
 
 #[test]
 fn snapshot_settings_appearance() {
-    shot("settings-appearance-ayu-dark", |ws, _, window, cx| ws.open_settings(SettingsSection::Appearance, window, cx));
+    shot("settings-appearance-ayu-dark", |ws, _, window, cx| {
+        ws.open_settings(SettingsSection::Appearance, window, cx)
+    });
 }
 
 #[test]
 fn snapshot_settings_editor() {
-    shot("settings-editor-ayu-dark", |ws, _, window, cx| ws.open_settings(SettingsSection::Editor, window, cx));
+    shot("settings-editor-ayu-dark", |ws, _, window, cx| {
+        ws.open_settings(SettingsSection::Editor, window, cx)
+    });
 }
 
 #[test]
 fn snapshot_palette_open() {
     shot("palette-ayu-dark", |ws, vault, window, cx| {
         ws.open_file(format!("{vault}/project-launch.md"), None, window, cx);
-        crate::palette::open(ws, PaletteKind::Commands { query: String::new() }, window, cx);
+        crate::palette::open(
+            ws,
+            PaletteKind::Commands {
+                query: String::new(),
+            },
+            window,
+            cx,
+        );
     });
 }
 
@@ -91,6 +113,11 @@ fn snapshot_editor() {
 #[test]
 fn snapshot_excalidraw_pane() {
     shot("excalidraw-pane-ayu-dark", |ws, vault, window, cx| {
-        ws.open_file(format!("{vault}/desenhos/Desenho.excalidraw"), None, window, cx);
+        ws.open_file(
+            format!("{vault}/desenhos/Desenho.excalidraw"),
+            None,
+            window,
+            cx,
+        );
     });
 }

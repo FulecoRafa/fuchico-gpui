@@ -5,9 +5,9 @@
 
 use std::ops::Range;
 
-use crate::syntax::{NodeKind, Parsed};
-use crate::text::{map_pos, Assoc, LineIndex, TextEdit};
 use crate::MarkdownModel;
+use crate::syntax::{NodeKind, Parsed};
+use crate::text::{Assoc, LineIndex, TextEdit, map_pos};
 
 /// What a folded range shows in place of its content.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,7 +73,11 @@ impl FoldState {
 
     /// Outermost fold containing `pos` strictly inside.
     pub fn covering(&self, pos: usize) -> Option<Range<usize>> {
-        self.ranges.iter().filter(|r| r.start < pos && pos <= r.end).max_by_key(|r| r.end - r.start).cloned()
+        self.ranges
+            .iter()
+            .filter(|r| r.start < pos && pos <= r.end)
+            .max_by_key(|r| r.end - r.start)
+            .cloned()
     }
 
     /// Maps the folds through an edit (deleted folds are dropped), like
@@ -100,7 +104,13 @@ impl FoldState {
 }
 
 /// Region fold service (`regionFolding.ts`).
-pub(crate) fn region_fold(text: &str, idx: &LineIndex, line: usize, start: &str, end: &str) -> Option<Range<usize>> {
+pub(crate) fn region_fold(
+    text: &str,
+    idx: &LineIndex,
+    line: usize,
+    start: &str,
+    end: &str,
+) -> Option<Range<usize>> {
     if start.trim().is_empty() || end.trim().is_empty() {
         return None;
     }
@@ -129,15 +139,18 @@ fn heading_fold(p: &Parsed, idx: &LineIndex, line: usize) -> Option<Range<usize>
     let end = idx.line_end(line);
     for &id in &p.line_nodes[line] {
         let n = &p.nodes[id as usize];
-        let NodeKind::Heading { level, .. } = n.kind else { continue };
+        let NodeKind::Heading { level, .. } = n.kind else {
+            continue;
+        };
         let parent = &p.nodes[n.parent?];
         let pos = parent.children.iter().position(|c| *c == id as usize)?;
         let mut last = id as usize;
         for &sib in &parent.children[pos + 1..] {
             if let NodeKind::Heading { level: l2, .. } = p.nodes[sib].kind
-                && l2 <= level {
-                    break;
-                }
+                && l2 <= level
+            {
+                break;
+            }
             last = sib;
         }
         let upto = p.nodes[last].range.end;
@@ -169,9 +182,15 @@ impl MarkdownModel {
             return None;
         }
         let s = &self.settings;
-        region_fold(&self.text, &self.lines, line, &s.fold_start_marker, &s.fold_end_marker)
-            .or_else(|| heading_fold(&self.parsed, &self.lines, line))
-            .or_else(|| syntax_fold(&self.parsed, &self.lines, line))
+        region_fold(
+            &self.text,
+            &self.lines,
+            line,
+            &s.fold_start_marker,
+            &s.fold_end_marker,
+        )
+        .or_else(|| heading_fold(&self.parsed, &self.lines, line))
+        .or_else(|| syntax_fold(&self.parsed, &self.lines, line))
     }
 
     /// `foldAll`: every foldable range, scanning top-down and skipping the
@@ -196,7 +215,12 @@ impl MarkdownModel {
     /// anything changed.
     pub fn toggle_fold(&self, folds: &mut FoldState, line: usize) -> bool {
         let lr = self.lines.line_range(line);
-        if let Some(r) = folds.ranges.iter().find(|r| r.start >= lr.start && r.start <= lr.end).cloned() {
+        if let Some(r) = folds
+            .ranges
+            .iter()
+            .find(|r| r.start >= lr.start && r.start <= lr.end)
+            .cloned()
+        {
             folds.ranges.retain(|x| *x != r);
             return true;
         }
@@ -223,7 +247,11 @@ impl MarkdownModel {
         let name = t[marker.len()..].trim();
         let end_line = self.lines.line_of(range.end);
         FoldPlaceholder::Region {
-            name: if name.is_empty() { "Region".into() } else { name.into() },
+            name: if name.is_empty() {
+                "Region".into()
+            } else {
+                name.into()
+            },
             line_count: end_line.saturating_sub(start_line + 1),
         }
     }
@@ -264,7 +292,13 @@ fn indent_width(s: &str, tab: usize) -> Option<usize> {
 }
 
 /// Fold range for 0-based `line` of a code file.
-pub fn code_foldable(text: &str, idx: &LineIndex, line: usize, style: CodeFoldStyle, tab_size: usize) -> Option<Range<usize>> {
+pub fn code_foldable(
+    text: &str,
+    idx: &LineIndex,
+    line: usize,
+    style: CodeFoldStyle,
+    tab_size: usize,
+) -> Option<Range<usize>> {
     let lr = idx.line_range(line);
     match style {
         CodeFoldStyle::Indent => {
@@ -356,11 +390,17 @@ mod tests {
     fn brackets_and_indent() {
         let t = "fn a() {\n  x;\n}\n";
         let idx = LineIndex::new(t);
-        assert_eq!(code_foldable(t, &idx, 0, CodeFoldStyle::Brackets, 4), Some(8..14));
+        assert_eq!(
+            code_foldable(t, &idx, 0, CodeFoldStyle::Brackets, 4),
+            Some(8..14)
+        );
         assert_eq!(code_foldable(t, &idx, 1, CodeFoldStyle::Brackets, 4), None);
         let p = "def f():\n    a\n\n    b\nc\n";
         let idx = LineIndex::new(p);
-        assert_eq!(code_foldable(p, &idx, 0, CodeFoldStyle::Indent, 4), Some(8..21));
+        assert_eq!(
+            code_foldable(p, &idx, 0, CodeFoldStyle::Indent, 4),
+            Some(8..21)
+        );
     }
 
     #[test]

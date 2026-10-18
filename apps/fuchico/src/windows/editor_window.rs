@@ -26,19 +26,36 @@ pub struct EditorWindow {
 /// `"● " + basename` when dirty.
 pub fn window_title(path: &str, dirty: bool) -> String {
     let name = basename(path);
-    if dirty { format!("● {name}") } else { name.to_string() }
+    if dirty {
+        format!("● {name}")
+    } else {
+        name.to_string()
+    }
 }
 
 impl EditorWindow {
-    pub fn new(path: String, root: Option<String>, label: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        path: String,
+        root: Option<String>,
+        label: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let pane = Self::mount(&path, &root, window, cx);
         pane.focus(window, cx);
         let subs = vec![
             crate::windows::geometry::track(label.clone(), window, cx),
             cx.observe_window_appearance(window, |_, _, cx| crate::theme::apply::refresh(cx)),
         ];
-        let this =
-            EditorWindow { label, root, path, dirty: false, pane, focus: cx.focus_handle(), _subs: subs };
+        let this = EditorWindow {
+            label,
+            root,
+            path,
+            dirty: false,
+            pane,
+            focus: cx.focus_handle(),
+            _subs: subs,
+        };
         this.update_title(window);
         this
     }
@@ -47,10 +64,22 @@ impl EditorWindow {
         &self.label
     }
 
-    fn mount(path: &str, root: &Option<String>, window: &mut Window, cx: &mut Context<Self>) -> PaneHandle {
-        open_pane(path, PaneContext { root: root.clone(), in_window: true }, window, cx, |this: &mut EditorWindow, ev, window, cx| {
-            this.on_pane_event(ev, window, cx)
-        })
+    fn mount(
+        path: &str,
+        root: &Option<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> PaneHandle {
+        open_pane(
+            path,
+            PaneContext {
+                root: root.clone(),
+                in_window: true,
+            },
+            window,
+            cx,
+            |this: &mut EditorWindow, ev, window, cx| this.on_pane_event(ev, window, cx),
+        )
     }
 
     fn update_title(&self, window: &mut Window) {

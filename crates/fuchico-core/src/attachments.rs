@@ -13,7 +13,8 @@ static SANITIZE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_
 static GENERIC_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^(image|screenshot|pasted|clipboard)").unwrap());
 static STRIP_EXT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\.[^.]+$").unwrap());
-static IMAGE_EXT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\.(png|jpe?g|gif|webp|svg|bmp)$").unwrap());
+static IMAGE_EXT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\.(png|jpe?g|gif|webp|svg|bmp)$").unwrap());
 static MD_EXT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\.md$").unwrap());
 
 pub fn ext_for_mime(mime: &str) -> Option<&'static str> {
@@ -34,16 +35,25 @@ pub fn timestamp(d: &NaiveDateTime) -> String {
 }
 
 fn sanitize(name: &str) -> String {
-    SANITIZE_RE.replace_all(name, "-").trim_matches('-').to_string()
+    SANITIZE_RE
+        .replace_all(name, "-")
+        .trim_matches('-')
+        .to_string()
 }
 
 /// On-disk name for a pasted/dropped image: keep a meaningful original
 /// filename, but generic clipboard names get a timestamp.
 pub fn attachment_name(file_name: &str, mime: &str, now: &NaiveDateTime) -> String {
-    let ext = ext_for_mime(mime).map(String::from).unwrap_or_else(|| file_name.rsplit('.').next().unwrap_or("png").to_string());
+    let ext = ext_for_mime(mime)
+        .map(String::from)
+        .unwrap_or_else(|| file_name.rsplit('.').next().unwrap_or("png").to_string());
     let base = sanitize(&STRIP_EXT_RE.replace(file_name, ""));
     let generic = base.is_empty() || GENERIC_RE.is_match(&base);
-    if generic { format!("pasted-{}.{ext}", timestamp(now)) } else { format!("{base}.{ext}") }
+    if generic {
+        format!("pasted-{}.{ext}", timestamp(now))
+    } else {
+        format!("{base}.{ext}")
+    }
 }
 
 fn dirname(p: &str) -> &str {
@@ -74,7 +84,13 @@ pub struct SavedImage {
 
 /// Saves image bytes into `dir`, suffixing a timestamp if the name is taken
 /// (`saveImage`).
-pub fn save_image(bytes: &[u8], file_name: &str, mime: &str, dir: &str, now: &NaiveDateTime) -> Result<SavedImage, String> {
+pub fn save_image(
+    bytes: &[u8],
+    file_name: &str,
+    mime: &str,
+    dir: &str,
+    now: &NaiveDateTime,
+) -> Result<SavedImage, String> {
     let name = attachment_name(file_name, mime, now);
     let mut path = format!("{dir}/{name}");
     if let Err(e) = fs_write_binary_bytes(&path, bytes) {
@@ -88,12 +104,19 @@ pub fn save_image(bytes: &[u8], file_name: &str, mime: &str, dir: &str, now: &Na
         path = format!("{dir}/{stem}-{}{ext}", timestamp(now));
         fs_write_binary_bytes(&path, bytes)?;
     }
-    Ok(SavedImage { path, name: STRIP_EXT_RE.replace(&name, "").into_owned() })
+    Ok(SavedImage {
+        path,
+        name: STRIP_EXT_RE.replace(&name, "").into_owned(),
+    })
 }
 
 /// Markdown image link for a saved attachment, relative to the note.
 pub fn image_link(saved: &SavedImage, current_path: &str) -> String {
-    format!("![{}]({})", saved.name, relative_path(dirname(current_path), &saved.path))
+    format!(
+        "![{}]({})",
+        saved.name,
+        relative_path(dirname(current_path), &saved.path)
+    )
 }
 
 /// Markdown to insert for a vault file dragged from the explorer into the
@@ -106,13 +129,21 @@ pub fn link_for_dropped_path(path: &str, current_path: &str) -> String {
     }
     let rel = relative_path(dirname(current_path), path);
     let label = STRIP_EXT_RE.replace(name, "");
-    if IMAGE_EXT_RE.is_match(name) { format!("![{label}]({rel})") } else { format!("[{label}]({rel})") }
+    if IMAGE_EXT_RE.is_match(name) {
+        format!("![{label}]({rel})")
+    } else {
+        format!("[{label}]({rel})")
+    }
 }
 
 /// Text to insert for dropped `paths`, one link per line; prefixed with a
 /// space when glued to a non-whitespace char (`char_before` the drop point).
 pub fn drop_insert_text(paths: &[String], current_path: &str, char_before: Option<char>) -> String {
-    let links = paths.iter().map(|p| link_for_dropped_path(p, current_path)).collect::<Vec<_>>().join("\n");
+    let links = paths
+        .iter()
+        .map(|p| link_for_dropped_path(p, current_path))
+        .collect::<Vec<_>>()
+        .join("\n");
     match char_before {
         Some(c) if !c.is_whitespace() => format!(" {links}"),
         _ => links,
@@ -125,22 +156,43 @@ mod tests {
     use chrono::NaiveDate;
 
     fn now() -> NaiveDateTime {
-        NaiveDate::from_ymd_opt(2026, 8, 27).unwrap().and_hms_opt(9, 5, 7).unwrap()
+        NaiveDate::from_ymd_opt(2026, 8, 27)
+            .unwrap()
+            .and_hms_opt(9, 5, 7)
+            .unwrap()
     }
 
     #[test]
     fn relative_path_links_from_notes_folder_to_attachments() {
-        assert_eq!(relative_path("/v", "/v/attachments/a.png"), "attachments/a.png");
-        assert_eq!(relative_path("/v/sub/deep", "/v/attachments/a.png"), "../../attachments/a.png");
-        assert_eq!(relative_path("/v/attachments", "/v/attachments/a.png"), "a.png");
+        assert_eq!(
+            relative_path("/v", "/v/attachments/a.png"),
+            "attachments/a.png"
+        );
+        assert_eq!(
+            relative_path("/v/sub/deep", "/v/attachments/a.png"),
+            "../../attachments/a.png"
+        );
+        assert_eq!(
+            relative_path("/v/attachments", "/v/attachments/a.png"),
+            "a.png"
+        );
     }
 
     #[test]
     fn dropped_paths_become_links() {
         let here = "/vault/notes/today.md";
-        assert_eq!(link_for_dropped_path("/vault/sub/Inner Note.md", here), "[[Inner Note]]");
-        assert_eq!(link_for_dropped_path("/vault/attachments/pic.png", here), "![pic](../attachments/pic.png)");
-        assert_eq!(link_for_dropped_path("/vault/notes/spec.pdf", here), "[spec](spec.pdf)");
+        assert_eq!(
+            link_for_dropped_path("/vault/sub/Inner Note.md", here),
+            "[[Inner Note]]"
+        );
+        assert_eq!(
+            link_for_dropped_path("/vault/attachments/pic.png", here),
+            "![pic](../attachments/pic.png)"
+        );
+        assert_eq!(
+            link_for_dropped_path("/vault/notes/spec.pdf", here),
+            "[spec](spec.pdf)"
+        );
     }
 
     #[test]
@@ -153,9 +205,18 @@ mod tests {
 
     #[test]
     fn attachment_names() {
-        assert_eq!(attachment_name("image.png", "image/png", &now()), "pasted-20260827-090507.png");
-        assert_eq!(attachment_name("Screenshot 2026.png", "image/jpeg", &now()), "pasted-20260827-090507.jpg");
-        assert_eq!(attachment_name("my photo!.jpeg", "", &now()), "my-photo.jpeg");
+        assert_eq!(
+            attachment_name("image.png", "image/png", &now()),
+            "pasted-20260827-090507.png"
+        );
+        assert_eq!(
+            attachment_name("Screenshot 2026.png", "image/jpeg", &now()),
+            "pasted-20260827-090507.jpg"
+        );
+        assert_eq!(
+            attachment_name("my photo!.jpeg", "", &now()),
+            "my-photo.jpeg"
+        );
     }
 
     #[test]
@@ -166,6 +227,9 @@ mod tests {
         let b = save_image(b"2", "cat.png", "image/png", &d, &now()).unwrap();
         assert!(a.path.ends_with("/att/cat.png"));
         assert!(b.path.ends_with("/att/cat-20260827-090507.png"));
-        assert_eq!(image_link(&a, &format!("{d}/../n.md")), format!("![cat]({})", relative_path(&format!("{d}/.."), &a.path)));
+        assert_eq!(
+            image_link(&a, &format!("{d}/../n.md")),
+            format!("![cat]({})", relative_path(&format!("{d}/.."), &a.path))
+        );
     }
 }

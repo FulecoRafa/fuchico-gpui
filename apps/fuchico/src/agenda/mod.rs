@@ -22,9 +22,9 @@
 
 mod model;
 #[cfg(test)]
-mod ui_tests;
-#[cfg(test)]
 mod snapshot_tests;
+#[cfg(test)]
+mod ui_tests;
 
 use std::time::Duration;
 
@@ -36,8 +36,8 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Icon, IconName};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, ClickEvent, Context, EventEmitter, FocusHandle, FontWeight, Hsla, KeyDownEvent, SharedString,
-    Subscription, Task, Window, div,
+    AnyElement, ClickEvent, Context, EventEmitter, FocusHandle, FontWeight, Hsla, KeyDownEvent,
+    SharedString, Subscription, Task, Window, div,
 };
 
 use crate::assets::AppIcon;
@@ -77,7 +77,9 @@ impl AgendaView {
         let sub = bus::subscribe(cx, |this: &mut AgendaView, ev, cx| this.on_bus(ev, cx));
         let clock = cx.spawn(async move |this, cx| {
             loop {
-                cx.background_executor().timer(Duration::from_secs(30)).await;
+                cx.background_executor()
+                    .timer(Duration::from_secs(30))
+                    .await;
                 let alive = this
                     .update(cx, |this, cx| {
                         if iso(local_today()) != this.today {
@@ -109,18 +111,24 @@ impl AgendaView {
     }
 
     fn on_bus(&mut self, ev: &AppEvent, cx: &mut Context<Self>) {
-        let Some(root) = self.root.as_deref() else { return };
+        let Some(root) = self.root.as_deref() else {
+            return;
+        };
         match ev {
             // The original rescans on every `fs:file-written`, from any source.
             AppEvent::Core(CoreEvent::FileWritten { .. }) => self.scan(cx),
-            AppEvent::Core(CoreEvent::FsChanged { dir, .. }) if is_under(dir, root) => self.scan(cx),
+            AppEvent::Core(CoreEvent::FsChanged { dir, .. }) if is_under(dir, root) => {
+                self.scan(cx)
+            }
             _ => {}
         }
     }
 
     /// Starts a scan, or queues one if a scan is already running.
     fn scan(&mut self, cx: &mut Context<Self>) {
-        let Some(root) = self.root.clone() else { return };
+        let Some(root) = self.root.clone() else {
+            return;
+        };
         if self.scanning {
             self.rescan_queued = true;
             return;
@@ -166,7 +174,10 @@ impl AgendaView {
         });
         cx.spawn(async move |this, cx| match task.await {
             Ok(()) => {
-                bus::send(AppEvent::Core(CoreEvent::FileWritten { path, source: Some("agenda".into()) }));
+                bus::send(AppEvent::Core(CoreEvent::FileWritten {
+                    path,
+                    source: Some("agenda".into()),
+                }));
             }
             Err(e) => {
                 log::error!("tasks_toggle failed: {e}");
@@ -179,8 +190,17 @@ impl AgendaView {
     /// `openFile(item.file, item.line)`.
     fn open(&mut self, path: &str, line: usize, cx: &mut Context<Self>) {
         let line = line as u32;
-        cx.emit(ViewEvent::OpenFile { path: path.to_string(), line: Some(line) });
-        bus::emit(cx, AppEvent::GotoLine { path: path.to_string(), line });
+        cx.emit(ViewEvent::OpenFile {
+            path: path.to_string(),
+            line: Some(line),
+        });
+        bus::emit(
+            cx,
+            AppEvent::GotoLine {
+                path: path.to_string(),
+                line,
+            },
+        );
     }
 
     fn focus_handle_at(&mut self, ix: usize, cx: &mut Context<Self>) -> FocusHandle {
@@ -196,10 +216,14 @@ impl AgendaView {
         let (p_open, p_reveal, p_copy) = (path.to_string(), path.to_string(), path.to_string());
         vec![
             MenuEntry::item(crate::t!(CommonOpen), move |_, cx| {
-                this.update(cx, |this, cx| this.open(&p_open, line, cx)).ok();
+                this.update(cx, |this, cx| this.open(&p_open, line, cx))
+                    .ok();
             }),
             MenuEntry::Separator,
-            MenuEntry::item(crate::t!(CommonRevealInFileManager), move |_, _| reveal(&p_reveal)).icon(IconName::Eye),
+            MenuEntry::item(crate::t!(CommonRevealInFileManager), move |_, _| {
+                reveal(&p_reveal)
+            })
+            .icon(IconName::Eye),
             MenuEntry::item(crate::t!(CommonCopyPath), move |_, cx| {
                 cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(p_copy.clone()))
             })
@@ -219,7 +243,10 @@ impl AgendaView {
     ) -> AnyElement {
         let by_date = items_by_date(items);
         let weeks = month_weeks(self.cursor.year, self.cursor.month);
-        let letters: Vec<String> = crate::t!(AgendaWeekdayLetters).split(',').map(String::from).collect();
+        let letters: Vec<String> = crate::t!(AgendaWeekdayLetters)
+            .split(',')
+            .map(String::from)
+            .collect();
         let hover = th.fg_alpha(0.06);
         let (muted, fg) = (th.colors.muted_foreground, th.colors.foreground);
         let radius = th.radius.sm;
@@ -238,7 +265,11 @@ impl AgendaView {
                 .hover(move |s| s.bg(hover).text_color(fg))
                 .child(Icon::new(icon).size(u(14.)))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    this.cursor = if prev { this.cursor.prev() } else { this.cursor.next() };
+                    this.cursor = if prev {
+                        this.cursor.prev()
+                    } else {
+                        this.cursor.next()
+                    };
                     cx.notify();
                 }))
         };
@@ -280,7 +311,11 @@ impl AgendaView {
                 let is_today = day == self.today;
                 let is_sel = self.selected.as_deref() == Some(day.as_str());
                 let has_items = by_date.contains_key(&day);
-                let dot = if is_sel { th.colors.accent_foreground } else { th.colors.syntax_function };
+                let dot = if is_sel {
+                    th.colors.accent_foreground
+                } else {
+                    th.colors.syntax_function
+                };
                 let d2 = day.clone();
                 row = row.child(
                     div()
@@ -293,12 +328,19 @@ impl AgendaView {
                         .items_center()
                         .justify_center()
                         .border_1()
-                        .border_color(if is_today { th.colors.ring } else { gpui_kit::transparent_black() })
+                        .border_color(if is_today {
+                            th.colors.ring
+                        } else {
+                            gpui_kit::transparent_black()
+                        })
                         .rounded(u(radius))
                         .text_size(u(12.))
                         .cursor_pointer()
                         .when(is_today, |d| d.font_weight(FontWeight::BOLD))
-                        .when(is_sel, |d| d.bg(th.colors.accent).text_color(th.colors.accent_foreground))
+                        .when(is_sel, |d| {
+                            d.bg(th.colors.accent)
+                                .text_color(th.colors.accent_foreground)
+                        })
                         .when(!is_sel, |d| d.text_color(fg).hover(move |s| s.bg(hover)))
                         .child(day_of(&day).to_string())
                         .when(has_items, |d| {
@@ -314,8 +356,11 @@ impl AgendaView {
                             )
                         })
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            this.selected =
-                                if this.selected.as_deref() == Some(d2.as_str()) { None } else { Some(d2.clone()) };
+                            this.selected = if this.selected.as_deref() == Some(d2.as_str()) {
+                                None
+                            } else {
+                                Some(d2.clone())
+                            };
                             cx.notify();
                         })),
                 );
@@ -398,7 +443,10 @@ impl AgendaView {
         let (path, line) = (item.file.clone(), item.line);
         let (p2, p3) = (path.clone(), path.clone());
         let view = cx.entity().downgrade();
-        let rule = recurrence_label(item.recurrence.as_deref().unwrap_or_default(), item.recur_time.as_deref());
+        let rule = recurrence_label(
+            item.recurrence.as_deref().unwrap_or_default(),
+            item.recur_time.as_deref(),
+        );
         let tint = th.fg_alpha(0.05);
         div()
             .id(("agenda-routine", ix))
@@ -424,7 +472,12 @@ impl AgendaView {
                     .text_size(u(12.))
                     .child(item.text.clone()),
             )
-            .child(div().text_size(u(10.)).text_color(th.colors.muted_foreground).child(rule))
+            .child(
+                div()
+                    .text_size(u(10.))
+                    .text_color(th.colors.muted_foreground)
+                    .child(rule),
+            )
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.open(&path, line, cx)))
             .on_key_down(cx.listener(move |this, ev: &KeyDownEvent, _, cx| {
                 if is_activate_key(ev) {
@@ -433,7 +486,9 @@ impl AgendaView {
                 }
             }))
             .context_menu(move |menu, _, cx| {
-                let items = view.update(cx, |this, cx| this.row_menu(&p3, line, cx)).unwrap_or_default();
+                let items = view
+                    .update(cx, |this, cx| this.row_menu(&p3, line, cx))
+                    .unwrap_or_default();
                 build_menu(menu, items)
             })
             .into_any_element()
@@ -471,7 +526,10 @@ impl AgendaView {
                             .text_color(th.colors.primary_foreground)
                             .child(Icon::new(IconName::Check).size(u(11.)))
                     })
-                    .when(!checked, |d| d.border_color(th.colors.muted_foreground).bg(th.colors.background))
+                    .when(!checked, |d| {
+                        d.border_color(th.colors.muted_foreground)
+                            .bg(th.colors.background)
+                    })
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         cx.stop_propagation();
                         this.toggle(&it, cx);
@@ -481,7 +539,11 @@ impl AgendaView {
             ItemKind::Event => row_icon(AppIcon::CalendarClock, th),
             ItemKind::Todo => row_icon(AppIcon::ListTodo, th),
         };
-        let text: String = if item.text.is_empty() { crate::t!(AgendaEmptyItem) } else { item.text.clone() };
+        let text: String = if item.text.is_empty() {
+            crate::t!(AgendaEmptyItem)
+        } else {
+            item.text.clone()
+        };
         let recur = item.recurrence.as_deref().map(|r| {
             let tip: SharedString = crate::t!(AgendaRecurringTask).into();
             div()
@@ -523,7 +585,9 @@ impl AgendaView {
                     .overflow_hidden()
                     .whitespace_nowrap()
                     .text_ellipsis()
-                    .when(item.checked, |d| d.text_color(th.colors.muted_foreground).line_through())
+                    .when(item.checked, |d| {
+                        d.text_color(th.colors.muted_foreground).line_through()
+                    })
                     .child(text),
             )
             .children(item.time.clone().map(|t| {
@@ -556,13 +620,21 @@ impl AgendaView {
                 }
             }))
             .context_menu(move |menu, _, cx| {
-                let items = view.update(cx, |this, cx| this.row_menu(&p3, line, cx)).unwrap_or_default();
+                let items = view
+                    .update(cx, |this, cx| this.row_menu(&p3, line, cx))
+                    .unwrap_or_default();
                 build_menu(menu, items)
             })
             .into_any_element()
     }
 
-    fn render_list(&mut self, items: &[AgendaItem], focus_ix: &mut usize, th: &AppTheme, cx: &mut Context<Self>) -> AnyElement {
+    fn render_list(
+        &mut self,
+        items: &[AgendaItem],
+        focus_ix: &mut usize,
+        th: &AppTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let mut list = div()
             .id("agenda-list")
             .flex_1()
@@ -575,7 +647,12 @@ impl AgendaView {
             .flex_col();
         match &self.state {
             ScanState::Idle => {}
-            ScanState::Loading => list = list.child(status(crate::t!(CommonScanning), th.colors.muted_foreground)),
+            ScanState::Loading => {
+                list = list.child(status(
+                    crate::t!(CommonScanning),
+                    th.colors.muted_foreground,
+                ))
+            }
             ScanState::Error(e) => list = list.child(status(e.clone(), th.colors.destructive)),
             ScanState::Loaded(_) if items.is_empty() => {
                 list = list.child(rich_status(
@@ -605,16 +682,29 @@ impl AgendaView {
                         continue;
                     }
                     any = true;
-                    let mut section = div().flex().flex_col().mb(u(18.)).child(section_title(title, th));
+                    let mut section = div()
+                        .flex()
+                        .flex_col()
+                        .mb(u(18.))
+                        .child(section_title(title, th));
                     for (i, item) in rows.iter().enumerate() {
                         let focus = self.focus_handle_at(*focus_ix, cx);
                         *focus_ix += 1;
-                        section = section.child(self.render_row(&format!("agenda-{id}-{i}"), item, focus, th, cx));
+                        section = section.child(self.render_row(
+                            &format!("agenda-{id}-{i}"),
+                            item,
+                            focus,
+                            th,
+                            cx,
+                        ));
                     }
                     list = list.child(section);
                 }
                 if !any {
-                    list = list.child(status(crate::t!(AgendaNothingHere), th.colors.muted_foreground));
+                    list = list.child(status(
+                        crate::t!(AgendaNothingHere),
+                        th.colors.muted_foreground,
+                    ));
                 }
             }
         }
@@ -643,7 +733,9 @@ impl MainView for AgendaView {
 impl Render for AgendaView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.root.is_none() {
-            return empty_state(crate::t!(AgendaOpenFolder), cx).p(u(24.)).into_any_element();
+            return empty_state(crate::t!(AgendaOpenFolder), cx)
+                .p(u(24.))
+                .into_any_element();
         }
         // Evaluated on each render like the original, but in local time.
         self.today = iso(local_today());
@@ -677,7 +769,10 @@ impl Render for AgendaView {
             .line_height(gpui_kit::relative(1.2))
             .on_key_down(|ev: &KeyDownEvent, window, cx| {
                 // Rows are tab stops (role=button tabIndex=0 in the original).
-                if ev.keystroke.key == "tab" && !ev.keystroke.modifiers.platform && !ev.keystroke.modifiers.control {
+                if ev.keystroke.key == "tab"
+                    && !ev.keystroke.modifiers.platform
+                    && !ev.keystroke.modifiers.control
+                {
                     if ev.keystroke.modifiers.shift {
                         window.focus_prev(cx);
                     } else {
@@ -696,7 +791,10 @@ impl Render for AgendaView {
 
 /// `dir` is the vault root or inside it.
 fn is_under(dir: &str, root: &str) -> bool {
-    dir == root || dir.strip_prefix(root).is_some_and(|rest| rest.starts_with('/') || rest.starts_with('\\'))
+    dir == root
+        || dir
+            .strip_prefix(root)
+            .is_some_and(|rest| rest.starts_with('/') || rest.starts_with('\\'))
 }
 
 fn is_activate_key(ev: &KeyDownEvent) -> bool {
@@ -726,7 +824,11 @@ fn section_title(title: String, th: &AppTheme) -> gpui_kit::Div {
 }
 
 fn status(text: String, color: Hsla) -> gpui_kit::Div {
-    div().py(u(8.)).text_size(u(12.)).text_color(color).child(text)
+    div()
+        .py(u(8.))
+        .text_size(u(12.))
+        .text_color(color)
+        .child(text)
 }
 
 enum Part {
@@ -769,12 +871,21 @@ fn rich_status(parts: Vec<Part>, th: &AppTheme) -> gpui_kit::Div {
 /// Shows `path` in the OS file manager.
 fn reveal(path: &str) {
     #[cfg(target_os = "macos")]
-    let r = std::process::Command::new("open").arg("-R").arg(path).spawn();
+    let r = std::process::Command::new("open")
+        .arg("-R")
+        .arg(path)
+        .spawn();
     #[cfg(target_os = "windows")]
-    let r = std::process::Command::new("explorer").arg(format!("/select,{path}")).spawn();
+    let r = std::process::Command::new("explorer")
+        .arg(format!("/select,{path}"))
+        .spawn();
     #[cfg(all(unix, not(target_os = "macos")))]
     let r = std::process::Command::new("xdg-open")
-        .arg(std::path::Path::new(path).parent().unwrap_or(std::path::Path::new("/")))
+        .arg(
+            std::path::Path::new(path)
+                .parent()
+                .unwrap_or(std::path::Path::new("/")),
+        )
         .spawn();
     if let Err(e) = r {
         log::warn!("reveal failed: {e}");

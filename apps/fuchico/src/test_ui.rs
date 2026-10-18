@@ -7,8 +7,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use gpui_kit::{
-    AnyWindowHandle, App, AppContext, Bounds, Context, Entity, IntoElement, Modifiers, MouseButton, Pixels, Point,
-    Render, Subscription, TestAppContext, VisualTestContext, Window, WindowBounds, WindowOptions, div, px, size,
+    AnyWindowHandle, App, AppContext, Bounds, Context, Entity, IntoElement, Modifiers, MouseButton,
+    Pixels, Point, Render, Subscription, TestAppContext, VisualTestContext, Window, WindowBounds,
+    WindowOptions, div, px, size,
 };
 
 use crate::bus::{self, AppEvent};
@@ -17,10 +18,16 @@ use crate::bus::{self, AppEvent};
 pub fn init(cx: &mut App) {
     gpui_kit::init(cx);
     crate::assets::register_fonts(cx);
-    crate::settings::SettingsStore::init(crate::settings::SettingsStore::with(Default::default()), cx);
+    crate::settings::SettingsStore::init(
+        crate::settings::SettingsStore::with(Default::default()),
+        cx,
+    );
     // The default `System` language follows the OS; tests assert English.
     crate::i18n::set_locale(crate::i18n::Locale::En);
-    crate::theme::apply::apply(crate::theme::resolve(&crate::settings::Settings::default(), true), cx);
+    crate::theme::apply::apply(
+        crate::theme::resolve(&crate::settings::Settings::default(), true),
+        cx,
+    );
     bus::init(cx);
 }
 
@@ -45,8 +52,12 @@ pub fn open_workspace(cx: &mut TestAppContext) -> (Ui, Entity<crate::workspace::
 }
 
 pub fn temp_dir(tag: &str) -> PathBuf {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let dir = std::env::temp_dir().join(format!("fuchico-{tag}-test-{}-{nanos}", std::process::id()));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir =
+        std::env::temp_dir().join(format!("fuchico-{tag}-test-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -58,9 +69,15 @@ pub fn open<V: Render + 'static>(
     build: impl FnOnce(&mut Window, &mut Context<V>) -> V,
 ) -> (Ui, Entity<V>) {
     let (handle, view): (AnyWindowHandle, Entity<V>) = cx.update(|cx| {
-        let bounds = Bounds { origin: Point::default(), size: size(px(w), px(h)) };
+        let bounds = Bounds {
+            origin: Point::default(),
+            size: size(px(w), px(h)),
+        };
         let (h, v) = gpui_kit::open_window(
-            WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() },
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                ..Default::default()
+            },
             cx,
             |window, cx| cx.new(|cx| build(window, cx)),
         )
@@ -77,7 +94,10 @@ pub struct Ui {
 
 impl Ui {
     pub fn new(win: AnyWindowHandle, cx: &TestAppContext) -> Ui {
-        Ui { cx: VisualTestContext::from_window(win, cx), win }
+        Ui {
+            cx: VisualTestContext::from_window(win, cx),
+            win,
+        }
     }
 
     /// Draws a frame (a no-op once the window is gone).
@@ -107,7 +127,10 @@ impl Ui {
     }
 
     pub fn click(&mut self, sel: &str) {
-        let at = self.bounds(sel).unwrap_or_else(|| panic!("no element {sel}")).center();
+        let at = self
+            .bounds(sel)
+            .unwrap_or_else(|| panic!("no element {sel}"))
+            .center();
         self.click_at(at);
     }
 
@@ -115,14 +138,20 @@ impl Ui {
     pub fn drag(&mut self, a: Point<Pixels>, b: Point<Pixels>) {
         self.cx.simulate_mouse_move(a, None, Modifiers::none());
         self.frame();
-        self.cx.simulate_mouse_down(a, MouseButton::Left, Modifiers::none());
+        self.cx
+            .simulate_mouse_down(a, MouseButton::Left, Modifiers::none());
         for i in 1..=4 {
             let t = i as f32 / 4.;
-            let p = Point { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-            self.cx.simulate_mouse_move(p, MouseButton::Left, Modifiers::none());
+            let p = Point {
+                x: a.x + (b.x - a.x) * t,
+                y: a.y + (b.y - a.y) * t,
+            };
+            self.cx
+                .simulate_mouse_move(p, MouseButton::Left, Modifiers::none());
             self.frame();
         }
-        self.cx.simulate_mouse_up(b, MouseButton::Left, Modifiers::none());
+        self.cx
+            .simulate_mouse_up(b, MouseButton::Left, Modifiers::none());
         self.cx.run_until_parked();
         self.frame();
     }
@@ -172,7 +201,10 @@ impl Render for BusRecorder {
     }
 }
 
-pub fn record(cx: &mut TestAppContext, keep: impl Fn(&AppEvent) -> bool + 'static) -> Entity<BusRecorder> {
+pub fn record(
+    cx: &mut TestAppContext,
+    keep: impl Fn(&AppEvent) -> bool + 'static,
+) -> Entity<BusRecorder> {
     cx.update(|cx| {
         cx.new(|cx| BusRecorder {
             seen: Vec::new(),

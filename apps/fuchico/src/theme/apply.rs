@@ -16,7 +16,10 @@ use crate::settings::SettingsStore;
 
 /// Whether the OS is in dark mode.
 pub fn os_is_dark(cx: &App) -> bool {
-    matches!(cx.window_appearance(), WindowAppearance::Dark | WindowAppearance::VibrantDark)
+    matches!(
+        cx.window_appearance(),
+        WindowAppearance::Dark | WindowAppearance::VibrantDark
+    )
 }
 
 /// Resolves from the current settings and OS appearance and installs it.
@@ -37,7 +40,11 @@ pub fn init(cx: &mut App) {
 }
 
 pub fn apply(theme: AppTheme, cx: &mut App) {
-    let mode = if theme.appearance.is_dark() { ThemeMode::Dark } else { ThemeMode::Light };
+    let mode = if theme.appearance.is_dark() {
+        ThemeMode::Dark
+    } else {
+        ThemeMode::Light
+    };
     if Theme::global(cx).mode != mode {
         // Switching mode reloads the registered config, which would clobber
         // edits made in the same closure; switch first, then edit.

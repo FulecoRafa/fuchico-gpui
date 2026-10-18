@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::model::Element;
 use crate::scene;
@@ -24,7 +24,11 @@ pub fn default_path() -> Option<PathBuf> {
     if let Some(p) = std::env::var_os(LIBRARY_ENV) {
         return Some(PathBuf::from(p));
     }
-    dirs::data_dir().map(|d| d.join("fuchico").join("excalidraw").join("library.excalidrawlib"))
+    dirs::data_dir().map(|d| {
+        d.join("fuchico")
+            .join("excalidraw")
+            .join("library.excalidrawlib")
+    })
 }
 
 /// Parses `.excalidrawlib` content (v2 `libraryItems`, or v1 `library`).
@@ -34,7 +38,11 @@ pub fn parse(content: &str) -> Result<Vec<Value>, String> {
         return Err("Not an Excalidraw library".into());
     }
     if let Some(items) = v.get("libraryItems").and_then(|i| i.as_array()) {
-        return Ok(items.iter().filter(|i| i.get("elements").map(|e| e.is_array()).unwrap_or(false)).cloned().collect());
+        return Ok(items
+            .iter()
+            .filter(|i| i.get("elements").map(|e| e.is_array()).unwrap_or(false))
+            .cloned()
+            .collect());
     }
     if let Some(items) = v.get("library").and_then(|i| i.as_array()) {
         return Ok(items
@@ -67,7 +75,11 @@ pub fn item_name(item: &Value) -> Option<&str> {
 pub fn item_elements(item: &Value) -> Vec<Element> {
     item.get("elements")
         .and_then(|e| e.as_array())
-        .map(|a| a.iter().filter_map(|x| serde_json::from_value::<Element>(x.clone()).ok()).collect::<Vec<_>>())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| serde_json::from_value::<Element>(x.clone()).ok())
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_default()
         .into_iter()
         .filter(|e| !e.is_deleted())
@@ -120,7 +132,11 @@ impl Library {
         let items = parse(content)?;
         let mut n = 0;
         for it in items {
-            if self.items.iter().any(|x| item_id(x) == item_id(&it) && !item_id(&it).is_empty()) {
+            if self
+                .items
+                .iter()
+                .any(|x| item_id(x) == item_id(&it) && !item_id(&it).is_empty())
+            {
                 continue;
             }
             self.items.push(it);
@@ -158,7 +174,9 @@ mod tests {
         let path = dir.join("lib.excalidrawlib");
         let mut lib = Library::load(Some(path.clone()));
         assert!(lib.items.is_empty());
-        let id = lib.add(vec![json!({"id":"a","type":"rectangle","x":0,"y":0,"width":10,"height":10})]);
+        let id = lib.add(vec![
+            json!({"id":"a","type":"rectangle","x":0,"y":0,"width":10,"height":10}),
+        ]);
         let back = Library::load(Some(path.clone()));
         assert_eq!(back.items.len(), 1);
         assert_eq!(item_id(&back.items[0]), id);

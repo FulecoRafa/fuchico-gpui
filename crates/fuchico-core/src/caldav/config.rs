@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(all(not(target_os = "linux"), not(test)))]
 use keyring::{Entry as KeyringEntry, Error as KeyringError};
 #[cfg(all(target_os = "linux", not(test)))]
-use keyring_core::{api::CredentialStoreApi, Entry as KeyringEntry, Error as KeyringError};
+use keyring_core::{Entry as KeyringEntry, Error as KeyringError, api::CredentialStoreApi};
 
 use crate::fs::file::write_atomic;
 
@@ -106,8 +106,10 @@ pub fn save_password(account_id: &str, password: &str) -> Result<(), String> {
 pub fn load_password(account_id: &str) -> Result<String, String> {
     #[cfg(test)]
     {
-        test_keyring::get(account_id)
-            .ok_or_else(|| "failed to read password from keyring: No matching entry found in secure storage".to_string())
+        test_keyring::get(account_id).ok_or_else(|| {
+            "failed to read password from keyring: No matching entry found in secure storage"
+                .to_string()
+        })
     }
     #[cfg(not(test))]
     keyring_entry(account_id)?
@@ -146,7 +148,10 @@ pub(crate) mod test_keyring {
     }
 
     pub fn set(id: &str, pw: &str) {
-        store().lock().unwrap().insert(id.to_string(), pw.to_string());
+        store()
+            .lock()
+            .unwrap()
+            .insert(id.to_string(), pw.to_string());
     }
 
     pub fn get(id: &str) -> Option<String> {

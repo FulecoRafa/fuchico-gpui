@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use fuchico_excalidraw::{ExcalidrawEvent, ExcalidrawStyle, ExcalidrawView, OnChange, StyleFn};
 use gpui::{
-    point, px, Entity, InputEvent, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    Pixels, Point, TestAppContext, VisualTestContext,
+    Entity, InputEvent, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    Pixels, Point, TestAppContext, VisualTestContext, point, px,
 };
 use serde_json::Value;
 
@@ -32,8 +32,13 @@ fn open(cx: &mut TestAppContext, json: &str) -> H {
     });
     let style: StyleFn = Rc::new(|_| ExcalidrawStyle::light());
     let json = json.to_string();
-    let (view, vcx) = cx.add_window_view(|window, cx| ExcalidrawView::new(json, style, on_change, window, cx));
-    let mut h = H { view, cx: vcx.clone(), saves };
+    let (view, vcx) =
+        cx.add_window_view(|window, cx| ExcalidrawView::new(json, style, on_change, window, cx));
+    let mut h = H {
+        view,
+        cx: vcx.clone(),
+        saves,
+    };
     // Never touch the user's real personal library.
     let lib = temp_path("library.excalidrawlib");
     h.view.update(&mut h.cx, |v, _| v.set_library_path(lib));
@@ -90,13 +95,28 @@ impl H {
         self.frame();
     }
     fn mv(&mut self, at: Point<Pixels>, pressed: Option<MouseButton>, mods: Modifiers) {
-        self.ev(MouseMoveEvent { position: at, pressed_button: pressed, modifiers: mods });
+        self.ev(MouseMoveEvent {
+            position: at,
+            pressed_button: pressed,
+            modifiers: mods,
+        });
     }
     fn down(&mut self, at: Point<Pixels>, button: MouseButton, mods: Modifiers, clicks: usize) {
-        self.ev(MouseDownEvent { button, position: at, modifiers: mods, click_count: clicks, first_mouse: false });
+        self.ev(MouseDownEvent {
+            button,
+            position: at,
+            modifiers: mods,
+            click_count: clicks,
+            first_mouse: false,
+        });
     }
     fn up(&mut self, at: Point<Pixels>, button: MouseButton, mods: Modifiers, clicks: usize) {
-        self.ev(MouseUpEvent { button, position: at, modifiers: mods, click_count: clicks });
+        self.ev(MouseUpEvent {
+            button,
+            position: at,
+            modifiers: mods,
+            click_count: clicks,
+        });
     }
     fn click(&mut self, at: Point<Pixels>) {
         self.click_m(at, Modifiers::default());
@@ -144,7 +164,9 @@ impl H {
     }
     /// Clicks a chrome element tagged with `debug_selector`.
     fn button(&mut self, sel: &str) {
-        let b = self.bounds(sel).unwrap_or_else(|| panic!("no element {sel}"));
+        let b = self
+            .bounds(sel)
+            .unwrap_or_else(|| panic!("no element {sel}"));
         self.click(b.center());
     }
     fn exists(&mut self, sel: &str) -> bool {
@@ -164,14 +186,19 @@ impl H {
             .collect()
     }
     fn of(&mut self, kind: &str) -> Vec<Value> {
-        self.elements().into_iter().filter(|e| e["type"] == kind).collect()
+        self.elements()
+            .into_iter()
+            .filter(|e| e["type"] == kind)
+            .collect()
     }
     fn selection(&mut self) -> Vec<String> {
         self.cx.update(|_, cx| self.view.read(cx).selection())
     }
     /// Advances the test clock past the save debounce.
     fn settle(&mut self) {
-        self.cx.executor().advance_clock(Duration::from_millis(1100));
+        self.cx
+            .executor()
+            .advance_clock(Duration::from_millis(1100));
         self.cx.run_until_parked();
         self.frame();
     }
@@ -187,7 +214,12 @@ impl H {
 #[gpui::test]
 fn draws_every_shape_tool_and_saves(cx: &mut TestAppContext) {
     let mut h = open(cx, EMPTY);
-    let tools = [("r", "rectangle"), ("d", "diamond"), ("o", "ellipse"), ("f", "frame")];
+    let tools = [
+        ("r", "rectangle"),
+        ("d", "diamond"),
+        ("o", "ellipse"),
+        ("f", "frame"),
+    ];
     for (i, (key, kind)) in tools.iter().enumerate() {
         h.press(key);
         let y = 120.0 + i as f32 * 120.0;
@@ -195,7 +227,10 @@ fn draws_every_shape_tool_and_saves(cx: &mut TestAppContext) {
         let els = h.of(kind);
         assert_eq!(els.len(), 1, "{kind} created");
         let e = &els[0];
-        assert!((e["width"].as_f64().unwrap() - 100.0).abs() < 1.0, "{kind} width {e}");
+        assert!(
+            (e["width"].as_f64().unwrap() - 100.0).abs() < 1.0,
+            "{kind} width {e}"
+        );
         assert!((e["height"].as_f64().unwrap() - 80.0).abs() < 1.0);
     }
     let saved = h.last_save();
@@ -232,7 +267,10 @@ fn context_menu_actions(cx: &mut TestAppContext) {
     assert_eq!(h.selection(), vec![id.clone()]);
     assert!(h.exists("cm-flip-h") && h.exists("cm-bring-front") && h.exists("cm-copy-styles"));
     h.button("cm-duplicate");
-    assert!(!h.exists("context-menu"), "running an action closes the menu");
+    assert!(
+        !h.exists("context-menu"),
+        "running an action closes the menu"
+    );
     assert_eq!(h.of("rectangle").len(), 2);
     // Lock via the menu, then canvas menu offers "unlock all".
     h.rclick(p(300.0, 340.0));
@@ -261,12 +299,21 @@ fn flip_mirrors_arrow_points(cx: &mut TestAppContext) {
     h.press("shift-h");
     let a = h.of("arrow")[0].clone();
     let (p0, p1) = (&a["points"][0], &a["points"][1]);
-    assert!((p0[0].as_f64().unwrap() - 0.0).abs() < 1e-6, "renormalised to first point {a}");
-    assert!((p1[0].as_f64().unwrap() + 100.0).abs() < 1.0, "x mirrored {a}");
+    assert!(
+        (p0[0].as_f64().unwrap() - 0.0).abs() < 1e-6,
+        "renormalised to first point {a}"
+    );
+    assert!(
+        (p1[0].as_f64().unwrap() + 100.0).abs() < 1.0,
+        "x mirrored {a}"
+    );
     assert!((f(&a, "x") - f(&before, "x") - 100.0).abs() < 1.0);
     h.press("shift-v");
     let a = h.of("arrow")[0].clone();
-    assert!((a["points"][1][1].as_f64().unwrap() + 50.0).abs() < 1.0, "y mirrored {a}");
+    assert!(
+        (a["points"][1][1].as_f64().unwrap() + 50.0).abs() < 1.0,
+        "y mirrored {a}"
+    );
 }
 
 // ---------------------------------------------------------- colour picker
@@ -287,7 +334,11 @@ fn colour_picker_palette_shades_hex(cx: &mut TestAppContext) {
     assert_eq!(h.of("rectangle")[0]["strokeColor"], "#fa5252");
     h.press("f"); // violet (q w e r t / a s d f g / z x c v b)
     assert_eq!(h.of("rectangle")[0]["strokeColor"], "#6741d9");
-    assert_eq!(h.cx.update(|_, cx| h.view.read(cx).tool()), fuchico_excalidraw::Tool::Selection, "picker keys don't switch tools");
+    assert_eq!(
+        h.cx.update(|_, cx| h.view.read(cx).tool()),
+        fuchico_excalidraw::Tool::Selection,
+        "picker keys don't switch tools"
+    );
     // Hex field.
     h.button("pk-hex");
     h.press("1 2 a b 5 6 enter");
@@ -327,7 +378,10 @@ fn arrow_type_elbow_routes_orthogonally(cx: &mut TestAppContext) {
     let pts = a["points"].as_array().unwrap();
     assert!(pts.len() >= 3, "routed {a}");
     for w in pts.windows(2) {
-        let (dx, dy) = (w[1][0].as_f64().unwrap() - w[0][0].as_f64().unwrap(), w[1][1].as_f64().unwrap() - w[0][1].as_f64().unwrap());
+        let (dx, dy) = (
+            w[1][0].as_f64().unwrap() - w[0][0].as_f64().unwrap(),
+            w[1][1].as_f64().unwrap() - w[0][1].as_f64().unwrap(),
+        );
         assert!(dx.abs() < 1e-6 || dy.abs() < 1e-6, "axis-aligned {a}");
     }
     h.button("at-round");
@@ -335,7 +389,9 @@ fn arrow_type_elbow_routes_orthogonally(cx: &mut TestAppContext) {
     assert_eq!(a["elbowed"], false);
     assert_eq!(a["roundness"]["type"], 2);
     // New arrows use the chosen type; every Excalidraw arrowhead is offered.
-    for k in ["None", "Arrow", "Bar", "●", "○", "▲", "△", "◆", "◇", "Cf1", "CfN", "Cf1N"] {
+    for k in [
+        "None", "Arrow", "Bar", "●", "○", "▲", "△", "◆", "◇", "Cf1", "CfN", "Cf1N",
+    ] {
         assert!(h.exists(&format!("ah-false-{k}")), "{k}");
     }
     h.button("ah-false-◇");
@@ -385,9 +441,23 @@ fn opacity_slider_drags(cx: &mut TestAppContext) {
     h.click(p(300.0, 340.0));
     let b = h.bounds("op-slider").unwrap();
     let y = b.center().y;
-    h.down(point(b.left() + px(25.0), y), MouseButton::Left, Modifiers::default(), 1);
-    h.mv(point(b.left() + px(60.0), y), Some(MouseButton::Left), Modifiers::default());
-    h.up(point(b.left() + px(60.0), y), MouseButton::Left, Modifiers::default(), 1);
+    h.down(
+        point(b.left() + px(25.0), y),
+        MouseButton::Left,
+        Modifiers::default(),
+        1,
+    );
+    h.mv(
+        point(b.left() + px(60.0), y),
+        Some(MouseButton::Left),
+        Modifiers::default(),
+    );
+    h.up(
+        point(b.left() + px(60.0), y),
+        MouseButton::Left,
+        Modifiers::default(),
+        1,
+    );
     assert_eq!(f(&h.of("rectangle")[0], "opacity"), 60.0);
 }
 
@@ -425,7 +495,10 @@ fn ime_composition_through_input_handler(cx: &mut TestAppContext) {
         v.replace_text_in_range(None, "か", w, cx);
         assert_eq!(v.marked_text_range(w, cx), None);
         let mut adj = None;
-        assert_eq!(v.text_for_range(0..3, &mut adj, w, cx).as_deref(), Some("Héか"));
+        assert_eq!(
+            v.text_for_range(0..3, &mut adj, w, cx).as_deref(),
+            Some("Héか")
+        );
     });
     h.frame();
     h.press("escape");
@@ -447,7 +520,13 @@ fn arrow_labels(cx: &mut TestAppContext) {
     let cx_ = f(&t, "x") + f(&t, "width") / 2.0;
     assert!((cx_ - 400.0).abs() < 1.0, "centred on the midpoint {t}");
     let a = h.of("arrow")[0].clone();
-    assert!(a["boundElements"].as_array().unwrap().iter().any(|b| b["id"] == t["id"]));
+    assert!(
+        a["boundElements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|b| b["id"] == t["id"])
+    );
 }
 
 #[gpui::test]
@@ -518,7 +597,11 @@ fn export_dialog_writes_svg_with_scene(cx: &mut TestAppContext) {
     h.cx.run_until_parked();
     h.frame();
     let svg = std::fs::read_to_string(&out).expect("exported");
-    assert!(svg.starts_with("<svg") && svg.contains("payload-type:application/vnd.excalidraw+json"), "{}", &svg[..200.min(svg.len())]);
+    assert!(
+        svg.starts_with("<svg") && svg.contains("payload-type:application/vnd.excalidraw+json"),
+        "{}",
+        &svg[..200.min(svg.len())]
+    );
     assert!(!h.exists("dialog-export-image"), "closes after export");
     // PNG export too.
     h.press("cmd-shift-e");
@@ -566,12 +649,22 @@ fn library_add_insert_drag_export(cx: &mut TestAppContext) {
     // Drag onto the canvas inserts at the drop point.
     let from = h.bounds("lib-item-0").unwrap().center();
     h.down(from, MouseButton::Left, Modifiers::default(), 1);
-    h.mv(point(from.x - px(20.0), from.y + px(10.0)), Some(MouseButton::Left), Modifiers::default());
-    h.mv(p(500.0, 600.0), Some(MouseButton::Left), Modifiers::default());
+    h.mv(
+        point(from.x - px(20.0), from.y + px(10.0)),
+        Some(MouseButton::Left),
+        Modifiers::default(),
+    );
+    h.mv(
+        p(500.0, 600.0),
+        Some(MouseButton::Left),
+        Modifiers::default(),
+    );
     h.up(p(500.0, 600.0), MouseButton::Left, Modifiers::default(), 1);
     let rects = h.of("rectangle");
     assert_eq!(rects.len(), 3);
-    let dropped = rects.iter().find(|e| (f(e, "x") + f(e, "width") / 2.0 - 500.0).abs() < 1.0);
+    let dropped = rects
+        .iter()
+        .find(|e| (f(e, "x") + f(e, "width") / 2.0 - 500.0).abs() < 1.0);
     assert!(dropped.is_some(), "{rects:?}");
     // Export via the save dialog.
     h.button("lib-export");

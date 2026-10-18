@@ -13,12 +13,18 @@ fn js_number(s: &str) -> f64 {
             if digits.is_empty() || !digits.chars().all(|c| c.is_digit(radix)) {
                 return f64::NAN;
             }
-            return digits.chars().fold(0.0, |acc, c| acc * radix as f64 + c.to_digit(radix).unwrap() as f64);
+            return digits.chars().fold(0.0, |acc, c| {
+                acc * radix as f64 + c.to_digit(radix).unwrap() as f64
+            });
         }
     }
     let body = s.strip_prefix(['+', '-']).unwrap_or(s);
     if body == "Infinity" {
-        return if s.starts_with('-') { f64::NEG_INFINITY } else { f64::INFINITY };
+        return if s.starts_with('-') {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
     }
     // StrDecimalLiteral: digits [. digits] [e[+-]digits], at least one digit
     // in the mantissa.
@@ -40,7 +46,10 @@ fn js_number(s: &str) -> f64 {
         if matches!(b.get(j), Some(b'+' | b'-')) {
             j += 1;
         }
-        let exp_digits = b[j.min(b.len())..].iter().take_while(|c| c.is_ascii_digit()).count();
+        let exp_digits = b[j.min(b.len())..]
+            .iter()
+            .take_while(|c| c.is_ascii_digit())
+            .count();
         if exp_digits == 0 {
             return f64::NAN;
         }
@@ -52,7 +61,11 @@ fn js_number(s: &str) -> f64 {
     s.parse::<f64>().unwrap_or_else(|_| {
         // Rust rejects "5." / ".5e1"-style forms in some versions; patch up.
         let fixed = s.replace(".e", ".0e").replace(".E", ".0E");
-        let fixed = if fixed.ends_with('.') { format!("{fixed}0") } else { fixed };
+        let fixed = if fixed.ends_with('.') {
+            format!("{fixed}0")
+        } else {
+            fixed
+        };
         fixed.parse().unwrap_or(f64::NAN)
     })
 }
@@ -79,7 +92,11 @@ pub fn parse_rulers(text: &str) -> Vec<u32> {
 
 /// `formatRulers`.
 pub fn format_rulers(columns: &[u32]) -> String {
-    columns.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(", ")
+    columns
+        .iter()
+        .map(|c| c.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// X offset of ruler `column`: `content_left + padding + column * char_width`.
@@ -89,5 +106,8 @@ pub fn column_x(content_left: f32, column: u32, char_width: f32) -> f32 {
 
 /// All ruler x offsets for `columns`.
 pub fn ruler_positions(columns: &[u32], content_left: f32, char_width: f32) -> Vec<f32> {
-    columns.iter().map(|c| column_x(content_left, *c, char_width)).collect()
+    columns
+        .iter()
+        .map(|c| column_x(content_left, *c, char_width))
+        .collect()
 }

@@ -25,7 +25,10 @@ pub struct CalDavCtx {
 
 impl CalDavCtx {
     pub fn new(data_dir: impl Into<PathBuf>, sink: Arc<dyn EventSink>) -> Self {
-        Self { data_dir: data_dir.into(), sink }
+        Self {
+            data_dir: data_dir.into(),
+            sink,
+        }
     }
 }
 
@@ -96,7 +99,11 @@ pub async fn caldav_discover_calendars_for_account(
         .find(|a| a.id == account_id)
         .ok_or_else(|| format!("no saved account for id {account_id}"))?;
     let password = config::load_password(&account_id)?;
-    let client = CalDavClient::new(account.server_url.clone(), account.username.clone(), password);
+    let client = CalDavClient::new(
+        account.server_url.clone(),
+        account.username.clone(),
+        password,
+    );
     let home_url = client.discover_calendar_home().await?;
     let calendars = client.list_task_calendars(&home_url).await?;
     Ok(calendars
@@ -214,7 +221,11 @@ async fn run_sync(ctx: &CalDavCtx, target: Option<String>) -> Vec<SyncReport> {
     };
 
     let mut reports = Vec::new();
-    for link in cfg.links.iter().filter(|l| target.as_deref().is_none_or(|t| t == l.folder_path)) {
+    for link in cfg
+        .links
+        .iter()
+        .filter(|l| target.as_deref().is_none_or(|t| t == l.folder_path))
+    {
         let Some(account) = cfg.accounts.iter().find(|a| a.id == link.account_id) else {
             reports.push(SyncReport {
                 folder: link.folder_path.clone(),
@@ -235,7 +246,11 @@ async fn run_sync(ctx: &CalDavCtx, target: Option<String>) -> Vec<SyncReport> {
             }
         };
 
-        let client = CalDavClient::new(account.server_url.clone(), account.username.clone(), password);
+        let client = CalDavClient::new(
+            account.server_url.clone(),
+            account.username.clone(),
+            password,
+        );
         let folder = std::path::PathBuf::from(&link.folder_path);
         let report = match sync::sync_folder(
             &client,
@@ -280,7 +295,9 @@ pub async fn caldav_sync_now(
 ) -> Result<Vec<SyncReport>, String> {
     let target = folder_path.map(to_canon);
     let reports = run_sync(ctx, target).await;
-    ctx.sink.emit(CoreEvent::CaldavSyncComplete { reports: reports.len() });
+    ctx.sink.emit(CoreEvent::CaldavSyncComplete {
+        reports: reports.len(),
+    });
     Ok(reports)
 }
 
@@ -309,14 +326,21 @@ fn find_linked_folder(cfg: &config::Config, file_path: &str) -> Option<String> {
 /// `fs:file-written` listener in `lib.rs`'s `.setup()`). Ignores writes that came from a sync itself (`source ==
 /// "caldav"`) to avoid a sync-triggers-sync loop, and writes outside any
 /// linked folder.
-pub fn on_file_written(ctx: &CalDavCtx, debounce: DebounceState, path: String, source: Option<String>) {
+pub fn on_file_written(
+    ctx: &CalDavCtx,
+    debounce: DebounceState,
+    path: String,
+    source: Option<String>,
+) {
     if source.as_deref() == Some("caldav") {
         return;
     }
     let ctx = ctx.clone();
     crate::runtime::spawn(async move {
         let ctx = &ctx;
-        let Ok(cfg) = config::load(&ctx.data_dir) else { return };
+        let Ok(cfg) = config::load(&ctx.data_dir) else {
+            return;
+        };
         let Some(folder) = find_linked_folder(&cfg, &path) else {
             return;
         };
@@ -338,7 +362,9 @@ pub fn on_file_written(ctx: &CalDavCtx, debounce: DebounceState, path: String, s
         }
 
         let reports = run_sync(ctx, Some(folder)).await;
-        ctx.sink.emit(CoreEvent::CaldavSyncComplete { reports: reports.len() });
+        ctx.sink.emit(CoreEvent::CaldavSyncComplete {
+            reports: reports.len(),
+        });
     });
 }
 
@@ -346,7 +372,9 @@ pub fn on_file_written(ctx: &CalDavCtx, debounce: DebounceState, path: String, s
 /// launch-time sync in `lib.rs`'s `.setup()`.
 pub async fn sync_all(ctx: &CalDavCtx) {
     let reports = run_sync(ctx, None).await;
-    ctx.sink.emit(CoreEvent::CaldavSyncComplete { reports: reports.len() });
+    ctx.sink.emit(CoreEvent::CaldavSyncComplete {
+        reports: reports.len(),
+    });
 }
 
 #[derive(Serialize)]
@@ -377,7 +405,10 @@ pub fn caldav_get_sync_status(ctx: &CalDavCtx) -> Result<Vec<FolderSyncStatus>, 
                 Some(sc) => (
                     sc.last_synced_at,
                     sc.tasks.len(),
-                    sc.tasks.iter().filter(|t| t.pending_delete_since.is_some()).count(),
+                    sc.tasks
+                        .iter()
+                        .filter(|t| t.pending_delete_since.is_some())
+                        .count(),
                 ),
                 None => (None, 0, 0),
             };
@@ -415,7 +446,9 @@ pub fn start_background_sync(ctx: CalDavCtx) -> tokio::task::JoinHandle<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::caldav::client::tests::{CALENDAR_LIST_RESPONSE, HOME_SET_RESPONSE, PRINCIPAL_RESPONSE};
+    use crate::caldav::client::tests::{
+        CALENDAR_LIST_RESPONSE, HOME_SET_RESPONSE, PRINCIPAL_RESPONSE,
+    };
     use crate::caldav::sidecar::{Sidecar, SidecarTask};
     use crossbeam_channel::{Receiver, unbounded};
     use wiremock::matchers::{header, method, path};
@@ -457,7 +490,11 @@ mod tests {
     }
 
     fn input(server_url: &str) -> AccountInput {
-        AccountInput { server_url: server_url.into(), username: "u@x".into(), password: "secret".into() }
+        AccountInput {
+            server_url: server_url.into(),
+            username: "u@x".into(),
+            password: "secret".into(),
+        }
     }
 
     fn task(uid: &str, pending: bool) -> SidecarTask {
@@ -479,8 +516,13 @@ mod tests {
     #[tokio::test]
     async fn test_connection_walks_discovery_and_saves_nothing() {
         let server = discovery_server().await;
-        let info = caldav_test_connection(server.uri(), "u".into(), "p".into()).await.unwrap();
-        assert_eq!(info.calendar_home_url, format!("{}/1234567/calendars/", server.uri()));
+        let info = caldav_test_connection(server.uri(), "u".into(), "p".into())
+            .await
+            .unwrap();
+        assert_eq!(
+            info.calendar_home_url,
+            format!("{}/1234567/calendars/", server.uri())
+        );
         assert_eq!(
             serde_json::to_value(&info).unwrap(),
             serde_json::json!({"calendarHomeUrl": format!("{}/1234567/calendars/", server.uri())})
@@ -494,17 +536,29 @@ mod tests {
             .respond_with(ResponseTemplate::new(401).set_body_string("nope"))
             .mount(&server)
             .await;
-        assert!(caldav_test_connection(server.uri(), "u".into(), "bad".into()).await.is_err());
+        assert!(
+            caldav_test_connection(server.uri(), "u".into(), "bad".into())
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
     async fn discover_calendars_lists_vtodo_calendars_with_absolute_hrefs() {
         let server = discovery_server().await;
-        let cals = caldav_discover_calendars(server.uri(), "u".into(), "p".into()).await.unwrap();
+        let cals = caldav_discover_calendars(server.uri(), "u".into(), "p".into())
+            .await
+            .unwrap();
         assert_eq!(cals.len(), 1);
-        assert_eq!(cals[0].href, format!("{}/1234567/calendars/home/", server.uri()));
+        assert_eq!(
+            cals[0].href,
+            format!("{}/1234567/calendars/home/", server.uri())
+        );
         assert_eq!(cals[0].display_name, "Reminders");
-        assert_eq!(serde_json::to_value(&cals[0]).unwrap()["displayName"], "Reminders");
+        assert_eq!(
+            serde_json::to_value(&cals[0]).unwrap()["displayName"],
+            "Reminders"
+        );
     }
 
     #[tokio::test]
@@ -532,10 +586,15 @@ mod tests {
             .respond_with(ResponseTemplate::new(207).set_body_string(list))
             .mount(&server)
             .await;
-        let cals = caldav_discover_calendars(server.uri(), "u".into(), "p".into()).await.unwrap();
+        let cals = caldav_discover_calendars(server.uri(), "u".into(), "p".into())
+            .await
+            .unwrap();
         assert_eq!(cals.len(), 1);
         assert_eq!(cals[0].display_name, "/1234567/calendars/todo/");
-        assert_eq!(cals[0].href, format!("{}/1234567/calendars/todo/", server.uri()));
+        assert_eq!(
+            cals[0].href,
+            format!("{}/1234567/calendars/todo/", server.uri())
+        );
     }
 
     #[tokio::test]
@@ -543,26 +602,38 @@ mod tests {
         let server = discovery_server().await;
         let (_d, ctx, _rx) = ctx();
 
-        let err = caldav_discover_calendars_for_account(&ctx, "missing".into()).await.err().unwrap();
+        let err = caldav_discover_calendars_for_account(&ctx, "missing".into())
+            .await
+            .err()
+            .unwrap();
         assert_eq!(err, "no saved account for id missing");
 
-        let id = caldav_save_account(&ctx, input(&server.uri())).await.unwrap();
+        let id = caldav_save_account(&ctx, input(&server.uri()))
+            .await
+            .unwrap();
         assert!(uuid::Uuid::parse_str(&id).is_ok());
         assert_eq!(config::load_password(&id).unwrap(), "secret");
 
         let accounts = caldav_list_accounts(&ctx).unwrap();
         assert_eq!(accounts.len(), 1);
         let json = serde_json::to_value(&accounts[0]).unwrap();
-        assert_eq!(json, serde_json::json!({"id": id, "serverUrl": server.uri(), "username": "u@x"}));
+        assert_eq!(
+            json,
+            serde_json::json!({"id": id, "serverUrl": server.uri(), "username": "u@x"})
+        );
         // The password never reaches config.json.
         let raw = std::fs::read_to_string(ctx.data_dir.join("caldav/config.json")).unwrap();
         assert!(!raw.contains("secret"));
 
-        let cals = caldav_discover_calendars_for_account(&ctx, id.clone()).await.unwrap();
+        let cals = caldav_discover_calendars_for_account(&ctx, id.clone())
+            .await
+            .unwrap();
         assert_eq!(cals[0].display_name, "Reminders");
 
         // Duplicates are allowed (no credential check, no dedup).
-        let id2 = caldav_save_account(&ctx, input(&server.uri())).await.unwrap();
+        let id2 = caldav_save_account(&ctx, input(&server.uri()))
+            .await
+            .unwrap();
         assert_ne!(id, id2);
         assert_eq!(caldav_list_accounts(&ctx).unwrap().len(), 2);
     }
@@ -576,12 +647,29 @@ mod tests {
         let fb = d.path().join("fb");
         std::fs::create_dir_all(&fa).unwrap();
         std::fs::create_dir_all(&fb).unwrap();
-        caldav_link_folder(&ctx, a.clone(), "https://a/cal/".into(), "A".into(), to_canon(&fa)).unwrap();
-        caldav_link_folder(&ctx, b.clone(), "https://b/cal/".into(), "B".into(), to_canon(&fb)).unwrap();
+        caldav_link_folder(
+            &ctx,
+            a.clone(),
+            "https://a/cal/".into(),
+            "A".into(),
+            to_canon(&fa),
+        )
+        .unwrap();
+        caldav_link_folder(
+            &ctx,
+            b.clone(),
+            "https://b/cal/".into(),
+            "B".into(),
+            to_canon(&fb),
+        )
+        .unwrap();
 
         caldav_remove_account(&ctx, a.clone()).unwrap();
         let accounts = caldav_list_accounts(&ctx).unwrap();
-        assert_eq!(accounts.iter().map(|x| x.id.clone()).collect::<Vec<_>>(), vec![b.clone()]);
+        assert_eq!(
+            accounts.iter().map(|x| x.id.clone()).collect::<Vec<_>>(),
+            vec![b.clone()]
+        );
         let links = caldav_list_links(&ctx).unwrap();
         assert_eq!(links.len(), 1);
         assert_eq!(links[0].account_id, b);
@@ -598,14 +686,31 @@ mod tests {
         std::fs::create_dir_all(&folder).unwrap();
         let fp = to_canon(&folder);
 
-        caldav_link_folder(&ctx, "acct-1".into(), "https://x/cal1/".into(), "One".into(), fp.clone()).unwrap();
+        caldav_link_folder(
+            &ctx,
+            "acct-1".into(),
+            "https://x/cal1/".into(),
+            "One".into(),
+            fp.clone(),
+        )
+        .unwrap();
         let sc = sidecar::load(&folder).unwrap().unwrap();
-        assert_eq!((sc.account_id.as_str(), sc.calendar_href.as_str()), ("acct-1", "https://x/cal1/"));
+        assert_eq!(
+            (sc.account_id.as_str(), sc.calendar_href.as_str()),
+            ("acct-1", "https://x/cal1/")
+        );
         assert!(sc.tasks.is_empty());
 
         // Re-link the same folder: the link is replaced, the existing
         // sidecar is left untouched even though it names another calendar.
-        caldav_link_folder(&ctx, "acct-2".into(), "https://x/cal2/".into(), "Two".into(), fp.clone()).unwrap();
+        caldav_link_folder(
+            &ctx,
+            "acct-2".into(),
+            "https://x/cal2/".into(),
+            "Two".into(),
+            fp.clone(),
+        )
+        .unwrap();
         let links = caldav_list_links(&ctx).unwrap();
         assert_eq!(links.len(), 1);
         assert_eq!(
@@ -669,16 +774,30 @@ mod tests {
             .mount(&server)
             .await;
         let (d, ctx, rx) = ctx();
-        let id = caldav_save_account(&ctx, input(&server.uri())).await.unwrap();
+        let id = caldav_save_account(&ctx, input(&server.uri()))
+            .await
+            .unwrap();
         let folder = d.path().join("notes");
         std::fs::create_dir_all(&folder).unwrap();
         let fp = to_canon(&folder);
-        caldav_link_folder(&ctx, id, format!("{}/cal/", server.uri()), "Reminders".into(), fp.clone()).unwrap();
+        caldav_link_folder(
+            &ctx,
+            id,
+            format!("{}/cal/", server.uri()),
+            "Reminders".into(),
+            fp.clone(),
+        )
+        .unwrap();
 
         // A folder that matches no link: nothing synced, still completes.
-        let none = caldav_sync_now(&ctx, Some("/nowhere".into())).await.unwrap();
+        let none = caldav_sync_now(&ctx, Some("/nowhere".into()))
+            .await
+            .unwrap();
         assert!(none.is_empty());
-        assert_eq!(drain(&rx), vec![CoreEvent::CaldavSyncComplete { reports: 0 }]);
+        assert_eq!(
+            drain(&rx),
+            vec![CoreEvent::CaldavSyncComplete { reports: 0 }]
+        );
 
         let reports = caldav_sync_now(&ctx, Some(fp.clone())).await.unwrap();
         assert_eq!(reports.len(), 1);
@@ -689,8 +808,13 @@ mod tests {
         assert_eq!(
             drain(&rx),
             vec![
-                CoreEvent::FileWritten { path: synced, source: Some("caldav".into()) },
-                CoreEvent::CaldavSyncProgress { folder_path: fp.clone() },
+                CoreEvent::FileWritten {
+                    path: synced,
+                    source: Some("caldav".into())
+                },
+                CoreEvent::CaldavSyncProgress {
+                    folder_path: fp.clone()
+                },
                 CoreEvent::CaldavSyncComplete { reports: 1 },
             ]
         );
@@ -706,21 +830,41 @@ mod tests {
         std::fs::create_dir_all(&folder).unwrap();
         let fp = to_canon(&folder);
         // Link to an account id that was never saved.
-        caldav_link_folder(&ctx, "ghost".into(), "https://x/cal/".into(), "X".into(), fp.clone()).unwrap();
+        caldav_link_folder(
+            &ctx,
+            "ghost".into(),
+            "https://x/cal/".into(),
+            "X".into(),
+            fp.clone(),
+        )
+        .unwrap();
         // And one whose saved account has no keyring entry.
         let id = caldav_save_account(&ctx, input("https://x")).await.unwrap();
         config::delete_password(&id).unwrap();
         let other = d.path().join("nopw");
         std::fs::create_dir_all(&other).unwrap();
-        caldav_link_folder(&ctx, id, "https://x/cal/".into(), "Y".into(), to_canon(&other)).unwrap();
+        caldav_link_folder(
+            &ctx,
+            id,
+            "https://x/cal/".into(),
+            "Y".into(),
+            to_canon(&other),
+        )
+        .unwrap();
 
         let reports = caldav_sync_now(&ctx, None).await.unwrap();
         assert_eq!(reports.len(), 2);
         assert_eq!(reports[0].folder, fp);
-        assert_eq!(reports[0].errors, vec!["no saved account for id ghost".to_string()]);
+        assert_eq!(
+            reports[0].errors,
+            vec!["no saved account for id ghost".to_string()]
+        );
         assert!(reports[1].errors[0].starts_with("failed to read password from keyring"));
         // Accounts that fail before syncing skip the progress event.
-        assert_eq!(drain(&rx), vec![CoreEvent::CaldavSyncComplete { reports: 2 }]);
+        assert_eq!(
+            drain(&rx),
+            vec![CoreEvent::CaldavSyncComplete { reports: 2 }]
+        );
     }
 
     #[test]
@@ -737,9 +881,18 @@ mod tests {
                 })
                 .collect(),
         };
-        assert_eq!(find_linked_folder(&cfg, "/v/work/deep/x.md").as_deref(), Some("/v/work/deep"));
-        assert_eq!(find_linked_folder(&cfg, "/v/work/y.md").as_deref(), Some("/v/work"));
-        assert_eq!(find_linked_folder(&cfg, "/v/workshop/z.md").as_deref(), Some("/v"));
+        assert_eq!(
+            find_linked_folder(&cfg, "/v/work/deep/x.md").as_deref(),
+            Some("/v/work/deep")
+        );
+        assert_eq!(
+            find_linked_folder(&cfg, "/v/work/y.md").as_deref(),
+            Some("/v/work")
+        );
+        assert_eq!(
+            find_linked_folder(&cfg, "/v/workshop/z.md").as_deref(),
+            Some("/v")
+        );
         assert_eq!(find_linked_folder(&cfg, "/v").as_deref(), Some("/v"));
         assert_eq!(find_linked_folder(&cfg, "/elsewhere/a.md"), None);
     }
@@ -754,13 +907,37 @@ mod tests {
         let inner = outer.join("work");
         std::fs::create_dir_all(&inner).unwrap();
         // Unsaved account ids: the sync fails fast offline but still reports.
-        caldav_link_folder(&ctx, "ghost".into(), "h".into(), "Outer".into(), to_canon(&outer)).unwrap();
-        caldav_link_folder(&ctx, "ghost".into(), "h".into(), "Inner".into(), to_canon(&inner)).unwrap();
+        caldav_link_folder(
+            &ctx,
+            "ghost".into(),
+            "h".into(),
+            "Outer".into(),
+            to_canon(&outer),
+        )
+        .unwrap();
+        caldav_link_folder(
+            &ctx,
+            "ghost".into(),
+            "h".into(),
+            "Inner".into(),
+            to_canon(&inner),
+        )
+        .unwrap();
         let debounce: DebounceState = Default::default();
         let file = to_canon(inner.join("note.md"));
 
-        on_file_written(&ctx, debounce.clone(), to_canon(outer.join("loop.md")), Some("caldav".into()));
-        on_file_written(&ctx, debounce.clone(), to_canon(d.path().join("outside.md")), Some("editor".into()));
+        on_file_written(
+            &ctx,
+            debounce.clone(),
+            to_canon(outer.join("loop.md")),
+            Some("caldav".into()),
+        );
+        on_file_written(
+            &ctx,
+            debounce.clone(),
+            to_canon(d.path().join("outside.md")),
+            Some("editor".into()),
+        );
         on_file_written(&ctx, debounce.clone(), file.clone(), Some("editor".into()));
         std::thread::sleep(Duration::from_millis(300));
         on_file_written(&ctx, debounce.clone(), file, None);
@@ -773,7 +950,10 @@ mod tests {
         assert_eq!(first, CoreEvent::CaldavSyncComplete { reports: 1 });
         std::thread::sleep(Duration::from_millis(600));
         assert!(drain(&rx).is_empty(), "the superseded write must not sync");
-        assert_eq!(debounce.lock().unwrap().get(&to_canon(&inner)).copied(), Some(2));
+        assert_eq!(
+            debounce.lock().unwrap().get(&to_canon(&inner)).copied(),
+            Some(2)
+        );
         assert!(!debounce.lock().unwrap().contains_key(&to_canon(&outer)));
     }
 }

@@ -23,15 +23,51 @@ pub struct ShortcutAction {
 }
 
 pub const SHORTCUT_ACTIONS: [ShortcutAction; 9] = [
-    ShortcutAction { id: "openOutline", label: Msg::ShortcutActionOpenOutlineLabel, desc: Msg::ShortcutActionOpenOutlineDesc },
-    ShortcutAction { id: "toggleCheckboxAtCursor", label: Msg::ShortcutActionToggleCheckboxAtCursorLabel, desc: Msg::ShortcutActionToggleCheckboxAtCursorDesc },
-    ShortcutAction { id: "insertDate", label: Msg::ShortcutActionInsertDateLabel, desc: Msg::ShortcutActionInsertDateDesc },
-    ShortcutAction { id: "insertDateTime", label: Msg::ShortcutActionInsertDateTimeLabel, desc: Msg::ShortcutActionInsertDateTimeDesc },
-    ShortcutAction { id: "insertRegion", label: Msg::ShortcutActionInsertRegionLabel, desc: Msg::ShortcutActionInsertRegionDesc },
-    ShortcutAction { id: "insertTable", label: Msg::ShortcutActionInsertTableLabel, desc: Msg::ShortcutActionInsertTableDesc },
-    ShortcutAction { id: "toggleTaskLine", label: Msg::ShortcutActionToggleTaskLineLabel, desc: Msg::ShortcutActionToggleTaskLineDesc },
-    ShortcutAction { id: "pickDueDate", label: Msg::ShortcutActionPickDueDateLabel, desc: Msg::ShortcutActionPickDueDateDesc },
-    ShortcutAction { id: "pickRecurrence", label: Msg::ShortcutActionPickRecurrenceLabel, desc: Msg::ShortcutActionPickRecurrenceDesc },
+    ShortcutAction {
+        id: "openOutline",
+        label: Msg::ShortcutActionOpenOutlineLabel,
+        desc: Msg::ShortcutActionOpenOutlineDesc,
+    },
+    ShortcutAction {
+        id: "toggleCheckboxAtCursor",
+        label: Msg::ShortcutActionToggleCheckboxAtCursorLabel,
+        desc: Msg::ShortcutActionToggleCheckboxAtCursorDesc,
+    },
+    ShortcutAction {
+        id: "insertDate",
+        label: Msg::ShortcutActionInsertDateLabel,
+        desc: Msg::ShortcutActionInsertDateDesc,
+    },
+    ShortcutAction {
+        id: "insertDateTime",
+        label: Msg::ShortcutActionInsertDateTimeLabel,
+        desc: Msg::ShortcutActionInsertDateTimeDesc,
+    },
+    ShortcutAction {
+        id: "insertRegion",
+        label: Msg::ShortcutActionInsertRegionLabel,
+        desc: Msg::ShortcutActionInsertRegionDesc,
+    },
+    ShortcutAction {
+        id: "insertTable",
+        label: Msg::ShortcutActionInsertTableLabel,
+        desc: Msg::ShortcutActionInsertTableDesc,
+    },
+    ShortcutAction {
+        id: "toggleTaskLine",
+        label: Msg::ShortcutActionToggleTaskLineLabel,
+        desc: Msg::ShortcutActionToggleTaskLineDesc,
+    },
+    ShortcutAction {
+        id: "pickDueDate",
+        label: Msg::ShortcutActionPickDueDateLabel,
+        desc: Msg::ShortcutActionPickDueDateDesc,
+    },
+    ShortcutAction {
+        id: "pickRecurrence",
+        label: Msg::ShortcutActionPickRecurrenceLabel,
+        desc: Msg::ShortcutActionPickRecurrenceDesc,
+    },
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -76,31 +112,131 @@ impl FixedShortcut {
 
 macro_rules! fixed {
     ($g:ident, $l:ident, $d:ident, $k:expr) => {
-        FixedShortcut { group: ShortcutGroup::$g, label: Msg::$l, desc: Msg::$d, keys: $k, keys_msg: None }
+        FixedShortcut {
+            group: ShortcutGroup::$g,
+            label: Msg::$l,
+            desc: Msg::$d,
+            keys: $k,
+            keys_msg: None,
+        }
     };
     ($g:ident, $l:ident, $d:ident, $k:expr, $km:ident) => {
-        FixedShortcut { group: ShortcutGroup::$g, label: Msg::$l, desc: Msg::$d, keys: $k, keys_msg: Some(Msg::$km) }
+        FixedShortcut {
+            group: ShortcutGroup::$g,
+            label: Msg::$l,
+            desc: Msg::$d,
+            keys: $k,
+            keys_msg: Some(Msg::$km),
+        }
     };
 }
 
 pub const FIXED_SHORTCUTS: [FixedShortcut; 17] = [
-    fixed!(Global, ShortcutsFixedCommandPaletteLabel, ShortcutsFixedCommandPaletteDesc, "Mod-Shift-p"),
-    fixed!(Global, ShortcutsFixedQuickOpenLabel, ShortcutsFixedQuickOpenDesc, "Mod-p"),
-    fixed!(Global, ShortcutsFixedEditorFontSizeLabel, ShortcutsFixedEditorFontSizeDesc, "Mod-= / Mod-- / Mod-0"),
-    fixed!(Global, ShortcutsFixedUiZoomLabel, ShortcutsFixedUiZoomDesc, "Mod-Shift-= / Mod-Shift-- / Mod-Shift-0"),
-    fixed!(Editor, ShortcutsFixedHelixPaletteLabel, ShortcutsFixedHelixPaletteDesc, ":"),
-    fixed!(Editor, ShortcutsFixedSaveLabel, ShortcutsFixedSaveDesc, "Mod-s"),
-    fixed!(Editor, ShortcutsFixedFindReplaceLabel, ShortcutsFixedFindReplaceDesc, "Mod-f"),
-    fixed!(Editor, ShortcutsFixedTaskAutocompleteLabel, ShortcutsFixedTaskAutocompleteDesc, "@"),
-    fixed!(Editor, ShortcutsFixedPasteImageLabel, ShortcutsFixedPasteImageDesc, "Mod-v"),
-    fixed!(Editor, ShortcutsFixedFollowLinkLabel, ShortcutsFixedFollowLinkDesc, "Click", ShortcutsFixedFollowLinkKeys),
-    fixed!(Explorer, ShortcutsFixedExplorerNavigateLabel, ShortcutsFixedExplorerNavigateDesc, "↑ ↓ ← →"),
-    fixed!(Explorer, ShortcutsFixedExplorerOpenLabel, ShortcutsFixedExplorerOpenDesc, "Enter"),
-    fixed!(Explorer, ShortcutsFixedExplorerRenameLabel, ShortcutsFixedExplorerRenameDesc, "F2"),
-    fixed!(Explorer, ShortcutsFixedExplorerDeleteLabel, ShortcutsFixedExplorerDeleteDesc, "Delete / Backspace"),
-    fixed!(Explorer, ShortcutsFixedExplorerTypeAheadLabel, ShortcutsFixedExplorerTypeAheadDesc, "a–z"),
-    fixed!(Explorer, ShortcutsFixedExplorerMenuLabel, ShortcutsFixedExplorerMenuDesc, "Right-click", ShortcutsFixedExplorerMenuKeys),
-    fixed!(Tabs, ShortcutsFixedTabMenuLabel, ShortcutsFixedTabMenuDesc, "Right-click", ShortcutsFixedTabMenuKeys),
+    fixed!(
+        Global,
+        ShortcutsFixedCommandPaletteLabel,
+        ShortcutsFixedCommandPaletteDesc,
+        "Mod-Shift-p"
+    ),
+    fixed!(
+        Global,
+        ShortcutsFixedQuickOpenLabel,
+        ShortcutsFixedQuickOpenDesc,
+        "Mod-p"
+    ),
+    fixed!(
+        Global,
+        ShortcutsFixedEditorFontSizeLabel,
+        ShortcutsFixedEditorFontSizeDesc,
+        "Mod-= / Mod-- / Mod-0"
+    ),
+    fixed!(
+        Global,
+        ShortcutsFixedUiZoomLabel,
+        ShortcutsFixedUiZoomDesc,
+        "Mod-Shift-= / Mod-Shift-- / Mod-Shift-0"
+    ),
+    fixed!(
+        Editor,
+        ShortcutsFixedHelixPaletteLabel,
+        ShortcutsFixedHelixPaletteDesc,
+        ":"
+    ),
+    fixed!(
+        Editor,
+        ShortcutsFixedSaveLabel,
+        ShortcutsFixedSaveDesc,
+        "Mod-s"
+    ),
+    fixed!(
+        Editor,
+        ShortcutsFixedFindReplaceLabel,
+        ShortcutsFixedFindReplaceDesc,
+        "Mod-f"
+    ),
+    fixed!(
+        Editor,
+        ShortcutsFixedTaskAutocompleteLabel,
+        ShortcutsFixedTaskAutocompleteDesc,
+        "@"
+    ),
+    fixed!(
+        Editor,
+        ShortcutsFixedPasteImageLabel,
+        ShortcutsFixedPasteImageDesc,
+        "Mod-v"
+    ),
+    fixed!(
+        Editor,
+        ShortcutsFixedFollowLinkLabel,
+        ShortcutsFixedFollowLinkDesc,
+        "Click",
+        ShortcutsFixedFollowLinkKeys
+    ),
+    fixed!(
+        Explorer,
+        ShortcutsFixedExplorerNavigateLabel,
+        ShortcutsFixedExplorerNavigateDesc,
+        "↑ ↓ ← →"
+    ),
+    fixed!(
+        Explorer,
+        ShortcutsFixedExplorerOpenLabel,
+        ShortcutsFixedExplorerOpenDesc,
+        "Enter"
+    ),
+    fixed!(
+        Explorer,
+        ShortcutsFixedExplorerRenameLabel,
+        ShortcutsFixedExplorerRenameDesc,
+        "F2"
+    ),
+    fixed!(
+        Explorer,
+        ShortcutsFixedExplorerDeleteLabel,
+        ShortcutsFixedExplorerDeleteDesc,
+        "Delete / Backspace"
+    ),
+    fixed!(
+        Explorer,
+        ShortcutsFixedExplorerTypeAheadLabel,
+        ShortcutsFixedExplorerTypeAheadDesc,
+        "a–z"
+    ),
+    fixed!(
+        Explorer,
+        ShortcutsFixedExplorerMenuLabel,
+        ShortcutsFixedExplorerMenuDesc,
+        "Right-click",
+        ShortcutsFixedExplorerMenuKeys
+    ),
+    fixed!(
+        Tabs,
+        ShortcutsFixedTabMenuLabel,
+        ShortcutsFixedTabMenuDesc,
+        "Right-click",
+        ShortcutsFixedTabMenuKeys
+    ),
 ];
 
 /// Named keys: binding (`KeyboardEvent.key`) ↔ GPUI key name.
@@ -275,7 +411,10 @@ fn binding_key_name(gpui_key: &str) -> String {
     if let Some((b, _)) = NAMED_KEYS.iter().find(|(_, g)| *g == gpui_key) {
         return b.to_string();
     }
-    if gpui_key.len() > 1 && gpui_key.starts_with('f') && gpui_key[1..].chars().all(|c| c.is_ascii_digit()) {
+    if gpui_key.len() > 1
+        && gpui_key.starts_with('f')
+        && gpui_key[1..].chars().all(|c| c.is_ascii_digit())
+    {
         return gpui_key.to_ascii_uppercase();
     }
     if single_char(gpui_key).is_some() {
@@ -298,7 +437,12 @@ pub fn binding_to_keystrokes(binding: &str) -> Vec<String> {
 /// recorded binding matches the defaults (`Mod-Shift-.`).
 pub fn binding_from_keystroke(ks: &Keystroke) -> Option<String> {
     let key = ks.key.as_str();
-    if key.is_empty() || matches!(key, "shift" | "control" | "alt" | "platform" | "cmd" | "function" | "fn" | "capslock") {
+    if key.is_empty()
+        || matches!(
+            key,
+            "shift" | "control" | "alt" | "platform" | "cmd" | "function" | "fn" | "capslock"
+        )
+    {
         return None;
     }
     let m = &ks.modifiers;
@@ -393,7 +537,12 @@ mod tests {
         assert_eq!(Binding::parse("Mod--").unwrap().key, "-");
         assert_eq!(Binding::parse("Mod-Shift--").unwrap().key, "-");
         assert_eq!(Binding::parse("a").unwrap().to_binding_string(), "a");
-        assert_eq!(Binding::parse("Shift-Alt-Mod-x").unwrap().to_binding_string(), "Mod-Alt-Shift-x");
+        assert_eq!(
+            Binding::parse("Shift-Alt-Mod-x")
+                .unwrap()
+                .to_binding_string(),
+            "Mod-Alt-Shift-x"
+        );
         assert_eq!(Binding::parse(""), None);
     }
 
@@ -445,16 +594,31 @@ mod tests {
         for s in ["F2", "Right-click", "Delete / Backspace"] {
             assert_eq!(format_binding(s, true), s);
         }
-        assert_eq!(format_binding("Mod-= / Mod-- / Mod-0", false), "Ctrl+= / Ctrl+- / Ctrl+0");
+        assert_eq!(
+            format_binding("Mod-= / Mod-- / Mod-0", false),
+            "Ctrl+= / Ctrl+- / Ctrl+0"
+        );
     }
 
     #[test]
     fn tables_are_complete() {
-        assert_eq!(SHORTCUT_ACTIONS.len(), crate::settings::DEFAULT_SHORTCUTS.len());
-        for (a, (id, _)) in SHORTCUT_ACTIONS.iter().zip(crate::settings::DEFAULT_SHORTCUTS) {
+        assert_eq!(
+            SHORTCUT_ACTIONS.len(),
+            crate::settings::DEFAULT_SHORTCUTS.len()
+        );
+        for (a, (id, _)) in SHORTCUT_ACTIONS
+            .iter()
+            .zip(crate::settings::DEFAULT_SHORTCUTS)
+        {
             assert_eq!(a.id, id);
         }
         let groups: Vec<_> = FIXED_SHORTCUTS.iter().map(|f| f.group).collect();
-        assert_eq!(groups.iter().filter(|g| **g == ShortcutGroup::Editor).count(), 6);
+        assert_eq!(
+            groups
+                .iter()
+                .filter(|g| **g == ShortcutGroup::Editor)
+                .count(),
+            6
+        );
     }
 }

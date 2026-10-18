@@ -7,8 +7,8 @@
 use std::time::Duration;
 
 use gpui_kit::{
-    AnyWindowHandle, AppContext, Bounds, Entity, Modifiers, Pixels, Point, TestAppContext, VisualTestContext,
-    WindowBounds, WindowOptions, px, size,
+    AnyWindowHandle, AppContext, Bounds, Entity, Modifiers, Pixels, Point, TestAppContext,
+    VisualTestContext, WindowBounds, WindowOptions, px, size,
 };
 
 use super::SettingsView;
@@ -38,7 +38,10 @@ impl Ui {
     }
 
     fn click(&mut self, sel: &str) {
-        let at = self.bounds(sel).unwrap_or_else(|| panic!("no element {sel}")).center();
+        let at = self
+            .bounds(sel)
+            .unwrap_or_else(|| panic!("no element {sel}"))
+            .center();
         self.cx.simulate_mouse_move(at, None, Modifiers::none());
         self.frame();
         self.cx.simulate_click(at, Modifiers::none());
@@ -76,8 +79,14 @@ impl Ui {
 
 #[gpui_kit::test]
 async fn settings_nav_search_toggles_rulers_themes_and_caldav(cx: &mut TestAppContext) {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let dir = std::env::temp_dir().join(format!("fuchico-settings-test-{}-{nanos}", std::process::id()));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!(
+        "fuchico-settings-test-{}-{nanos}",
+        std::process::id()
+    ));
     std::fs::create_dir_all(&dir).unwrap();
     crate::persist::set_test_dir(dir.clone());
 
@@ -85,29 +94,43 @@ async fn settings_nav_search_toggles_rulers_themes_and_caldav(cx: &mut TestAppCo
         gpui_kit::init(cx);
         SettingsStore::init(SettingsStore::load(), cx);
         cx.set_global(UiState::load());
-        crate::theme::apply::apply(crate::theme::resolve(&crate::settings::Settings::default(), true), cx);
+        crate::theme::apply::apply(
+            crate::theme::resolve(&crate::settings::Settings::default(), true),
+            cx,
+        );
         crate::bus::init(cx);
         crate::caldav::init(cx);
         crate::i18n::set_language(Language::En);
     });
     let root = dir.to_string_lossy().to_string();
     let (handle, _view): (AnyWindowHandle, Entity<SettingsView>) = cx.update(|cx| {
-        let bounds = Bounds { origin: Point::default(), size: size(px(1100.), px(1300.)) }; // room for the 360px CSS editor
+        let bounds = Bounds {
+            origin: Point::default(),
+            size: size(px(1100.), px(1300.)),
+        }; // room for the 360px CSS editor
         gpui_kit::open_window(
-            WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() },
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                ..Default::default()
+            },
             cx,
             |window, cx| cx.new(|cx| SettingsView::new(Some(root.clone()), window, cx)),
         )
         .expect("open test window")
     });
-    let mut ui = Ui { cx: VisualTestContext::from_window(handle, cx) };
+    let mut ui = Ui {
+        cx: VisualTestContext::from_window(handle, cx),
+    };
 
     // ---- nav + remembered section --------------------------------------------
     for s in SettingsSection::ALL {
         assert!(ui.has(&format!("settings-nav-{}", s.id())));
     }
     ui.click("settings-nav-editor");
-    assert_eq!(ui.cx.update(|_, cx| UiState::get(cx).settings_section), SettingsSection::Editor);
+    assert_eq!(
+        ui.cx.update(|_, cx| UiState::get(cx).settings_section),
+        SettingsSection::Editor
+    );
     assert!(ui.has("settings-tab-2"));
 
     // ---- toggles write settings ----------------------------------------------
@@ -116,12 +139,18 @@ async fn settings_nav_search_toggles_rulers_themes_and_caldav(cx: &mut TestAppCo
     ui.click("settings-lines-relative");
     assert!(ui.settings().relative_line_numbers);
     ui.click("settings-keymap-vim");
-    assert_eq!(ui.settings().keybinding_mode, crate::settings::KeybindingMode::Vim);
+    assert_eq!(
+        ui.settings().keybinding_mode,
+        crate::settings::KeybindingMode::Vim
+    );
 
     // ---- rulers commit on Enter (parsed, sorted) -----------------------------
     ui.click("settings-rulers");
     ui.type_text("120, 80");
-    assert!(ui.settings().rulers.is_empty(), "rulers must not commit while typing");
+    assert!(
+        ui.settings().rulers.is_empty(),
+        "rulers must not commit while typing"
+    );
     ui.press("enter");
     assert_eq!(ui.settings().rulers, parse_rulers("80, 120"));
 
@@ -142,12 +171,18 @@ async fn settings_nav_search_toggles_rulers_themes_and_caldav(cx: &mut TestAppCo
     assert_eq!(s.custom_themes.len(), 1);
     assert!(s.custom_themes[0].css.contains("--background"));
     assert!(ui.has("settings-theme-css"));
-    assert!(ui.has(&format!("settings-palette-custom-{}", s.custom_themes[0].id)));
+    assert!(ui.has(&format!(
+        "settings-palette-custom-{}",
+        s.custom_themes[0].id
+    )));
     // Duplicate adds a second one and selects it.
     ui.click("settings-theme-duplicate");
     let s = ui.settings();
     assert_eq!(s.custom_themes.len(), 2);
-    assert_eq!(s.custom_theme_id.as_deref(), Some(s.custom_themes[1].id.as_str()));
+    assert_eq!(
+        s.custom_theme_id.as_deref(),
+        Some(s.custom_themes[1].id.as_str())
+    );
     assert_ne!(s.custom_themes[0].name, s.custom_themes[1].name);
 
     // ---- CSS draft: edits apply only on Apply ----------------------------------
@@ -155,8 +190,18 @@ async fn settings_nav_search_toggles_rulers_themes_and_caldav(cx: &mut TestAppCo
     ui.press("cmd-end");
     ui.type_text("\n/* tweak */");
     let id = ui.settings().custom_theme_id.clone().unwrap();
-    let saved = |s: &crate::settings::Settings| s.custom_themes.iter().find(|t| t.id == id).unwrap().css.clone();
-    assert!(!saved(&ui.settings()).contains("tweak"), "draft is not saved before Apply");
+    let saved = |s: &crate::settings::Settings| {
+        s.custom_themes
+            .iter()
+            .find(|t| t.id == id)
+            .unwrap()
+            .css
+            .clone()
+    };
+    assert!(
+        !saved(&ui.settings()).contains("tweak"),
+        "draft is not saved before Apply"
+    );
     ui.click("settings-theme-apply");
     assert!(saved(&ui.settings()).contains("/* tweak */"));
 

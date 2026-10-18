@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use fuchico_mermaid::{Chrome, MermaidEvent, MermaidView};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyWindowHandle, App, Context, Entity, Global, Subscription, TitlebarOptions, WeakEntity, Window,
-    WindowOptions, div, px, size,
+    AnyWindowHandle, App, Context, Entity, Global, Subscription, TitlebarOptions, WeakEntity,
+    Window, WindowOptions, div, px, size,
 };
 
 use crate::bus::{self, AppEvent};
@@ -33,12 +33,17 @@ fn registry(cx: &mut App) -> &mut HashMap<String, (AnyWindowHandle, WeakEntity<M
 }
 
 pub fn is_open(block_key: &str, cx: &mut App) -> bool {
-    let Some((h, _)) = registry(cx).get(&window_label(block_key)).cloned() else { return false };
+    let Some((h, _)) = registry(cx).get(&window_label(block_key)).cloned() else {
+        return false;
+    };
     h.update(cx, |_, _, _| ()).is_ok()
 }
 
 /// The open diagram window for `block_key`, if any.
-pub fn window_for(block_key: &str, cx: &mut App) -> Option<(AnyWindowHandle, Entity<MermaidWindow>)> {
+pub fn window_for(
+    block_key: &str,
+    cx: &mut App,
+) -> Option<(AnyWindowHandle, Entity<MermaidWindow>)> {
     let (h, w) = registry(cx).get(&window_label(block_key))?.clone();
     Some((h, w.upgrade()?))
 }
@@ -50,15 +55,28 @@ pub fn open_mermaid_window(block_key: String, label: String, text: Option<String
     let wl = window_label(&block_key);
     if let Some((h, _)) = registry(cx).get(&wl).cloned() {
         let background = crate::background_mode();
-        if h.update(cx, |_, w, _| if !background { w.activate_window() }).is_ok() {
+        if h.update(cx, |_, w, _| {
+            if !background {
+                w.activate_window()
+            }
+        })
+        .is_ok()
+        {
             return;
         }
         registry(cx).remove(&wl);
     }
     let opts = WindowOptions {
         // Remembered per label, like the original's window-state plugin.
-        window_bounds: Some(crate::windows::geometry::initial_bounds(&wl, WINDOW_SIZE, cx)),
-        titlebar: Some(TitlebarOptions { title: Some(label.clone().into()), ..Default::default() }),
+        window_bounds: Some(crate::windows::geometry::initial_bounds(
+            &wl,
+            WINDOW_SIZE,
+            cx,
+        )),
+        titlebar: Some(TitlebarOptions {
+            title: Some(label.clone().into()),
+            ..Default::default()
+        }),
         window_min_size: Some(size(px(320.), px(240.))),
         app_id: Some("fuchico".into()),
         focus: !crate::background_mode(),
@@ -96,24 +114,40 @@ impl MermaidWindow {
             bus::subscribe(cx, |this: &mut MermaidWindow, ev, cx| {
                 super::apply_update(&this.block_key, ev, &this.view, cx);
             }),
-            cx.subscribe_in(&view, window, move |this, _, ev: &MermaidEvent, window, _| {
-                if *ev == MermaidEvent::Dock {
-                    this.docking = true;
-                    bus::send(AppEvent::MermaidDockRequest { block_key: this.block_key.clone(), label: label.clone() });
-                    window.remove_window();
-                }
-            }),
+            cx.subscribe_in(
+                &view,
+                window,
+                move |this, _, ev: &MermaidEvent, window, _| {
+                    if *ev == MermaidEvent::Dock {
+                        this.docking = true;
+                        bus::send(AppEvent::MermaidDockRequest {
+                            block_key: this.block_key.clone(),
+                            label: label.clone(),
+                        });
+                        window.remove_window();
+                    }
+                },
+            ),
             super::follow_theme(&view, cx),
             cx.observe_window_appearance(window, |_, _, cx| crate::theme::apply::refresh(cx)),
             cx.on_release(|this, cx| {
                 registry(cx).remove(&window_label(&this.block_key));
                 if !this.docking {
-                    bus::send(AppEvent::MermaidClosed { block_key: this.block_key.clone() });
+                    bus::send(AppEvent::MermaidClosed {
+                        block_key: this.block_key.clone(),
+                    });
                 }
             }),
         ];
-        bus::send(AppEvent::MermaidRequest { block_key: block_key.clone() });
-        MermaidWindow { block_key, view, docking: false, _subs: subs }
+        bus::send(AppEvent::MermaidRequest {
+            block_key: block_key.clone(),
+        });
+        MermaidWindow {
+            block_key,
+            view,
+            docking: false,
+            _subs: subs,
+        }
     }
 
     pub fn block_key(&self) -> &str {
@@ -153,7 +187,14 @@ mod tests {
         crate::persist::set_test_dir(crate::test_ui::temp_dir("mermaid-geom-cfg"));
         cx.update(crate::test_ui::init_shell);
         let open = |cx: &mut TestAppContext| {
-            cx.update(|cx| super::open_mermaid_window("k".into(), "Diagram".into(), Some("graph TD\nA-->B".into()), cx));
+            cx.update(|cx| {
+                super::open_mermaid_window(
+                    "k".into(),
+                    "Diagram".into(),
+                    Some("graph TD\nA-->B".into()),
+                    cx,
+                )
+            });
             cx.run_until_parked();
             cx.update(|cx| super::registry(cx).get("mermaid-k").unwrap().0)
         };
@@ -161,8 +202,13 @@ mod tests {
         let vcx = VisualTestContext::from_window(h, cx);
         vcx.simulate_resize(size(px(900.), px(650.)));
         vcx.run_until_parked();
-        let saved = cx.read(|cx| geometry::initial_bounds("mermaid-k", super::WINDOW_SIZE, cx).get_bounds());
-        assert_eq!((saved.size.width, saved.size.height), (px(900.), px(650.)), "recorded under the window label");
+        let saved = cx
+            .read(|cx| geometry::initial_bounds("mermaid-k", super::WINDOW_SIZE, cx).get_bounds());
+        assert_eq!(
+            (saved.size.width, saved.size.height),
+            (px(900.), px(650.)),
+            "recorded under the window label"
+        );
 
         cx.update(|cx| h.update(cx, |_, w, _| w.remove_window()).unwrap());
         cx.run_until_parked();

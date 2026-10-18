@@ -2,7 +2,7 @@
 //! context menu and close; activity bar switching; dock resize drag; vault
 //! restore; Open Folder cancel. No OS input, no window focus.
 
-use gpui_kit::{Entity, MouseButton, Modifiers, TestAppContext, point, px};
+use gpui_kit::{Entity, Modifiers, MouseButton, TestAppContext, point, px};
 
 use super::{MainViewKind, Workspace};
 use crate::persist;
@@ -34,7 +34,14 @@ fn active(ui: &mut Ui, ws: &Entity<Workspace>) -> Option<String> {
 }
 
 fn tab_paths(ui: &mut Ui, ws: &Entity<Workspace>) -> Vec<String> {
-    ui.cx.read(|cx| ws.read(cx).tabs().tabs.iter().map(|t| t.path.clone()).collect())
+    ui.cx.read(|cx| {
+        ws.read(cx)
+            .tabs()
+            .tabs
+            .iter()
+            .map(|t| t.path.clone())
+            .collect()
+    })
 }
 
 #[gpui_kit::test]
@@ -71,7 +78,9 @@ async fn tab_bar_click_keys_menu_and_close(cx: &mut TestAppContext) {
     // (Activating hands focus to the mounted editor; back to the tab.)
     ui.cx.update(|window, cx| window.focus(&focus, cx));
     ui.press("shift-tab");
-    let on_b = ui.cx.update(|window, cx| ws.read(cx).tab_focus[&p[1]].is_focused(window));
+    let on_b = ui
+        .cx
+        .update(|window, cx| ws.read(cx).tab_focus[&p[1]].is_focused(window));
     assert!(on_b, "shift-tab focuses the previous tab");
 
     // Close button: closes that tab only.
@@ -82,14 +91,18 @@ async fn tab_bar_click_keys_menu_and_close(cx: &mut TestAppContext) {
     let at = ui.bounds("tab-0").unwrap().center();
     ui.cx.simulate_mouse_move(at, None, Modifiers::none());
     ui.frame();
-    ui.cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::none());
-    ui.cx.simulate_mouse_up(at, MouseButton::Right, Modifiers::none());
+    ui.cx
+        .simulate_mouse_down(at, MouseButton::Right, Modifiers::none());
+    ui.cx
+        .simulate_mouse_up(at, MouseButton::Right, Modifiers::none());
     ui.cx.run_until_parked();
     ui.frame();
     ui.press("down enter");
     assert_eq!(tab_paths(&mut ui, &ws), vec![p[2].clone()]);
     // Focus handles follow the open tabs.
-    let kept: Vec<String> = ui.cx.read(|cx| ws.read(cx).tab_focus.keys().cloned().collect());
+    let kept: Vec<String> = ui
+        .cx
+        .read(|cx| ws.read(cx).tab_focus.keys().cloned().collect());
     assert_eq!(kept, vec![p[2].clone()]);
 }
 
@@ -98,7 +111,12 @@ async fn activity_bar_switches_views(cx: &mut TestAppContext) {
     let (mut ui, ws) = shell(cx, "ws-activity");
     let view = |ui: &mut Ui| ui.cx.read(|cx| ws.read(cx).main_view());
     assert_eq!(view(&mut ui), MainViewKind::Editor);
-    for (i, want) in [(1, MainViewKind::Agenda), (2, MainViewKind::Search), (3, MainViewKind::Tags), (4, MainViewKind::Settings)] {
+    for (i, want) in [
+        (1, MainViewKind::Agenda),
+        (2, MainViewKind::Search),
+        (3, MainViewKind::Tags),
+        (4, MainViewKind::Settings),
+    ] {
         ui.click(&format!("activity:{i}"));
         assert_eq!(view(&mut ui), want);
     }
@@ -112,7 +130,8 @@ async fn activity_bar_switches_views(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 async fn dock_resize_drag_clamps(cx: &mut TestAppContext) {
     let (mut ui, ws) = shell(cx, "ws-dock");
-    ui.cx.update(|window, cx| ws.update(cx, |ws, cx| ws.toggle_backlinks(window, cx)));
+    ui.cx
+        .update(|window, cx| ws.update(cx, |ws, cx| ws.toggle_backlinks(window, cx)));
     ui.frame();
     let width = |ui: &mut Ui| ui.cx.read(|cx| ws.read(cx).dock_width);
     let w0 = width(&mut ui);
@@ -120,7 +139,10 @@ async fn dock_resize_drag_clamps(cx: &mut TestAppContext) {
     // Dragging left widens the dock.
     ui.drag(h, point(h.x - px(100.), h.y));
     assert_eq!(width(&mut ui), w0 + 100.);
-    assert!(ui.cx.read(|cx| ws.read(cx).dock_drag.is_none()), "mouse up ends the drag");
+    assert!(
+        ui.cx.read(|cx| ws.read(cx).dock_drag.is_none()),
+        "mouse up ends the drag"
+    );
     // Clamped to the original's 240..800.
     let h = ui.bounds("dock-resizer").unwrap().center();
     ui.drag(h, point(h.x + px(1000.), h.y));
@@ -135,21 +157,33 @@ async fn vault_restore_adopts_the_last_root(cx: &mut TestAppContext) {
     cx.update(test_ui::init_shell);
     let (mut ui, ws) = test_ui::open_workspace(cx);
     let r = root.clone();
-    ui.wait("vault restored", move |cx| ws.read(cx).root() == Some(r.as_str())).await;
-
+    ui.wait("vault restored", move |cx| {
+        ws.read(cx).root() == Some(r.as_str())
+    })
+    .await;
 }
 
 #[gpui_kit::test]
 async fn vault_restore_forgets_a_missing_root(cx: &mut TestAppContext) {
-    let missing = test_ui::temp_dir("ws-gone").join("gone").to_string_lossy().to_string();
+    let missing = test_ui::temp_dir("ws-gone")
+        .join("gone")
+        .to_string_lossy()
+        .to_string();
     persist::set_test_dir(test_ui::temp_dir("ws-gone-cfg"));
     persist::save(persist::KEY_LAST_ROOT, &missing);
     cx.update(test_ui::init_shell);
-    assert_eq!(cx.read(|cx| UiState::get(cx).last_root.clone()), Some(missing));
+    assert_eq!(
+        cx.read(|cx| UiState::get(cx).last_root.clone()),
+        Some(missing)
+    );
     let (mut ui, ws) = test_ui::open_workspace(cx);
     let w = ws.clone();
-    ui.wait("restore settled", move |cx| !w.read(cx).restoring).await;
-    assert_eq!(ui.cx.read(|cx| ws.read(cx).root().map(str::to_string)), None);
+    ui.wait("restore settled", move |cx| !w.read(cx).restoring)
+        .await;
+    assert_eq!(
+        ui.cx.read(|cx| ws.read(cx).root().map(str::to_string)),
+        None
+    );
     assert_eq!(ui.cx.read(|cx| UiState::get(cx).last_root.clone()), None);
     assert_eq!(persist::load::<String>(persist::KEY_LAST_ROOT), None);
 }
@@ -174,7 +208,10 @@ async fn open_folder_cancel_keeps_the_vault(cx: &mut TestAppContext) {
     });
     ui.cx.run_until_parked();
     ui.frame();
-    assert_eq!(ui.cx.read(|cx| ws.read(cx).root().map(str::to_string)), Some(root.clone()));
+    assert_eq!(
+        ui.cx.read(|cx| ws.read(cx).root().map(str::to_string)),
+        Some(root.clone())
+    );
     assert_eq!(tab_paths(&mut ui, &ws), p, "cancel keeps the open tabs");
 
     // Picking a folder adopts it (and closes the tabs).
@@ -182,9 +219,13 @@ async fn open_folder_cancel_keeps_the_vault(cx: &mut TestAppContext) {
     let pick = std::path::PathBuf::from(&other);
     ui.cx.dispatch_action(crate::actions::OpenFolder);
     ui.cx.run_until_parked();
-    ui.cx.simulate_path_prompt_response(move |_| Some(vec![pick]));
+    ui.cx
+        .simulate_path_prompt_response(move |_| Some(vec![pick]));
     ui.cx.run_until_parked();
     ui.frame();
-    assert_eq!(ui.cx.read(|cx| ws.read(cx).root().map(str::to_string)), Some(other));
+    assert_eq!(
+        ui.cx.read(|cx| ws.read(cx).root().map(str::to_string)),
+        Some(other)
+    );
     assert!(tab_paths(&mut ui, &ws).is_empty());
 }

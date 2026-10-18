@@ -20,8 +20,8 @@ use gpui_kit::{
 
 use crate::actions::*;
 use crate::settings::{
-    EDITOR_FONT_SIZE_DEFAULT, ModePref, PaletteId, SettingsStore, UI_SCALE_DEFAULT, clamp_editor_font_size,
-    clamp_ui_scale,
+    EDITOR_FONT_SIZE_DEFAULT, ModePref, PaletteId, SettingsStore, UI_SCALE_DEFAULT,
+    clamp_editor_font_size, clamp_ui_scale,
 };
 use crate::workspace::Workspace;
 use editor_window::EditorWindow;
@@ -61,7 +61,10 @@ fn percent_decode(s: &str) -> String {
     while i < bytes.len() {
         if bytes[i] == b'%'
             && i + 2 < bytes.len()
-            && let Ok(b) = u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("zz"), 16)
+            && let Ok(b) = u8::from_str_radix(
+                std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("zz"),
+                16,
+            )
         {
             out.push(b);
             i += 3;
@@ -138,7 +141,9 @@ pub fn open_editor_window(path: String, root: Option<String>, cx: &mut App) {
     let title = crate::workspace::tabs::basename(&path).to_string();
     let opts = options(&label, &title, EDITOR_SIZE, cx);
     let l = label.clone();
-    match gpui_kit::open_window(opts, cx, |window, cx| cx.new(|cx| EditorWindow::new(path, root, l, window, cx))) {
+    match gpui_kit::open_window(opts, cx, |window, cx| {
+        cx.new(|cx| EditorWindow::new(path, root, l, window, cx))
+    }) {
         Ok((handle, _)) => {
             WindowRegistry::get(cx).editors.insert(label, handle);
         }
@@ -200,7 +205,11 @@ pub fn register_global_actions(cx: &mut App) {
             if s.palette == PaletteId::Dracula {
                 return;
             }
-            s.mode = if dark { ModePref::Light } else { ModePref::Dark };
+            s.mode = if dark {
+                ModePref::Light
+            } else {
+                ModePref::Dark
+            };
         });
     });
 }
@@ -239,7 +248,10 @@ mod tests {
         assert_eq!(percent_decode("/v/a%20b.md"), "/v/a b.md");
         assert_eq!(percent_decode("/v/%C3%A9.md"), "/v/é.md");
         assert_eq!(percent_decode("/v/100%"), "/v/100%");
-        assert!(paths_from_urls(&["https://x".into(), "file:///definitely/missing.md".into()]).is_empty());
+        assert!(
+            paths_from_urls(&["https://x".into(), "file:///definitely/missing.md".into()])
+                .is_empty()
+        );
     }
 
     /// Finder "Open With" / double-click on a `.md` (CFBundleDocumentTypes):

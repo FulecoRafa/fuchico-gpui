@@ -187,14 +187,19 @@ mod tests {
         assert_eq!(keys.len(), Msg::ALL.len());
         // 300 keys ported from the original catalog plus the native-only ones
         // (CalDAV UI, shortcut reset, explorer, media, …) appended after them.
-        assert_eq!(Msg::ALL.len(), 362);
+        assert_eq!(Msg::ALL.len(), 376);
     }
 
     #[test]
     fn no_message_is_blank() {
         for &m in Msg::ALL {
             for l in Locale::ALL {
-                assert!(!raw(l, m).trim().is_empty(), "{} blank in {}", m.key(), l.tag());
+                assert!(
+                    !raw(l, m).trim().is_empty(),
+                    "{} blank in {}",
+                    m.key(),
+                    l.tag()
+                );
             }
         }
     }
@@ -213,9 +218,16 @@ mod tests {
 
     #[test]
     fn interpolates_params() {
-        assert_eq!(translate(Locale::En, Msg::SearchLine, &[("n", &7)]), "line 7");
         assert_eq!(
-            translate(Locale::En, Msg::ExplorerConfirmDelete, &[("name", &"\"a.md\"")]),
+            translate(Locale::En, Msg::SearchLine, &[("n", &7)]),
+            "line 7"
+        );
+        assert_eq!(
+            translate(
+                Locale::En,
+                Msg::ExplorerConfirmDelete,
+                &[("name", &"\"a.md\"")]
+            ),
             "Delete \"a.md\"?"
         );
         assert_eq!(interpolate("{a}-{b}-{a}", &[("a", &1)]), "1-{b}-1");

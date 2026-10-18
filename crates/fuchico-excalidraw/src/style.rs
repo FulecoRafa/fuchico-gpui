@@ -1,7 +1,7 @@
 //! Theme for the editor chrome. The canvas itself follows Excalidraw's
 //! rules (dark mode = filtered canvas colours); this only styles islands.
 
-use gpui_kit::{rgb, Hsla};
+use gpui_kit::{Hsla, rgb};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ExcalidrawStyle {

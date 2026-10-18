@@ -25,7 +25,9 @@ fn validate(key: &str) -> bool {
     if key == SMALLEST_INTEGER {
         return false;
     }
-    let Some(i) = integer_part(key) else { return false };
+    let Some(i) = integer_part(key) else {
+        return false;
+    };
     let f = &key[i.len()..];
     !f.ends_with('0') && key.bytes().all(|b| digit_index(b).is_some())
 }

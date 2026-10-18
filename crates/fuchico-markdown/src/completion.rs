@@ -11,12 +11,12 @@ use std::sync::LazyLock;
 
 use chrono::NaiveDate;
 use fuchico_core::fuzzy::fuzzy_match;
-use fuchico_core::task_helpers::{task_completions, task_trigger, TaskKind};
+use fuchico_core::task_helpers::{TaskKind, task_completions, task_trigger};
 use fuchico_core::wikilinks::{resolve_wikilink_target, wikilink_completions};
 use regex::Regex;
 
-use crate::text::TextEdit;
 use crate::MarkdownModel;
+use crate::text::TextEdit;
 
 /// CodeMirror's `matchBefore` looks at most this many chars back.
 const MATCH_BEFORE_WINDOW: usize = 250;
@@ -28,13 +28,18 @@ const MAX_WORDS: usize = 20;
 
 static TAG_TRIGGER_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?:^|\s)#([\p{L}][\p{L}\p{N}_/-]*)$").unwrap());
-static WIKILINK_TRIGGER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\[\[([^\[\]]*)$").unwrap());
-static HEADING_TRIGGER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\[\[([^\[\]#]*)#([^\[\]]*)$").unwrap());
-static WORD_TRIGGER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[A-Za-z][A-Za-z0-9_-]{3,}$").unwrap());
-static WORD_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[A-Za-z][A-Za-z0-9_-]{3,}").unwrap());
+static WIKILINK_TRIGGER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[\[([^\[\]]*)$").unwrap());
+static HEADING_TRIGGER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[\[([^\[\]#]*)#([^\[\]]*)$").unwrap());
+static WORD_TRIGGER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[A-Za-z][A-Za-z0-9_-]{3,}$").unwrap());
+static WORD_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[A-Za-z][A-Za-z0-9_-]{3,}").unwrap());
 static OPEN_WIKILINK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\[\[[^\[\]]*$").unwrap());
 static FENCE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*(`{3,}|~{3,})").unwrap());
-static HEADING_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^#{1,6}\s+(.+?)\s*#*\s*$").unwrap());
+static HEADING_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^#{1,6}\s+(.+?)\s*#*\s*$").unwrap());
 
 /// Which provider produced an option.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,7 +109,11 @@ pub struct CompletionContext<'a> {
 fn match_before<'b>(before: &'b str, re: &Regex) -> Option<(usize, &'b str)> {
     let n = before.chars().count();
     let start = if n > MATCH_BEFORE_WINDOW {
-        before.char_indices().nth(n - MATCH_BEFORE_WINDOW).map(|(i, _)| i).unwrap_or(0)
+        before
+            .char_indices()
+            .nth(n - MATCH_BEFORE_WINDOW)
+            .map(|(i, _)| i)
+            .unwrap_or(0)
     } else {
         0
     };
@@ -172,12 +181,21 @@ fn rank<T>(mut v: Vec<(T, f64)>, cap: usize) -> Vec<T> {
 
 fn link_apply(doc: &str, from: usize, to: usize, label: &str) -> (TextEdit, usize) {
     let has_close = doc.get(to..).is_some_and(|s| s.starts_with("]]"));
-    let insert = if has_close { label.to_string() } else { format!("{label}]]") };
+    let insert = if has_close {
+        label.to_string()
+    } else {
+        format!("{label}]]")
+    };
     let cursor = from + insert.len();
     (TextEdit::new(from..to, insert), cursor)
 }
 
-fn plain_option(source: CompletionSource, label: String, from: usize, to: usize) -> CompletionOption {
+fn plain_option(
+    source: CompletionSource,
+    label: String,
+    from: usize,
+    to: usize,
+) -> CompletionOption {
     let cursor = from + label.len();
     CompletionOption {
         edit: TextEdit::new(from..to, label.clone()),
@@ -193,8 +211,15 @@ fn plain_option(source: CompletionSource, label: String, from: usize, to: usize)
     }
 }
 
-fn wikilink_source(doc: &str, line_start: usize, before: &str, ctx: &CompletionContext) -> Vec<CompletionOption> {
-    let Some((at, m)) = match_before(before, &WIKILINK_TRIGGER_RE) else { return Vec::new() };
+fn wikilink_source(
+    doc: &str,
+    line_start: usize,
+    before: &str,
+    ctx: &CompletionContext,
+) -> Vec<CompletionOption> {
+    let Some((at, m)) = match_before(before, &WIKILINK_TRIGGER_RE) else {
+        return Vec::new();
+    };
     let query = m.strip_prefix("[[").unwrap_or(m);
     let to = ctx.pos;
     let from = line_start + at + m.len() - query.len();
@@ -218,9 +243,18 @@ fn wikilink_source(doc: &str, line_start: usize, before: &str, ctx: &CompletionC
         .collect()
 }
 
-fn heading_source(doc: &str, line_start: usize, before: &str, ctx: &CompletionContext) -> Vec<CompletionOption> {
-    let Some((_, m)) = match_before(before, &HEADING_TRIGGER_RE) else { return Vec::new() };
-    let Some(c) = HEADING_TRIGGER_RE.captures(m) else { return Vec::new() };
+fn heading_source(
+    doc: &str,
+    line_start: usize,
+    before: &str,
+    ctx: &CompletionContext,
+) -> Vec<CompletionOption> {
+    let Some((_, m)) = match_before(before, &HEADING_TRIGGER_RE) else {
+        return Vec::new();
+    };
+    let Some(c) = HEADING_TRIGGER_RE.captures(m) else {
+        return Vec::new();
+    };
     let (target, query) = (&c[1], &c[2]);
     let to = ctx.pos;
     let from = to - query.len();
@@ -228,7 +262,9 @@ fn heading_source(doc: &str, line_start: usize, before: &str, ctx: &CompletionCo
     let headings = if target.trim().is_empty() {
         extract_headings(doc)
     } else {
-        let Some(path) = resolve_wikilink_target(target, ctx.vault_files) else { return Vec::new() };
+        let Some(path) = resolve_wikilink_target(target, ctx.vault_files) else {
+            return Vec::new();
+        };
         match (ctx.read_note)(&path) {
             Some(t) => extract_headings(&t),
             None => return Vec::new(),
@@ -262,7 +298,9 @@ fn heading_source(doc: &str, line_start: usize, before: &str, ctx: &CompletionCo
 }
 
 fn tag_source(line_start: usize, before: &str, ctx: &CompletionContext) -> Vec<CompletionOption> {
-    let Some((_, m)) = match_before(before, &TAG_TRIGGER_RE) else { return Vec::new() };
+    let Some((_, m)) = match_before(before, &TAG_TRIGGER_RE) else {
+        return Vec::new();
+    };
     let query = &m[m.rfind('#').map(|i| i + 1).unwrap_or(0)..];
     let to = ctx.pos;
     let from = to - query.len();
@@ -275,11 +313,21 @@ fn tag_source(line_start: usize, before: &str, ctx: &CompletionContext) -> Vec<C
             r.matched.then(|| (t.clone(), r.score))
         })
         .collect();
-    rank(scored, MAX_TAGS).into_iter().map(|t| plain_option(CompletionSource::Tag, t, from, to)).collect()
+    rank(scored, MAX_TAGS)
+        .into_iter()
+        .map(|t| plain_option(CompletionSource::Tag, t, from, to))
+        .collect()
 }
 
-fn task_source(line: &str, line_start: usize, before: &str, ctx: &CompletionContext) -> Vec<CompletionOption> {
-    let Some(res) = task_completions(before, line, ctx.today) else { return Vec::new() };
+fn task_source(
+    line: &str,
+    line_start: usize,
+    before: &str,
+    ctx: &CompletionContext,
+) -> Vec<CompletionOption> {
+    let Some(res) = task_completions(before, line, ctx.today) else {
+        return Vec::new();
+    };
     let from = line_start + res.from;
     let to = ctx.pos;
     let kind = match res.kind {
@@ -306,11 +354,18 @@ fn task_source(line: &str, line_start: usize, before: &str, ctx: &CompletionCont
         .collect()
 }
 
-fn word_source(model: &MarkdownModel, line_start: usize, before: &str, ctx: &CompletionContext) -> Vec<CompletionOption> {
+fn word_source(
+    model: &MarkdownModel,
+    line_start: usize,
+    before: &str,
+    ctx: &CompletionContext,
+) -> Vec<CompletionOption> {
     if OPEN_WIKILINK_RE.is_match(before) {
         return Vec::new();
     }
-    let Some((at, query)) = match_before(before, &WORD_TRIGGER_RE) else { return Vec::new() };
+    let Some((at, query)) = match_before(before, &WORD_TRIGGER_RE) else {
+        return Vec::new();
+    };
     if model.is_inside_code(ctx.pos) {
         return Vec::new();
     }
@@ -325,7 +380,10 @@ fn word_source(model: &MarkdownModel, line_start: usize, before: &str, ctx: &Com
             r.matched.then_some((w, r.score))
         })
         .collect();
-    rank(scored, MAX_WORDS).into_iter().map(|w| plain_option(CompletionSource::Word, w, from, to)).collect()
+    rank(scored, MAX_WORDS)
+        .into_iter()
+        .map(|w| plain_option(CompletionSource::Word, w, from, to))
+        .collect()
 }
 
 impl MarkdownModel {
@@ -352,13 +410,13 @@ impl MarkdownModel {
         for o in all {
             if let Some(prev) = out.last()
                 && !o.custom_apply
-                    && !prev.custom_apply
-                    && prev.label == o.label
-                    && prev.detail == o.detail
-                    && prev.kind == o.kind
-                {
-                    continue;
-                }
+                && !prev.custom_apply
+                && prev.label == o.label
+                && prev.detail == o.detail
+                && prev.kind == o.kind
+            {
+                continue;
+            }
             out.push(o);
             if out.len() == MAX_RENDERED_OPTIONS {
                 break;
@@ -380,7 +438,10 @@ mod tests {
 
     #[test]
     fn words_distinct_in_order() {
-        assert_eq!(extract_words("abcd the abcd efgh-ij x1234"), vec!["abcd", "efgh-ij", "x1234"]);
+        assert_eq!(
+            extract_words("abcd the abcd efgh-ij x1234"),
+            vec!["abcd", "efgh-ij", "x1234"]
+        );
     }
 
     #[test]

@@ -11,8 +11,9 @@ use std::time::Duration;
 use chrono::Days;
 use fuchico_core::events::CoreEvent;
 use gpui_kit::{
-    AnyWindowHandle, AppContext, Bounds, Context, Entity, IntoElement, Modifiers, Pixels, Point, Render, Subscription,
-    TestAppContext, VisualTestContext, Window, WindowBounds, WindowOptions, div, px, size,
+    AnyWindowHandle, AppContext, Bounds, Context, Entity, IntoElement, Modifiers, Pixels, Point,
+    Render, Subscription, TestAppContext, VisualTestContext, Window, WindowBounds, WindowOptions,
+    div, px, size,
 };
 
 use super::model::{MonthCursor, iso, local_today};
@@ -33,8 +34,14 @@ impl Render for BusRecorder {
 }
 
 fn temp_vault() -> std::path::PathBuf {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let dir = std::env::temp_dir().join(format!("fuchico-agenda-test-{}-{nanos}", std::process::id()));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!(
+        "fuchico-agenda-test-{}-{nanos}",
+        std::process::id()
+    ));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -64,7 +71,10 @@ impl Ui {
     }
 
     fn click(&mut self, sel: &str) {
-        let at = self.bounds(sel).unwrap_or_else(|| panic!("no element {sel}")).center();
+        let at = self
+            .bounds(sel)
+            .unwrap_or_else(|| panic!("no element {sel}"))
+            .center();
         self.cx.simulate_mouse_move(at, None, Modifiers::none());
         self.frame();
         self.cx.simulate_click(at, Modifiers::none());
@@ -91,7 +101,10 @@ impl Ui {
     }
 }
 
-fn loaded(view: &Entity<AgendaView>, cx: &gpui_kit::App) -> Option<Vec<fuchico_core::tasks::AgendaItem>> {
+fn loaded(
+    view: &Entity<AgendaView>,
+    cx: &gpui_kit::App,
+) -> Option<Vec<fuchico_core::tasks::AgendaItem>> {
     match &view.read(cx).state {
         ScanState::Loaded(items) => Some(items.clone()),
         _ => None,
@@ -122,7 +135,10 @@ async fn agenda_sections_toggle_filter_nav_open_and_rescan(cx: &mut TestAppConte
 
     cx.update(|cx| {
         gpui_kit::init(cx);
-        crate::theme::apply::apply(crate::theme::resolve(&crate::settings::Settings::default(), true), cx);
+        crate::theme::apply::apply(
+            crate::theme::resolve(&crate::settings::Settings::default(), true),
+            cx,
+        );
         bus::init(cx);
     });
     let recorder = cx.update(|cx| {
@@ -137,17 +153,29 @@ async fn agenda_sections_toggle_filter_nav_open_and_rescan(cx: &mut TestAppConte
     });
     let opened: Rc<RefCell<Vec<ViewEvent>>> = Rc::default();
     let (handle, view): (AnyWindowHandle, Entity<AgendaView>) = cx.update(|cx| {
-        let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(900.)) };
+        let bounds = Bounds {
+            origin: Point::default(),
+            size: size(px(1200.), px(900.)),
+        };
         gpui_kit::open_window(
-            WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() },
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                ..Default::default()
+            },
             cx,
             |window, cx| cx.new(|cx| AgendaView::new(Some(root.clone()), window, cx)),
         )
         .expect("open test window")
     });
     let sink = opened.clone();
-    let _view_sub = cx.update(|cx| cx.subscribe(&view, move |_, ev: &ViewEvent, _| sink.borrow_mut().push(ev.clone())));
-    let mut ui = Ui { cx: VisualTestContext::from_window(handle, cx) };
+    let _view_sub = cx.update(|cx| {
+        cx.subscribe(&view, move |_, ev: &ViewEvent, _| {
+            sink.borrow_mut().push(ev.clone())
+        })
+    });
+    let mut ui = Ui {
+        cx: VisualTestContext::from_window(handle, cx),
+    };
 
     // ---- scan + sections ----------------------------------------------------
     ui.wait(|cx| loaded(&view, cx).is_some()).await;
@@ -169,10 +197,19 @@ async fn agenda_sections_toggle_filter_nav_open_and_rescan(cx: &mut TestAppConte
 
     // ---- checkbox toggle writes the file; rescan via fs:file-written --------
     ui.click("agenda-today-0-cb");
-    ui.wait(|cx| loaded(&view, cx).is_some_and(|items| items.iter().any(|i| i.text.contains("today task") && i.checked)))
-        .await;
+    ui.wait(|cx| {
+        loaded(&view, cx).is_some_and(|items| {
+            items
+                .iter()
+                .any(|i| i.text.contains("today task") && i.checked)
+        })
+    })
+    .await;
     let text = std::fs::read_to_string(&note).unwrap();
-    assert!(text.contains(&format!("- [x] today task 📅 {today_s}")), "{text}");
+    assert!(
+        text.contains(&format!("- [x] today task 📅 {today_s}")),
+        "{text}"
+    );
     // The checkbox click must not also open the row.
     assert!(opened.borrow().is_empty());
     assert!(ui.cx.read(|cx| recorder.read(cx).seen.is_empty()));
@@ -181,10 +218,19 @@ async fn agenda_sections_toggle_filter_nav_open_and_rescan(cx: &mut TestAppConte
 
     // ---- row click → OpenFile + GotoLine (1-based line) ----------------------
     ui.click("agenda-overdue-0");
-    assert_eq!(opened.borrow().as_slice(), &[ViewEvent::OpenFile { path: note_s.clone(), line: Some(1) }]);
+    assert_eq!(
+        opened.borrow().as_slice(),
+        &[ViewEvent::OpenFile {
+            path: note_s.clone(),
+            line: Some(1)
+        }]
+    );
     assert_eq!(
         ui.cx.read(|cx| recorder.read(cx).seen.clone()),
-        vec![AppEvent::GotoLine { path: note_s.clone(), line: 1 }]
+        vec![AppEvent::GotoLine {
+            path: note_s.clone(),
+            line: 1
+        }]
     );
 
     // ---- keyboard: Enter / Tab + Space on focused rows ----------------------
@@ -194,19 +240,37 @@ async fn agenda_sections_toggle_filter_nav_open_and_rescan(cx: &mut TestAppConte
     let focus = ui.cx.read(|cx| view.read(cx).row_focus.clone());
     ui.cx.update(|window, cx| window.focus(&focus[3], cx));
     ui.press("enter");
-    assert_eq!(opened.borrow().as_slice(), &[ViewEvent::OpenFile { path: note_s.clone(), line: Some(5) }]);
+    assert_eq!(
+        opened.borrow().as_slice(),
+        &[ViewEvent::OpenFile {
+            path: note_s.clone(),
+            line: Some(5)
+        }]
+    );
     opened.borrow_mut().clear();
     ui.press("tab");
     assert!(ui.cx.update(|window, _| focus[4].is_focused(window)));
     ui.press("space");
-    assert_eq!(opened.borrow().as_slice(), &[ViewEvent::OpenFile { path: note_s.clone(), line: Some(3) }]);
+    assert_eq!(
+        opened.borrow().as_slice(),
+        &[ViewEvent::OpenFile {
+            path: note_s.clone(),
+            line: Some(3)
+        }]
+    );
     opened.borrow_mut().clear();
     ui.press("shift-tab");
     assert!(ui.cx.update(|window, _| focus[3].is_focused(window)));
 
     // ---- routine row opens too -----------------------------------------------
     ui.click("agenda-routine-0");
-    assert_eq!(opened.borrow().as_slice(), &[ViewEvent::OpenFile { path: note_s.clone(), line: Some(6) }]);
+    assert_eq!(
+        opened.borrow().as_slice(),
+        &[ViewEvent::OpenFile {
+            path: note_s.clone(),
+            line: Some(6)
+        }]
+    );
 
     // ---- day filter + clear --------------------------------------------------
     let selected = |ui: &mut Ui| ui.cx.read(|cx| view.read(cx).selected.clone());
@@ -247,12 +311,37 @@ async fn agenda_sections_toggle_filter_nav_open_and_rescan(cx: &mut TestAppConte
 
     // ---- fs:changed under the vault → rescan; outside it → ignored ----------
     std::fs::write(vault.join("more.md"), "- [ ] brand new task\n").unwrap();
-    ui.cx.update(|_, cx| bus::emit(cx, AppEvent::Core(CoreEvent::FsChanged { dir: root.clone(), from: None })));
-    ui.wait(|cx| loaded(&view, cx).is_some_and(|items| items.iter().any(|i| i.text.contains("brand new task")))).await;
+    ui.cx.update(|_, cx| {
+        bus::emit(
+            cx,
+            AppEvent::Core(CoreEvent::FsChanged {
+                dir: root.clone(),
+                from: None,
+            }),
+        )
+    });
+    ui.wait(|cx| {
+        loaded(&view, cx)
+            .is_some_and(|items| items.iter().any(|i| i.text.contains("brand new task")))
+    })
+    .await;
     std::fs::write(vault.join("ignored.md"), "- [ ] should wait\n").unwrap();
-    ui.cx.update(|_, cx| bus::emit(cx, AppEvent::Core(CoreEvent::FsChanged { dir: "/elsewhere".into(), from: None })));
+    ui.cx.update(|_, cx| {
+        bus::emit(
+            cx,
+            AppEvent::Core(CoreEvent::FsChanged {
+                dir: "/elsewhere".into(),
+                from: None,
+            }),
+        )
+    });
     ui.cx.run_until_parked();
-    assert!(ui.cx.read(|cx| !loaded(&view, cx).unwrap().iter().any(|i| i.text.contains("should wait"))));
+    assert!(ui.cx.read(|cx| {
+        !loaded(&view, cx)
+            .unwrap()
+            .iter()
+            .any(|i| i.text.contains("should wait"))
+    }));
 
     let _ = std::fs::remove_dir_all(&vault);
 }

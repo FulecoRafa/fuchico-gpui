@@ -1,8 +1,12 @@
 //! The Command Palette overlay (spec 4 §4, `CommandPalette.tsx`).
 
-use gpui_kit::component::input::{Enter, Escape, InputEvent, InputState, MoveDown, MoveUp, Position};
+use gpui_kit::component::input::{
+    Enter, Escape, InputEvent, InputState, MoveDown, MoveUp, Position,
+};
 use gpui_kit::prelude::*;
-use gpui_kit::{Context, EventEmitter, FocusHandle, Focusable, ScrollHandle, Subscription, Window, div};
+use gpui_kit::{
+    Context, EventEmitter, FocusHandle, Focusable, ScrollHandle, Subscription, Window, div,
+};
 
 use super::OverlayEvent;
 use super::commands::{CommandContext, Ranked, build_commands, rank};
@@ -31,13 +35,26 @@ impl Focusable for CommandPalette {
 }
 
 impl CommandPalette {
-    pub fn new(query: String, ctx: CommandContext, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let input = cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(PaletteRunCommand)));
+    pub fn new(
+        query: String,
+        ctx: CommandContext,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(PaletteRunCommand)));
         let len = query.chars().count() as u32;
         input.update(cx, |s, cx| {
             s.set_value(query, window, cx);
             // Caret after any pre-filled ":" so typing appends.
-            s.set_cursor_position(Position { line: 0, character: len }, window, cx);
+            s.set_cursor_position(
+                Position {
+                    line: 0,
+                    character: len,
+                },
+                window,
+                cx,
+            );
             s.focus(window, cx);
         });
         let subs = vec![
@@ -48,11 +65,20 @@ impl CommandPalette {
             }),
             // Settings (shortcuts, custom themes, templates folder, language).
             cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
-                this.input.update(cx, |s, cx| s.set_placeholder(crate::t!(PaletteRunCommand), window, cx));
+                this.input.update(cx, |s, cx| {
+                    s.set_placeholder(crate::t!(PaletteRunCommand), window, cx)
+                });
                 this.recompute(cx);
             }),
         ];
-        let mut this = CommandPalette { input, ctx, results: vec![], active: 0, scroll: ScrollHandle::new(), _subs: subs };
+        let mut this = CommandPalette {
+            input,
+            ctx,
+            results: vec![],
+            active: 0,
+            scroll: ScrollHandle::new(),
+            _subs: subs,
+        };
         this.recompute(cx);
         this
     }
@@ -117,20 +143,32 @@ impl Render for CommandPalette {
                 .enumerate()
                 .map(|(i, r)| {
                     let active = i == self.active;
-                    overlay::item(("palette-cmd", i), AppIcon::Command, &r.command.title, &r.indices, active, cx)
-                        .when_some(r.alias, |d, a| d.child(overlay::alias_chip(a, cx)))
-                        .when_some(r.command.binding.as_ref(), |d, b| {
-                            d.child(overlay::keys_chip(display_binding(b), active, r.alias.is_some(), cx))
-                        })
-                        .debug_selector(move || format!("palette-row-{i}"))
-                        .on_mouse_move(cx.listener(move |this, _, _, cx| {
-                            if this.active != i {
-                                this.active = i;
-                                cx.notify();
-                            }
-                        }))
-                        .on_click(cx.listener(move |this, _, _, cx| this.run(i, cx)))
-                        .into_any_element()
+                    overlay::item(
+                        ("palette-cmd", i),
+                        AppIcon::Command,
+                        &r.command.title,
+                        &r.indices,
+                        active,
+                        cx,
+                    )
+                    .when_some(r.alias, |d, a| d.child(overlay::alias_chip(a, cx)))
+                    .when_some(r.command.binding.as_ref(), |d, b| {
+                        d.child(overlay::keys_chip(
+                            display_binding(b),
+                            active,
+                            r.alias.is_some(),
+                            cx,
+                        ))
+                    })
+                    .debug_selector(move || format!("palette-row-{i}"))
+                    .on_mouse_move(cx.listener(move |this, _, _, cx| {
+                        if this.active != i {
+                            this.active = i;
+                            cx.notify();
+                        }
+                    }))
+                    .on_click(cx.listener(move |this, _, _, cx| this.run(i, cx)))
+                    .into_any_element()
                 })
                 .collect()
         };
@@ -155,6 +193,13 @@ impl Render for CommandPalette {
                 cx.stop_propagation();
                 this.run(this.active, cx);
             }))
-            .child(overlay::frame("command-palette", &self.input, rows, &self.scroll, backdrop, cx))
+            .child(overlay::frame(
+                "command-palette",
+                &self.input,
+                rows,
+                &self.scroll,
+                backdrop,
+                cx,
+            ))
     }
 }

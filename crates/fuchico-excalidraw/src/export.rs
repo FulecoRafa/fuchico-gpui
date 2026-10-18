@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use std::fmt::Write as _;
 
 use base64::Engine as _;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::color::{self, Rgba};
 use crate::geom;
@@ -43,17 +43,30 @@ pub struct ExportOptions {
 
 impl Default for ExportOptions {
     fn default() -> Self {
-        Self { background: true, dark: false, embed_scene: false, scale: 1.0, only: None, padding: 10.0 }
+        Self {
+            background: true,
+            dark: false,
+            embed_scene: false,
+            scale: 1.0,
+            only: None,
+            padding: 10.0,
+        }
     }
 }
 
 /// The elements an export covers (selection plus bound text and frame children).
 pub fn export_elements<'a>(scene: &'a Scene, only: Option<&HashSet<String>>) -> Vec<&'a Element> {
-    let Some(ids) = only else { return scene.elements().collect() };
+    let Some(ids) = only else {
+        return scene.elements().collect();
+    };
     let mut set = ids.clone();
     for el in scene.elements() {
         let contained = el.container_id().map(|c| ids.contains(c)).unwrap_or(false);
-        let framed = el.f.frame_id.get().map(|f| ids.contains(f)).unwrap_or(false);
+        let framed =
+            el.f.frame_id
+                .get()
+                .map(|f| ids.contains(f))
+                .unwrap_or(false);
         if contained || framed {
             set.insert(el.id.clone());
         }
@@ -64,7 +77,10 @@ pub fn export_elements<'a>(scene: &'a Scene, only: Option<&HashSet<String>>) -> 
 /// The scene (or a subset) as `.excalidraw` JSON, for embedding.
 pub fn scene_json(scene: &Scene, only: Option<&HashSet<String>>) -> String {
     let els = export_elements(scene, only);
-    let ids: HashSet<&str> = els.iter().filter_map(|e| e.f.file_id.get().map(|s| s.as_str())).collect();
+    let ids: HashSet<&str> = els
+        .iter()
+        .filter_map(|e| e.f.file_id.get().map(|s| s.as_str()))
+        .collect();
     let files: Map<String, Value> = scene
         .files
         .iter()
@@ -73,8 +89,16 @@ pub fn scene_json(scene: &Scene, only: Option<&HashSet<String>>) -> String {
         .collect();
     let mut app = Map::new();
     let st = scene.app_state();
-    app.insert("gridSize".into(), st.and_then(|a| a.get("gridSize")).cloned().unwrap_or(Value::from(20)));
-    app.insert("viewBackgroundColor".into(), Value::from(scene.view_background()));
+    app.insert(
+        "gridSize".into(),
+        st.and_then(|a| a.get("gridSize"))
+            .cloned()
+            .unwrap_or(Value::from(20)),
+    );
+    app.insert(
+        "viewBackgroundColor".into(),
+        Value::from(scene.view_background()),
+    );
     let v = json!({
         "type": "excalidraw",
         "version": 2,
@@ -112,7 +136,10 @@ fn encode_payload(scene_json: &str) -> String {
 fn decode_payload(wrapper: &str) -> Option<String> {
     let v: Value = serde_json::from_str(wrapper).ok()?;
     let enc = v.get("encoded")?.as_str()?;
-    if v.get("compressed").and_then(|c| c.as_bool()).unwrap_or(false) {
+    if v.get("compressed")
+        .and_then(|c| c.as_bool())
+        .unwrap_or(false)
+    {
         return None; // deflated payloads (Excalidraw web) aren't supported
     }
     match v.get("encoding").and_then(|e| e.as_str()) {
@@ -132,7 +159,9 @@ pub fn decode_embedded_svg(svg: &str) -> Option<String> {
     }
     let start = svg.find("<!-- payload-start -->")? + "<!-- payload-start -->".len();
     let end = svg[start..].find("<!-- payload-end -->")? + start;
-    let raw = base64::engine::general_purpose::STANDARD.decode(svg[start..end].trim()).ok()?;
+    let raw = base64::engine::general_purpose::STANDARD
+        .decode(svg[start..end].trim())
+        .ok()?;
     let wrapper: String = raw.iter().map(|b| *b as char).collect();
     decode_payload(&wrapper)
 }
@@ -146,10 +175,11 @@ pub fn decode_embedded_png(png: &[u8]) -> Option<String> {
         let data = png.get(i + 8..i + 8 + len)?;
         if ty == b"tEXt"
             && let Some(nul) = data.iter().position(|b| *b == 0)
-                && &data[..nul] == EXCALIDRAW_MIME.as_bytes() {
-                    let text: String = data[nul + 1..].iter().map(|b| *b as char).collect();
-                    return decode_payload(&text);
-                }
+            && &data[..nul] == EXCALIDRAW_MIME.as_bytes()
+        {
+            let text: String = data[nul + 1..].iter().map(|b| *b as char).collect();
+            return decode_payload(&text);
+        }
         i += 12 + len;
     }
     None
@@ -159,7 +189,11 @@ pub fn decode_embedded_png(png: &[u8]) -> Option<String> {
 
 fn fmt(v: f64) -> String {
     let r = (v * 100.0).round() / 100.0;
-    if r == r.trunc() { format!("{}", r as i64) } else { format!("{r}") }
+    if r == r.trunc() {
+        format!("{}", r as i64)
+    } else {
+        format!("{r}")
+    }
 }
 
 fn path_d(ops: &[Op]) -> String {
@@ -170,7 +204,16 @@ fn path_d(ops: &[Op]) -> String {
             Op::Move(p) => write!(d, "M{} {} ", f(p[0]), f(p[1])),
             Op::Line(p) => write!(d, "L{} {} ", f(p[0]), f(p[1])),
             Op::Quad(c, p) => write!(d, "Q{} {} {} {} ", f(c[0]), f(c[1]), f(p[0]), f(p[1])),
-            Op::Cubic(a, b, p) => write!(d, "C{} {} {} {} {} {} ", f(a[0]), f(a[1]), f(b[0]), f(b[1]), f(p[0]), f(p[1])),
+            Op::Cubic(a, b, p) => write!(
+                d,
+                "C{} {} {} {} {} {} ",
+                f(a[0]),
+                f(a[1]),
+                f(b[0]),
+                f(b[1]),
+                f(p[0]),
+                f(p[1])
+            ),
             Op::Close => write!(d, "Z "),
         }
         .ok();
@@ -183,16 +226,21 @@ fn css(c: Rgba) -> (String, Option<f32>) {
 }
 
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// Content bounds of an export (world coordinates, before padding).
 pub fn export_bounds(els: &[&Element]) -> Option<[f64; 4]> {
-    els.iter().map(|e| {
-        let b = geom::aabb(e);
-        let sw = e.stroke_width() / 2.0;
-        [b[0] - sw, b[1] - sw, b[2] + sw, b[3] + sw]
-    }).reduce(geom::union)
+    els.iter()
+        .map(|e| {
+            let b = geom::aabb(e);
+            let sw = e.stroke_width() / 2.0;
+            [b[0] - sw, b[1] - sw, b[2] + sw, b[3] + sw]
+        })
+        .reduce(geom::union)
 }
 
 /// Data URLs that resvg can't decode (no raster-image features) are
@@ -206,15 +254,30 @@ fn png_data_url(url: &str) -> Option<String> {
     image::DynamicImage::ImageRgba8(img)
         .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
         .ok()?;
-    Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(out)))
+    Some(format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(out)
+    ))
 }
 
 fn write_image(out: &mut String, el: &Element, scene: &Scene, for_raster: bool) {
-    let Some(fid) = el.f.file_id.get() else { return };
-    let Some(url) = scene.file_data_url(fid) else { return };
-    let url = if for_raster { png_data_url(url).unwrap_or_default() } else { url.to_string() };
+    let Some(fid) = el.f.file_id.get() else {
+        return;
+    };
+    let Some(url) = scene.file_data_url(fid) else {
+        return;
+    };
+    let url = if for_raster {
+        png_data_url(url).unwrap_or_default()
+    } else {
+        url.to_string()
+    };
     let (w, h) = (el.width().abs(), el.height().abs());
-    let (fx, fy) = el.f.scale.get().map(|s| (s[0].0 < 0.0, s[1].0 < 0.0)).unwrap_or((false, false));
+    let (fx, fy) =
+        el.f.scale
+            .get()
+            .map(|s| (s[0].0 < 0.0, s[1].0 < 0.0))
+            .unwrap_or((false, false));
     let flip = if fx || fy {
         format!(
             " transform=\"translate({} {}) scale({} {})\"",
@@ -231,14 +294,24 @@ fn write_image(out: &mut String, el: &Element, scene: &Scene, for_raster: bool) 
             let _ = write!(
                 out,
                 "<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" preserveAspectRatio=\"none\" overflow=\"hidden\"{flip}><image href=\"{}\" width=\"{}\" height=\"{}\" preserveAspectRatio=\"none\"/></svg>",
-                fmt(w), fmt(h), fmt(c.x), fmt(c.y), fmt(c.width), fmt(c.height), esc(&url), fmt(c.natural_width), fmt(c.natural_height)
+                fmt(w),
+                fmt(h),
+                fmt(c.x),
+                fmt(c.y),
+                fmt(c.width),
+                fmt(c.height),
+                esc(&url),
+                fmt(c.natural_width),
+                fmt(c.natural_height)
             );
         }
         None => {
             let _ = write!(
                 out,
                 "<image href=\"{}\" width=\"{}\" height=\"{}\" preserveAspectRatio=\"none\"{flip}/>",
-                esc(&url), fmt(w), fmt(h)
+                esc(&url),
+                fmt(w),
+                fmt(h)
             );
         }
     }
@@ -272,9 +345,20 @@ pub fn crop_of(el: &Element) -> Option<Crop> {
 fn write_element(out: &mut String, el: &Element, scene: &Scene, pal: Palette, for_raster: bool) {
     let lc = geom::local_center(el);
     let opacity = (el.opacity() / 100.0).clamp(0.0, 1.0);
-    let _ = write!(out, "<g transform=\"translate({} {})", fmt(el.x()), fmt(el.y()));
+    let _ = write!(
+        out,
+        "<g transform=\"translate({} {})",
+        fmt(el.x()),
+        fmt(el.y())
+    );
     if el.angle() != 0.0 {
-        let _ = write!(out, " rotate({} {} {})", fmt(el.angle().to_degrees()), fmt(lc[0]), fmt(lc[1]));
+        let _ = write!(
+            out,
+            " rotate({} {} {})",
+            fmt(el.angle().to_degrees()),
+            fmt(lc[0]),
+            fmt(lc[1])
+        );
     }
     out.push('"');
     if opacity < 1.0 {
@@ -285,7 +369,9 @@ fn write_element(out: &mut String, el: &Element, scene: &Scene, pal: Palette, fo
         let _ = write!(
             out,
             "<rect x=\"-4\" y=\"-4\" width=\"{}\" height=\"{}\" fill=\"{}\"/>",
-            fmt(el.width() + 8.0), fmt(el.height() + 8.0), pal.canvas.to_hex()
+            fmt(el.width() + 8.0),
+            fmt(el.height() + 8.0),
+            pal.canvas.to_hex()
         );
     }
     match el.kind.as_str() {
@@ -295,7 +381,9 @@ fn write_element(out: &mut String, el: &Element, scene: &Scene, pal: Palette, fo
             let _ = write!(
                 out,
                 "<rect width=\"{}\" height=\"{}\" rx=\"8\" fill=\"none\" stroke=\"{}\" stroke-width=\"2\"/>",
-                fmt(w), fmt(h), pal.resolve("#bbbbbb").to_hex()
+                fmt(w),
+                fmt(h),
+                pal.resolve("#bbbbbb").to_hex()
             );
         }
         "rectangle" | "diamond" | "ellipse" | "line" | "arrow" | "freedraw" | "text" => {
@@ -328,7 +416,12 @@ fn write_element(out: &mut String, el: &Element, scene: &Scene, pal: Palette, fo
                             fmt(*width as f64)
                         );
                         if let Some([on, off]) = dash {
-                            let _ = write!(out, " stroke-dasharray=\"{} {}\"", fmt(*on as f64), fmt(*off as f64));
+                            let _ = write!(
+                                out,
+                                " stroke-dasharray=\"{} {}\"",
+                                fmt(*on as f64),
+                                fmt(*off as f64)
+                            );
                         }
                         if let Some(a) = a {
                             let _ = write!(out, " stroke-opacity=\"{}\"", fmt(a as f64));
@@ -346,7 +439,10 @@ fn write_element(out: &mut String, el: &Element, scene: &Scene, pal: Palette, fo
 fn build_svg(scene: &Scene, opts: &ExportOptions, for_raster: bool) -> String {
     let els = export_elements(scene, opts.only.as_ref());
     let bg = color::parse(&scene.view_background()).unwrap_or(Rgba::new(1.0, 1.0, 1.0, 1.0));
-    let pal = Palette { dark: opts.dark, canvas: if opts.dark { bg.dark_filter() } else { bg } };
+    let pal = Palette {
+        dark: opts.dark,
+        canvas: if opts.dark { bg.dark_filter() } else { bg },
+    };
     let b = export_bounds(&els).unwrap_or([0.0, 0.0, 0.0, 0.0]);
     let pad = opts.padding;
     let (w, h) = (b[2] - b[0] + pad * 2.0, b[3] - b[1] + pad * 2.0);
@@ -354,7 +450,10 @@ fn build_svg(scene: &Scene, opts: &ExportOptions, for_raster: bool) -> String {
     let _ = write!(
         out,
         "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 {} {}\" width=\"{}\" height=\"{}\">",
-        fmt(w), fmt(h), fmt(w), fmt(h)
+        fmt(w),
+        fmt(h),
+        fmt(w),
+        fmt(h)
     );
     if opts.embed_scene && !for_raster {
         let payload = encode_payload(&scene_json(scene, opts.only.as_ref()));
@@ -365,7 +464,10 @@ fn build_svg(scene: &Scene, opts: &ExportOptions, for_raster: bool) -> String {
         );
     }
     // Frame clip paths.
-    let frames: Vec<&&Element> = els.iter().filter(|e| e.kind == "frame" || e.kind == "magicframe").collect();
+    let frames: Vec<&&Element> = els
+        .iter()
+        .filter(|e| e.kind == "frame" || e.kind == "magicframe")
+        .collect();
     if !frames.is_empty() {
         out.push_str("<defs>");
         for f in &frames {
@@ -373,21 +475,41 @@ fn build_svg(scene: &Scene, opts: &ExportOptions, for_raster: bool) -> String {
             let _ = write!(
                 out,
                 "<clipPath id=\"clip-{}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"8\"/></clipPath>",
-                esc(&f.id), fmt(fb[0]), fmt(fb[1]), fmt(fb[2] - fb[0]), fmt(fb[3] - fb[1])
+                esc(&f.id),
+                fmt(fb[0]),
+                fmt(fb[1]),
+                fmt(fb[2] - fb[0]),
+                fmt(fb[3] - fb[1])
             );
         }
         out.push_str("</defs>");
     }
     if opts.background {
-        let _ = write!(out, "<rect x=\"0\" y=\"0\" width=\"{}\" height=\"{}\" fill=\"{}\"/>", fmt(w), fmt(h), pal.canvas.to_hex());
+        let _ = write!(
+            out,
+            "<rect x=\"0\" y=\"0\" width=\"{}\" height=\"{}\" fill=\"{}\"/>",
+            fmt(w),
+            fmt(h),
+            pal.canvas.to_hex()
+        );
     }
     let frame_ids: HashSet<&str> = frames.iter().map(|f| f.id.as_str()).collect();
-    let _ = write!(out, "<g transform=\"translate({} {})\">", fmt(pad - b[0]), fmt(pad - b[1]));
+    let _ = write!(
+        out,
+        "<g transform=\"translate({} {})\">",
+        fmt(pad - b[0]),
+        fmt(pad - b[1])
+    );
     for el in &els {
         if el.kind == "frame" || el.kind == "magicframe" {
             continue;
         }
-        match el.f.frame_id.get().filter(|f| frame_ids.contains(f.as_str())) {
+        match el
+            .f
+            .frame_id
+            .get()
+            .filter(|f| frame_ids.contains(f.as_str()))
+        {
             Some(f) => {
                 let _ = write!(out, "<g clip-path=\"url(#clip-{})\">", esc(f));
                 write_element(&mut out, el, scene, pal, for_raster);
@@ -405,13 +527,25 @@ fn build_svg(scene: &Scene, opts: &ExportOptions, for_raster: bool) -> String {
 
 /// Text bound to an arrow (drawn over a canvas-coloured backing).
 pub fn is_arrow_label(el: &Element, scene: &Scene) -> bool {
-    el.kind == "text" && el.container_id().and_then(|c| scene.get(c)).map(|c| c.is_linear()).unwrap_or(false)
+    el.kind == "text"
+        && el
+            .container_id()
+            .and_then(|c| scene.get(c))
+            .map(|c| c.is_linear())
+            .unwrap_or(false)
 }
 
 /// Colour of the rendered scene at a world point (the eyedropper), as
 /// `#rrggbb`; the canvas colour where nothing is drawn.
 pub fn sample_color(scene: &Scene, p: [f64; 2], dark: bool) -> Option<String> {
-    let opts = ExportOptions { background: true, dark, embed_scene: false, scale: 1.0, only: None, padding: 10.0 };
+    let opts = ExportOptions {
+        background: true,
+        dark,
+        embed_scene: false,
+        scale: 1.0,
+        only: None,
+        padding: 10.0,
+    };
     let els = export_elements(scene, None);
     let b = export_bounds(&els)?;
     let (x, y) = (p[0] - b[0] + opts.padding, p[1] - b[1] + opts.padding);
@@ -423,9 +557,18 @@ pub fn sample_color(scene: &Scene, p: [f64; 2], dark: bool) -> Option<String> {
         return Some(if dark { bg.dark_filter() } else { bg }.to_hex());
     }
     let mut pm = resvg::tiny_skia::Pixmap::new(1, 1)?;
-    resvg::render(&tree, resvg::tiny_skia::Transform::from_translate(-x as f32, -y as f32), &mut pm.as_mut());
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::from_translate(-x as f32, -y as f32),
+        &mut pm.as_mut(),
+    );
     let px = pm.pixel(0, 0)?.demultiply();
-    Some(format!("#{:02x}{:02x}{:02x}", px.red(), px.green(), px.blue()))
+    Some(format!(
+        "#{:02x}{:02x}{:02x}",
+        px.red(),
+        px.green(),
+        px.blue()
+    ))
 }
 
 /// The scene as an SVG document.
@@ -440,7 +583,11 @@ fn crc32(data: &[u8]) -> u32 {
     for &b in data {
         c ^= b as u32;
         for _ in 0..8 {
-            c = if c & 1 != 0 { 0xedb8_8320 ^ (c >> 1) } else { c >> 1 };
+            c = if c & 1 != 0 {
+                0xedb8_8320 ^ (c >> 1)
+            } else {
+                c >> 1
+            };
         }
     }
     !c
@@ -461,15 +608,23 @@ fn text_chunk(keyword: &str, text: &[u8]) -> Vec<u8> {
 /// The scene rasterised to PNG bytes.
 pub fn to_png(scene: &Scene, opts: &ExportOptions) -> Result<Vec<u8>, String> {
     let svg = build_svg(scene, opts, true);
-    let tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default()).map_err(|e| e.to_string())?;
+    let tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())
+        .map_err(|e| e.to_string())?;
     let scale = opts.scale.clamp(0.1, 8.0) as f32;
     let size = tree.size();
-    let (w, h) = (((size.width() * scale).ceil() as u32).max(1), ((size.height() * scale).ceil() as u32).max(1));
+    let (w, h) = (
+        ((size.width() * scale).ceil() as u32).max(1),
+        ((size.height() * scale).ceil() as u32).max(1),
+    );
     if (w as u64) * (h as u64) > 16384 * 16384 {
         return Err("Canvas too big".into());
     }
     let mut pm = resvg::tiny_skia::Pixmap::new(w, h).ok_or("Canvas too big")?;
-    resvg::render(&tree, resvg::tiny_skia::Transform::from_scale(scale, scale), &mut pm.as_mut());
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::from_scale(scale, scale),
+        &mut pm.as_mut(),
+    );
     let mut png = pm.encode_png().map_err(|e| e.to_string())?;
     if opts.embed_scene {
         let payload = encode_payload(&scene_json(scene, opts.only.as_ref()));
@@ -482,7 +637,7 @@ pub fn to_png(scene: &Scene, opts: &ExportOptions) -> Result<Vec<u8>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_embedded_png, decode_embedded_svg, to_png, to_svg, ExportOptions};
+    use super::{ExportOptions, decode_embedded_png, decode_embedded_svg, to_png, to_svg};
     use crate::scene::Scene;
 
     const DOC: &str = r##"{"type":"excalidraw","version":2,"source":"t","elements":[
@@ -493,7 +648,13 @@ mod tests {
     #[test]
     fn svg_embeds_and_decodes_scene() {
         let s = Scene::parse(DOC).unwrap();
-        let svg = to_svg(&s, &ExportOptions { embed_scene: true, ..Default::default() });
+        let svg = to_svg(
+            &s,
+            &ExportOptions {
+                embed_scene: true,
+                ..Default::default()
+            },
+        );
         assert!(svg.starts_with("<svg"));
         assert!(svg.contains("<path"));
         assert!(svg.contains("opacity=\"0.6\""));
@@ -508,11 +669,22 @@ mod tests {
     #[test]
     fn png_renders_and_embeds_scene() {
         let s = Scene::parse(DOC).unwrap();
-        let png = to_png(&s, &ExportOptions { embed_scene: true, scale: 2.0, ..Default::default() }).unwrap();
+        let png = to_png(
+            &s,
+            &ExportOptions {
+                embed_scene: true,
+                scale: 2.0,
+                ..Default::default()
+            },
+        )
+        .unwrap();
         let img = image::load_from_memory(&png).unwrap().to_rgba8();
         assert!(img.width() > 200 && img.height() > 200);
         // The rectangle's solid fill is painted.
-        let p = img.get_pixel((60.0 - 10.0 + 10.0) as u32 * 2, (50.0 - 20.0 + 10.0) as u32 * 2);
+        let p = img.get_pixel(
+            (60.0 - 10.0 + 10.0) as u32 * 2,
+            (50.0 - 20.0 + 10.0) as u32 * 2,
+        );
         assert!(p[2] > 200 && p[0] < 200, "fill pixel {p:?}");
         let json = decode_embedded_png(&png).expect("payload");
         assert_eq!(Scene::parse(&json).unwrap().elements().count(), 2);

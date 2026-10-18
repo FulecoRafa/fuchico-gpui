@@ -9,8 +9,13 @@ pub fn widget_name(w: &Widget) -> String {
     match w {
         Widget::Checkbox { checked, .. } => format!("[cb:{}]", if *checked { "x" } else { " " }),
         Widget::Link { text, url } => format!("[link:{text}->{url}]"),
-        Widget::Wikilink { label, resolved, .. } => {
-            format!("[wiki:{label}{}]", if resolved.is_some() { "" } else { "?" })
+        Widget::Wikilink {
+            label, resolved, ..
+        } => {
+            format!(
+                "[wiki:{label}{}]",
+                if resolved.is_some() { "" } else { "?" }
+            )
         }
         Widget::Tag { tag, .. } => format!("[tag:{tag}]"),
         Widget::CalloutHeader { text, .. } => format!("[callout:{text}]"),
@@ -19,7 +24,9 @@ pub fn widget_name(w: &Widget) -> String {
         Widget::RegionEnd => "[region-end]".into(),
         Widget::RegionMarkerHidden => "[region-hidden]".into(),
         Widget::Fold(FoldPlaceholder::Ellipsis) => "[…]".into(),
-        Widget::Fold(FoldPlaceholder::Region { name, line_count }) => format!("[fold:{name}:{line_count}]"),
+        Widget::Fold(FoldPlaceholder::Region { name, line_count }) => {
+            format!("[fold:{name}:{line_count}]")
+        }
     }
 }
 
@@ -56,7 +63,12 @@ pub fn render(doc: &str, cursor: Option<usize>) -> Vec<String> {
 
 pub fn render_model(m: &MarkdownModel, cursor: Option<usize>, folds: &FoldState) -> Vec<String> {
     let files = vec!["/v/Note A.md".to_string()];
-    let ctx = DecorationContext { cursor_line: cursor, folds, vault_files: &files, table_edit: None };
+    let ctx = DecorationContext {
+        cursor_line: cursor,
+        folds,
+        vault_files: &files,
+        table_edit: None,
+    };
     let d = m.decorations(0..m.line_count(), &ctx);
     d.lines.iter().map(|l| display(m, l)).collect()
 }
@@ -73,5 +85,9 @@ pub fn styles(doc: &str, line: usize) -> Vec<(String, String)> {
     let m = model(doc);
     let fs = FoldState::new();
     let d = m.decorations(line..line + 1, &DecorationContext::new(None, &fs));
-    d.lines[0].styles.iter().map(|s| (doc[s.range.clone()].to_string(), s.styles.names())).collect()
+    d.lines[0]
+        .styles
+        .iter()
+        .map(|s| (doc[s.range.clone()].to_string(), s.styles.names()))
+        .collect()
 }

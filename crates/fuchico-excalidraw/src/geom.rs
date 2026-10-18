@@ -70,20 +70,35 @@ pub fn aabb(el: &Element) -> [f64; 4] {
         let mut r = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
         for p in el.points() {
             let w = to_world(el, p);
-            r = [r[0].min(w[0]), r[1].min(w[1]), r[2].max(w[0]), r[3].max(w[1])];
+            r = [
+                r[0].min(w[0]),
+                r[1].min(w[1]),
+                r[2].max(w[0]),
+                r[3].max(w[1]),
+            ];
         }
         return r;
     }
     let mut r = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
     for p in [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]] {
         let w = to_world(el, p);
-        r = [r[0].min(w[0]), r[1].min(w[1]), r[2].max(w[0]), r[3].max(w[1])];
+        r = [
+            r[0].min(w[0]),
+            r[1].min(w[1]),
+            r[2].max(w[0]),
+            r[3].max(w[1]),
+        ];
     }
     r
 }
 
 pub fn union(a: [f64; 4], b: [f64; 4]) -> [f64; 4] {
-    [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])]
+    [
+        a[0].min(b[0]),
+        a[1].min(b[1]),
+        a[2].max(b[2]),
+        a[3].max(b[3]),
+    ]
 }
 
 pub fn dist(a: P, b: P) -> f64 {
@@ -148,7 +163,9 @@ pub fn sampled_points(el: &Element) -> Vec<P> {
             let t2 = t * t;
             let t3 = t2 * t;
             let f = |a: f64, b: f64, c: f64, d: f64| {
-                0.5 * (2.0 * b + (-a + c) * t + (2.0 * a - 5.0 * b + 4.0 * c - d) * t2
+                0.5 * (2.0 * b
+                    + (-a + c) * t
+                    + (2.0 * a - 5.0 * b + 4.0 * c - d) * t2
                     + (-a + 3.0 * b - 3.0 * c + d) * t3)
             };
             out.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
@@ -172,11 +189,8 @@ pub fn hit(el: &Element, p: P, tol: f64) -> bool {
         }
         "frame" => {
             // The border or the name label above it.
-            let border = dist_to_polyline(
-                q,
-                &[[0.0, 0.0], [w, 0.0], [w, h], [0.0, h]],
-                true,
-            ) <= tol;
+            let border =
+                dist_to_polyline(q, &[[0.0, 0.0], [w, 0.0], [w, h], [0.0, h]], true) <= tol;
             let label = q[1] < 0.0 && q[1] > -24.0 && q[0] >= 0.0 && q[0] <= w.min(200.0);
             border || label
         }
@@ -208,7 +222,11 @@ pub fn hit(el: &Element, p: P, tol: f64) -> bool {
             if closed && point_in_polygon(q, &pts) {
                 return true;
             }
-            let extra = if el.kind == "freedraw" { el.stroke_width() * 2.0 } else { 0.0 };
+            let extra = if el.kind == "freedraw" {
+                el.stroke_width() * 2.0
+            } else {
+                0.0
+            };
             dist_to_polyline(q, &pts, false) <= tol + extra
         }
         _ => q[0] >= b[0] - tol && q[0] <= b[2] + tol && q[1] >= b[1] - tol && q[1] <= b[3] + tol,
@@ -260,8 +278,16 @@ pub fn outline_toward_center(el: &Element, from: P) -> P {
             }
         }
         _ => {
-            let tx = if ux.abs() > 1e-9 { (w / 2.0) / ux.abs() } else { f64::MAX };
-            let ty = if uy.abs() > 1e-9 { (h / 2.0) / uy.abs() } else { f64::MAX };
+            let tx = if ux.abs() > 1e-9 {
+                (w / 2.0) / ux.abs()
+            } else {
+                f64::MAX
+            };
+            let ty = if uy.abs() > 1e-9 {
+                (h / 2.0) / uy.abs()
+            } else {
+                f64::MAX
+            };
             tx.min(ty)
         }
     };
@@ -295,7 +321,10 @@ pub fn ray_outline(el: &Element, from: P, toward: P) -> Option<P> {
                 return None;
             }
             let s = disc.sqrt();
-            [(-b - s) / (2.0 * a), (-b + s) / (2.0 * a)].into_iter().filter(|t| *t >= 0.0).reduce(f64::min)
+            [(-b - s) / (2.0 * a), (-b + s) / (2.0 * a)]
+                .into_iter()
+                .filter(|t| *t >= 0.0)
+                .reduce(f64::min)
         }
         _ => {
             let poly: Vec<P> = if el.kind == "diamond" {
@@ -314,7 +343,10 @@ pub fn ray_outline(el: &Element, from: P, toward: P) -> Option<P> {
                 let q = [a[0] - f[0], a[1] - f[1]];
                 let tt = (q[0] * e[1] - q[1] * e[0]) / den;
                 let u = (q[0] * d[1] - q[1] * d[0]) / den;
-                if tt >= 0.0 && (-1e-9..=1.0 + 1e-9).contains(&u) && best.map(|b| tt < b).unwrap_or(true) {
+                if tt >= 0.0
+                    && (-1e-9..=1.0 + 1e-9).contains(&u)
+                    && best.map(|b| tt < b).unwrap_or(true)
+                {
                     best = Some(tt);
                 }
             }
@@ -347,7 +379,11 @@ pub fn focus_of(el: &Element, adj: P, end: P) -> f64 {
     let hit = [adj[0] + d[0] / len * along, adj[1] + d[1] / len * along];
     let off = (hit[0] - c[0]) * n[0] + (hit[1] - c[1]) * n[1];
     let half = half_extent(el, n);
-    if half < 1e-9 { 0.0 } else { (off / half).clamp(-1.0, 1.0) }
+    if half < 1e-9 {
+        0.0
+    } else {
+        (off / half).clamp(-1.0, 1.0)
+    }
 }
 
 /// Point the binding with `focus` aims at, seen from `adj`.
@@ -387,7 +423,9 @@ mod tests {
 
     #[test]
     fn rotation_round_trip() {
-        let e = el(r#"{"id":"a","type":"rectangle","x":10,"y":20,"width":100,"height":50,"angle":0.7}"#);
+        let e = el(
+            r#"{"id":"a","type":"rectangle","x":10,"y":20,"width":100,"height":50,"angle":0.7}"#,
+        );
         let w = to_world(&e, [30.0, 5.0]);
         let l = to_local(&e, w);
         assert!((l[0] - 30.0).abs() < 1e-9 && (l[1] - 5.0).abs() < 1e-9);
@@ -395,10 +433,14 @@ mod tests {
 
     #[test]
     fn hits() {
-        let r = el(r#"{"id":"a","type":"rectangle","x":0,"y":0,"width":100,"height":50,"backgroundColor":"transparent"}"#);
+        let r = el(
+            r#"{"id":"a","type":"rectangle","x":0,"y":0,"width":100,"height":50,"backgroundColor":"transparent"}"#,
+        );
         assert!(hit(&r, [0.0, 25.0], 2.0));
         assert!(!hit(&r, [50.0, 25.0], 2.0));
-        let l = el(r#"{"id":"b","type":"line","x":0,"y":0,"width":100,"height":0,"points":[[0,0],[100,0]]}"#);
+        let l = el(
+            r#"{"id":"b","type":"line","x":0,"y":0,"width":100,"height":0,"points":[[0,0],[100,0]]}"#,
+        );
         assert!(hit(&l, [50.0, 1.0], 2.0));
         assert!(!hit(&l, [50.0, 30.0], 2.0));
         let e = el(r#"{"id":"c","type":"ellipse","x":0,"y":0,"width":100,"height":100}"#);

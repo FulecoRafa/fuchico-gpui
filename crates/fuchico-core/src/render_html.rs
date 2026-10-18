@@ -8,7 +8,7 @@
 
 use std::sync::LazyLock;
 
-use pulldown_cmark::{html, CowStr, Event, LinkType, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CowStr, Event, LinkType, Options, Parser, Tag, TagEnd, html};
 use regex::{Captures, Regex};
 
 use crate::frontmatter::parse_frontmatter;
@@ -40,11 +40,15 @@ pub struct RenderOptions<'a> {
 
 static WIKILINK_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[\[([^\[\]|#]+)(#[^\[\]|]*)?(?:\|([^\[\]]+))?\]\]").unwrap());
-static EMBED_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"!\[\[([^\[\]|]+)(?:\|([^\[\]]+))?\]\]").unwrap());
+static EMBED_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"!\[\[([^\[\]|]+)(?:\|([^\[\]]+))?\]\]").unwrap());
 static NON_WORD_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_]+").unwrap());
 
 pub fn escape_html(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// JS `encodeURI`.
@@ -80,7 +84,10 @@ pub fn rewrite_wikilinks(markdown: &str) -> String {
                 },
             };
             let anchor = match heading {
-                Some(h) => format!("#{}", NON_WORD_RE.replace_all(&h[1..].trim().to_lowercase(), "-")),
+                Some(h) => format!(
+                    "#{}",
+                    NON_WORD_RE.replace_all(&h[1..].trim().to_lowercase(), "-")
+                ),
                 None => String::new(),
             };
             format!("[{label}]({}.html{anchor})", encode_uri(t))
@@ -133,12 +140,20 @@ pub fn render_body(markdown_body: &str, resolve: Option<HrefResolver>) -> String
     let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
     let events: Vec<Event> = Parser::new_ext(&src, opts).collect();
     let mut out: Vec<Event> = Vec::with_capacity(events.len());
-    let title_attr = |t: &CowStr| if t.is_empty() { String::new() } else { format!(" title=\"{}\"", escape_html(t)) };
+    let title_attr = |t: &CowStr| {
+        if t.is_empty() {
+            String::new()
+        } else {
+            format!(" title=\"{}\"", escape_html(t))
+        }
+    };
 
     let mut i = 0;
     while i < events.len() {
         match &events[i] {
-            Event::Start(Tag::Image { dest_url, title, .. }) => {
+            Event::Start(Tag::Image {
+                dest_url, title, ..
+            }) => {
                 let mut alt = String::new();
                 let mut depth = 1;
                 let mut j = i + 1;
@@ -169,8 +184,17 @@ pub fn render_body(markdown_body: &str, resolve: Option<HrefResolver>) -> String
                 i = j + 1;
                 continue;
             }
-            Event::Start(Tag::Link { link_type, dest_url, title, .. }) => {
-                let href = if *link_type == LinkType::Email { format!("mailto:{dest_url}") } else { dest_url.to_string() };
+            Event::Start(Tag::Link {
+                link_type,
+                dest_url,
+                title,
+                ..
+            }) => {
+                let href = if *link_type == LinkType::Email {
+                    format!("mailto:{dest_url}")
+                } else {
+                    dest_url.to_string()
+                };
                 out.push(Event::Html(
                     format!(
                         "<a href=\"{}\"{}>",
@@ -181,8 +205,12 @@ pub fn render_body(markdown_body: &str, resolve: Option<HrefResolver>) -> String
                 ));
             }
             Event::End(TagEnd::Link) => out.push(Event::Html("</a>".into())),
-            Event::Start(Tag::Item) if matches!(events.get(i + 1), Some(Event::TaskListMarker(_))) => {
-                let Some(Event::TaskListMarker(checked)) = events.get(i + 1) else { unreachable!() };
+            Event::Start(Tag::Item)
+                if matches!(events.get(i + 1), Some(Event::TaskListMarker(_))) =>
+            {
+                let Some(Event::TaskListMarker(checked)) = events.get(i + 1) else {
+                    unreachable!()
+                };
                 out.push(Event::Html(
                     format!(
                         "<li class=\"task\"><input type=\"checkbox\" disabled{}> ",
@@ -209,7 +237,12 @@ pub fn render_html(markdown: &str, opts: &RenderOptions) -> String {
         None => markdown,
     };
     let html_body = render_body(body, opts.resolve_href);
-    let var_css = opts.theme_vars.iter().map(|(k, v)| format!("  {k}: {v};")).collect::<Vec<_>>().join("\n");
+    let var_css = opts
+        .theme_vars
+        .iter()
+        .map(|(k, v)| format!("  {k}: {v};"))
+        .collect::<Vec<_>>()
+        .join("\n");
     let mode = match opts.mode {
         ThemeMode::Light => "light",
         ThemeMode::Dark => "dark",
@@ -262,14 +295,20 @@ mod tests {
             HrefKind::Link => format!("lnk:{h}"),
         };
         let out = render_body("![a \"b\"](p.png \"T\") and [x](y.md)\n", Some(&resolve));
-        assert!(out.contains("<img src=\"img:p.png\" alt=\"a &quot;b&quot;\" title=\"T\">"), "{out}");
+        assert!(
+            out.contains("<img src=\"img:p.png\" alt=\"a &quot;b&quot;\" title=\"T\">"),
+            "{out}"
+        );
         assert!(out.contains("<a href=\"lnk:y.md\">x</a>"), "{out}");
     }
 
     #[test]
     fn checked_task_items_and_gfm_tables() {
         let out = render_body("- [x] done\n\n| a | b |\n|---|---|\n| 1 | 2 |\n", None);
-        assert!(out.contains("<li class=\"task\"><input type=\"checkbox\" disabled checked> done"), "{out}");
+        assert!(
+            out.contains("<li class=\"task\"><input type=\"checkbox\" disabled checked> done"),
+            "{out}"
+        );
         assert!(out.contains("<table>"), "{out}");
     }
 

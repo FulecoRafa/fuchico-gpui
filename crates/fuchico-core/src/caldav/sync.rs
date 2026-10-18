@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use super::client::CalDavClient;
 use super::ical::{self, SyncTask};
-use super::matcher::{self, ScannedTask, PENDING_DELETE_STREAK_THRESHOLD};
+use super::matcher::{self, PENDING_DELETE_STREAK_THRESHOLD, ScannedTask};
 use super::sidecar::{self, Sidecar, SidecarTask};
 use crate::fs::file::write_atomic;
 use crate::fs::to_canon;
@@ -90,7 +90,9 @@ fn walk_and_scan(root: &Path, rel_dir: &Path, out: &mut Vec<RawTask>) {
             let is_md = path
                 .extension()
                 .and_then(|e| e.to_str())
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"));
+                .is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")
+                });
             if is_md {
                 scan_file(root, &rel_dir.join(&name), out);
             }
@@ -180,7 +182,8 @@ pub async fn sync_folder(
         match ical::parse_vtodos(cd) {
             Ok(tasks) => {
                 for t in tasks {
-                    remote_by_uid.insert(t.uid.clone(), (client.resolve(&r.href), r.etag.clone(), t));
+                    remote_by_uid
+                        .insert(t.uid.clone(), (client.resolve(&r.href), r.etag.clone(), t));
                 }
             }
             Err(e) => report.errors.push(format!("bad VTODO at {}: {e}", r.href)),
@@ -207,22 +210,55 @@ pub async fn sync_folder(
                 consumed_remote_uids.insert(old_entry.uid.clone());
                 let mut entry = old_entry.clone();
 
-                let local_changed = matcher::normalize_text(&raw.text) != matcher::normalize_text(&old_entry.last_text)
+                let local_changed = matcher::normalize_text(&raw.text)
+                    != matcher::normalize_text(&old_entry.last_text)
                     || raw.checked != old_entry.checked;
                 let remote_changed = etag.as_deref() != old_entry.etag.as_deref();
 
                 if local_changed && remote_changed {
-                    let remote_time = remote_task.last_modified.unwrap_or(DateTime::<Utc>::MIN_UTC);
+                    let remote_time = remote_task
+                        .last_modified
+                        .unwrap_or(DateTime::<Utc>::MIN_UTC);
                     let local_time = file_mtime(folder, &raw.file);
                     if remote_time > local_time {
-                        pull_into(&mut entry, remote_task, etag, raw, &mut file_edits, &mut report);
+                        pull_into(
+                            &mut entry,
+                            remote_task,
+                            etag,
+                            raw,
+                            &mut file_edits,
+                            &mut report,
+                        );
                     } else {
-                        push_update(client, &mut entry, raw, old_entry.etag.as_deref(), href, &mut report).await;
+                        push_update(
+                            client,
+                            &mut entry,
+                            raw,
+                            old_entry.etag.as_deref(),
+                            href,
+                            &mut report,
+                        )
+                        .await;
                     }
                 } else if local_changed {
-                    push_update(client, &mut entry, raw, old_entry.etag.as_deref(), href, &mut report).await;
+                    push_update(
+                        client,
+                        &mut entry,
+                        raw,
+                        old_entry.etag.as_deref(),
+                        href,
+                        &mut report,
+                    )
+                    .await;
                 } else if remote_changed {
-                    pull_into(&mut entry, remote_task, etag, raw, &mut file_edits, &mut report);
+                    pull_into(
+                        &mut entry,
+                        remote_task,
+                        etag,
+                        raw,
+                        &mut file_edits,
+                        &mut report,
+                    );
                 } else {
                     entry.file = raw.file.clone();
                     entry.line_hint = raw.line;
@@ -262,9 +298,10 @@ pub async fn sync_folder(
                     pending_delete_streak: 0,
                 });
             }
-            Err(e) => report
-                .errors
-                .push(format!("failed to create remote task for {}:{}: {e}", raw.file, raw.line)),
+            Err(e) => report.errors.push(format!(
+                "failed to create remote task for {}:{}: {e}",
+                raw.file, raw.line
+            )),
         }
     }
 
@@ -345,7 +382,10 @@ fn pull_into(
     };
     let checkchar = if remote_task.completed { "x" } else { " " };
     let new_line = format!("{}{checkchar}{}{new_text}", raw.prefix, raw.bracket_spacer);
-    file_edits.entry(raw.file.clone()).or_default().push((raw.line, new_line));
+    file_edits
+        .entry(raw.file.clone())
+        .or_default()
+        .push((raw.line, new_line));
 
     entry.file = raw.file.clone();
     entry.line_hint = raw.line;
@@ -385,9 +425,10 @@ async fn push_update(
             entry.last_modified_remote = Some(Utc::now());
             report.pushed_updated += 1;
         }
-        Err(e) => report
-            .errors
-            .push(format!("failed to push update for {}:{}: {e}", raw.file, raw.line)),
+        Err(e) => report.errors.push(format!(
+            "failed to push update for {}:{}: {e}",
+            raw.file, raw.line
+        )),
     }
 }
 
@@ -420,7 +461,8 @@ fn append_new_remote_tasks(
         let checkchar = if task.completed { "x" } else { " " };
         content.push_str(&format!("- [{checkchar}] {}\n", task.summary));
     }
-    write_atomic(&path, content.as_bytes()).map_err(|e| format!("failed to write {}: {e}", path.display()))?;
+    write_atomic(&path, content.as_bytes())
+        .map_err(|e| format!("failed to write {}: {e}", path.display()))?;
     report.touched_files.push(to_canon(&path));
     Ok(())
 }
@@ -432,7 +474,8 @@ fn apply_file_edits(
 ) -> Result<(), String> {
     for (rel_file, edits) in file_edits {
         let abs: PathBuf = folder.join(&rel_file);
-        let content = std::fs::read_to_string(&abs).map_err(|e| format!("failed to read {}: {e}", abs.display()))?;
+        let content = std::fs::read_to_string(&abs)
+            .map_err(|e| format!("failed to read {}: {e}", abs.display()))?;
         let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
         for (line, new_text) in edits {
             if line == 0 || line > lines.len() {
@@ -444,7 +487,8 @@ fn apply_file_edits(
         if content.ends_with('\n') {
             new_content.push('\n');
         }
-        write_atomic(&abs, new_content.as_bytes()).map_err(|e| format!("failed to write {}: {e}", abs.display()))?;
+        write_atomic(&abs, new_content.as_bytes())
+            .map_err(|e| format!("failed to write {}: {e}", abs.display()))?;
         if !report.touched_files.contains(&to_canon(&abs)) {
             report.touched_files.push(to_canon(&abs));
         }
@@ -464,8 +508,18 @@ mod tests {
         std::fs::write(dir.join(name), content).unwrap();
     }
 
-    fn report_body_for(href: &str, etag: &str, uid: &str, summary: &str, completed: bool) -> String {
-        let status = if completed { "COMPLETED" } else { "NEEDS-ACTION" };
+    fn report_body_for(
+        href: &str,
+        etag: &str,
+        uid: &str,
+        summary: &str,
+        completed: bool,
+    ) -> String {
+        let status = if completed {
+            "COMPLETED"
+        } else {
+            "NEEDS-ACTION"
+        };
         format!(
             "<?xml version=\"1.0\"?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">\n  <response>\n    <href>{href}</href>\n    <propstat>\n      <prop>\n        <getetag>{etag}</getetag>\n        <C:calendar-data>BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:{uid}\r\nSUMMARY:{summary}\r\nSTATUS:{status}\r\nEND:VTODO\r\nEND:VCALENDAR\r\n</C:calendar-data>\n      </prop>\n      <status>HTTP/1.1 200 OK</status>\n    </propstat>\n  </response>\n</multistatus>"
         )
@@ -675,7 +729,11 @@ mod tests {
         std::fs::create_dir(dir.path().join("sub")).unwrap();
         write_file(&dir.path().join("sub"), "Tasks.md", "- [ ] Nested task\n");
         // Marks `sub/` as its own linked folder.
-        sidecar::save(&dir.path().join("sub"), &Sidecar::new("acct-2", "https://x/other/")).unwrap();
+        sidecar::save(
+            &dir.path().join("sub"),
+            &Sidecar::new("acct-2", "https://x/other/"),
+        )
+        .unwrap();
 
         let server = MockServer::start().await;
         Mock::given(method("REPORT"))

@@ -69,10 +69,19 @@ pub struct CommandContext {
 /// `SETTINGS_SECTIONS` labels and extra keywords.
 fn section_info(s: SettingsSection) -> (Msg, &'static [&'static str]) {
     match s {
-        SettingsSection::Appearance => (Msg::SettingsNavAppearance, &["theme", "font", "zoom", "language", "idioma"]),
-        SettingsSection::Editor => (Msg::SettingsNavEditor, &["keybindings", "helix", "vim", "folding", "behavior"]),
+        SettingsSection::Appearance => (
+            Msg::SettingsNavAppearance,
+            &["theme", "font", "zoom", "language", "idioma"],
+        ),
+        SettingsSection::Editor => (
+            Msg::SettingsNavEditor,
+            &["keybindings", "helix", "vim", "folding", "behavior"],
+        ),
         SettingsSection::Shortcuts => (Msg::SettingsNavShortcuts, &["keys", "hotkeys"]),
-        SettingsSection::Vault => (Msg::SettingsNavVault, &["folders", "daily", "templates", "external tool"]),
+        SettingsSection::Vault => (
+            Msg::SettingsNavVault,
+            &["folders", "daily", "templates", "external tool"],
+        ),
         SettingsSection::Integrations => (Msg::SettingsNavIntegrations, &["caldav", "sync"]),
         SettingsSection::About => (Msg::SettingsNavAbout, &["version"]),
     }
@@ -82,8 +91,20 @@ fn kw(words: &[&str]) -> Vec<String> {
     words.iter().map(|s| s.to_string()).collect()
 }
 
-fn cmd(id: impl Into<String>, title: String, keywords: Vec<String>, action: CommandAction) -> AppCommand {
-    AppCommand { id: id.into(), title, keywords, binding: None, aliases: &[], action }
+fn cmd(
+    id: impl Into<String>,
+    title: String,
+    keywords: Vec<String>,
+    action: CommandAction,
+) -> AppCommand {
+    AppCommand {
+        id: id.into(),
+        title,
+        keywords,
+        binding: None,
+        aliases: &[],
+        action,
+    }
 }
 
 fn t(msg: Msg) -> String {
@@ -106,14 +127,24 @@ pub fn build_commands(ctx: &CommandContext, settings: &Settings) -> Vec<AppComma
     let has_root = ctx.root.is_some();
     let has_active = ctx.active_path.is_some();
     let mut out = vec![
-        cmd("go-to-editor", t(Msg::CommandGoToEditor), kw(&["files", "explorer", "view"]), A::SetView(MainViewKind::Editor)),
+        cmd(
+            "go-to-editor",
+            t(Msg::CommandGoToEditor),
+            kw(&["files", "explorer", "view"]),
+            A::SetView(MainViewKind::Editor),
+        ),
         cmd(
             "go-to-agenda",
             t(Msg::CommandGoToAgenda),
             kw(&["agenda", "tasks", "calendar", "view"]),
             A::SetView(MainViewKind::Agenda),
         ),
-        cmd("go-to-search", t(Msg::CommandGoToSearch), kw(&["find", "view"]), A::SetView(MainViewKind::Search)),
+        cmd(
+            "go-to-search",
+            t(Msg::CommandGoToSearch),
+            kw(&["find", "view"]),
+            A::SetView(MainViewKind::Search),
+        ),
         cmd(
             "go-to-settings",
             t(Msg::CommandGoToSettings),
@@ -147,33 +178,63 @@ pub fn build_commands(ctx: &CommandContext, settings: &Settings) -> Vec<AppComma
             A::OpenSettings(s),
         ));
     }
-    out.push(cmd("open-folder", t(Msg::CommandOpenFolder), kw(&["vault", "workspace", "directory"]), A::OpenFolder));
+    out.push(cmd(
+        "open-folder",
+        t(Msg::CommandOpenFolder),
+        kw(&["vault", "workspace", "directory"]),
+        A::OpenFolder,
+    ));
     if has_root {
         out.push(AppCommand {
             binding: Some("Mod-p".into()),
             aliases: &[":o", ":open", ":e", ":edit"],
-            ..cmd("quick-open-file", t(Msg::CommandQuickOpen), kw(&["switcher", "find file", "open file"]), A::QuickOpen)
+            ..cmd(
+                "quick-open-file",
+                t(Msg::CommandQuickOpen),
+                kw(&["switcher", "find file", "open file"]),
+                A::QuickOpen,
+            )
         });
     }
     if has_active {
         out.push(AppCommand {
             binding: Some("Mod-s".into()),
             aliases: &[":w", ":write"],
-            ..cmd("save-file", t(Msg::CommandSaveFile), kw(&["write"]), A::Save)
+            ..cmd(
+                "save-file",
+                t(Msg::CommandSaveFile),
+                kw(&["write"]),
+                A::Save,
+            )
         });
         out.push(AppCommand {
             aliases: &[":wq", ":x"],
-            ..cmd("save-and-close", t(Msg::CommandSaveAndCloseTab), kw(&["write quit"]), A::SaveAndClose)
+            ..cmd(
+                "save-and-close",
+                t(Msg::CommandSaveAndCloseTab),
+                kw(&["write quit"]),
+                A::SaveAndClose,
+            )
         });
         out.push(AppCommand {
             aliases: &[":q", ":quit", ":bc"],
-            ..cmd("close-active-tab", t(Msg::CommandCloseActiveTab), kw(&["close file"]), A::CloseActiveTab)
+            ..cmd(
+                "close-active-tab",
+                t(Msg::CommandCloseActiveTab),
+                kw(&["close file"]),
+                A::CloseActiveTab,
+            )
         });
     }
     if ctx.has_open_tabs {
         out.push(AppCommand {
             aliases: &[":qa"],
-            ..cmd("close-all-tabs", t(Msg::CommandCloseAllTabs), kw(&["close everything"]), A::CloseAllTabs)
+            ..cmd(
+                "close-all-tabs",
+                t(Msg::CommandCloseAllTabs),
+                kw(&["close everything"]),
+                A::CloseAllTabs,
+            )
         });
     }
     if let Some(root) = &ctx.root {
@@ -207,10 +268,19 @@ pub fn build_commands(ctx: &CommandContext, settings: &Settings) -> Vec<AppComma
         ));
     }
     if has_root {
-        let title = t(if ctx.backlinks_open { Msg::CommandHideBacklinks } else { Msg::CommandShowBacklinks });
+        let title = t(if ctx.backlinks_open {
+            Msg::CommandHideBacklinks
+        } else {
+            Msg::CommandShowBacklinks
+        });
         out.push(AppCommand {
             aliases: &[":backlinks", ":bl"],
-            ..cmd("toggle-backlinks", title, kw(&["links", "references", "linked mentions", "graph"]), A::ToggleBacklinks)
+            ..cmd(
+                "toggle-backlinks",
+                title,
+                kw(&["links", "references", "linked mentions", "graph"]),
+                A::ToggleBacklinks,
+            )
         });
     }
     if let Some(path) = ctx.active_path.as_ref().filter(|p| is_markdown(p)) {
@@ -238,7 +308,12 @@ pub fn build_commands(ctx: &CommandContext, settings: &Settings) -> Vec<AppComma
         // keyword so the search still finds both.
         out.push(AppCommand {
             aliases: &[":print"],
-            ..cmd("print-pdf", t(Msg::ExportPrint), kw(&["print", "pdf", "printer"]), A::PrintPdf(path.clone()))
+            ..cmd(
+                "print-pdf",
+                t(Msg::ExportPrint),
+                kw(&["print", "pdf", "printer"]),
+                A::PrintPdf(path.clone()),
+            )
         });
     }
     out.push(AppCommand {
@@ -289,8 +364,18 @@ pub struct Ranked {
     pub alias: Option<&'static str>,
 }
 
-fn row(command: &AppCommand, indices: Vec<usize>, score: f64, alias: Option<&'static str>) -> Ranked {
-    Ranked { command: command.clone(), indices, score, alias }
+fn row(
+    command: &AppCommand,
+    indices: Vec<usize>,
+    score: f64,
+    alias: Option<&'static str>,
+) -> Ranked {
+    Ranked {
+        command: command.clone(),
+        indices,
+        score,
+        alias,
+    }
 }
 
 /// `^:(\d+)$`
@@ -299,7 +384,11 @@ fn line_query(q: &str) -> Option<u32> {
     if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    Some(digits.parse::<u64>().map_or(u32::MAX, |n| n.min(u32::MAX as u64) as u32))
+    Some(
+        digits
+            .parse::<u64>()
+            .map_or(u32::MAX, |n| n.min(u32::MAX as u64) as u32),
+    )
 }
 
 /// The palette's result list for `query` (CommandPalette.tsx `results`).
@@ -323,7 +412,12 @@ pub fn rank(commands: &[AppCommand], query: &str) -> Vec<Ranked> {
         }
         for c in commands {
             if let Some(alias) = c.aliases.iter().find(|a| a.starts_with(q)) {
-                ranked.push(row(c, vec![], if *alias == q { 200. } else { 100. }, Some(alias)));
+                ranked.push(row(
+                    c,
+                    vec![],
+                    if *alias == q { 200. } else { 100. },
+                    Some(alias),
+                ));
                 continue;
             }
             if body.is_empty() {
@@ -342,8 +436,16 @@ pub fn rank(commands: &[AppCommand], query: &str) -> Vec<Ranked> {
                 ranked.push(row(c, m.indices, m.score + 1., None));
                 continue;
             }
-            let extras = c.binding.iter().flat_map(|b| [b.replace('-', " "), display_binding(b)]);
-            if c.keywords.iter().cloned().chain(extras).any(|k| fuzzy_match(q, &k).matched) {
+            let extras = c
+                .binding
+                .iter()
+                .flat_map(|b| [b.replace('-', " "), display_binding(b)]);
+            if c.keywords
+                .iter()
+                .cloned()
+                .chain(extras)
+                .any(|k| fuzzy_match(q, &k).matched)
+            {
                 ranked.push(row(c, vec![], 0., None));
             }
         }
@@ -380,11 +482,26 @@ mod tests {
     #[test]
     fn registry_order_with_everything() {
         let mut s = Settings::default();
-        s.custom_themes.push(CustomTheme { id: "c1".into(), name: "Mine".into(), css: String::new() });
+        s.custom_themes.push(CustomTheme {
+            id: "c1".into(),
+            name: "Mine".into(),
+            css: String::new(),
+        });
         let ids = ids(&build_commands(&ctx_full(), &s));
-        let mut want: Vec<String> = ["go-to-editor", "go-to-agenda", "go-to-search", "go-to-settings"].map(String::from).into();
+        let mut want: Vec<String> = [
+            "go-to-editor",
+            "go-to-agenda",
+            "go-to-search",
+            "go-to-settings",
+        ]
+        .map(String::from)
+        .into();
         want.extend(SHORTCUT_ACTIONS.iter().map(|a| format!("editor:{}", a.id)));
-        want.extend(SettingsSection::ALL.iter().map(|s| format!("settings:{}", s.id())));
+        want.extend(
+            SettingsSection::ALL
+                .iter()
+                .map(|s| format!("settings:{}", s.id())),
+        );
         want.extend(
             [
                 "open-folder",
@@ -415,26 +532,51 @@ mod tests {
 
     #[test]
     fn registry_without_vault_or_tabs() {
-        let ids = ids(&build_commands(&CommandContext::default(), &Settings::default()));
+        let ids = ids(&build_commands(
+            &CommandContext::default(),
+            &Settings::default(),
+        ));
         assert_eq!(ids.len(), 4 + 6 + 1 + 1 + 1 + 3);
-        assert!(!ids.iter().any(|i| i.starts_with("editor:") || i == "quick-open-file" || i == "toggle-backlinks"));
+        assert!(!ids.iter().any(|i| i.starts_with("editor:")
+            || i == "quick-open-file"
+            || i == "toggle-backlinks"));
         assert!(ids.contains(&"keyboard-shortcuts".to_string()));
     }
 
     #[test]
     fn conditions() {
         // A drawing tab: editor commands listed, export not.
-        let ctx = CommandContext { active_path: Some("/v/d.excalidraw".into()), ..ctx_full() };
+        let ctx = CommandContext {
+            active_path: Some("/v/d.excalidraw".into()),
+            ..ctx_full()
+        };
         let ids = ids(&build_commands(&ctx, &Settings::default()));
         assert!(ids.contains(&"editor:insertDate".to_string()));
         assert!(!ids.contains(&"export-html".to_string()));
-        let ctx = CommandContext { active_path: Some("/v/A.MARKDOWN".into()), ..ctx_full() };
+        let ctx = CommandContext {
+            active_path: Some("/v/A.MARKDOWN".into()),
+            ..ctx_full()
+        };
         let cmds = build_commands(&ctx, &Settings::default());
-        assert!(cmds.iter().any(|c| c.id == "export-pdf" && c.aliases == [":pdf"] && c.keywords.iter().any(|k| k == "print")));
-        assert!(cmds.iter().any(|c| c.id == "print-pdf" && c.aliases == [":print"]));
-        assert!(cmds.iter().any(|c| c.id == "export-html" && c.aliases == [":export"]));
-        let ctx = CommandContext { backlinks_open: true, ..ctx_full() };
-        let c = build_commands(&ctx, &Settings::default()).into_iter().find(|c| c.id == "toggle-backlinks").unwrap();
+        assert!(cmds.iter().any(|c| c.id == "export-pdf"
+            && c.aliases == [":pdf"]
+            && c.keywords.iter().any(|k| k == "print")));
+        assert!(
+            cmds.iter()
+                .any(|c| c.id == "print-pdf" && c.aliases == [":print"])
+        );
+        assert!(
+            cmds.iter()
+                .any(|c| c.id == "export-html" && c.aliases == [":export"])
+        );
+        let ctx = CommandContext {
+            backlinks_open: true,
+            ..ctx_full()
+        };
+        let c = build_commands(&ctx, &Settings::default())
+            .into_iter()
+            .find(|c| c.id == "toggle-backlinks")
+            .unwrap();
         assert_eq!(c.title, "Hide Backlinks");
     }
 
@@ -446,14 +588,30 @@ mod tests {
         let c = cmds.iter().find(|c| c.id == "editor:insertDate").unwrap();
         assert_eq!(c.title, "Editor: Insert date");
         assert_eq!(c.binding.as_deref(), Some("Mod-Alt-x"));
-        assert!(c.keywords.contains(&"Insert today's date at the cursor.".to_string()));
+        assert!(
+            c.keywords
+                .contains(&"Insert today's date at the cursor.".to_string())
+        );
         let c = cmds.iter().find(|c| c.id == "settings:vault").unwrap();
         assert_eq!(c.title, "Settings: Vault");
-        let c = cmds.iter().find(|c| c.id.ends_with("first_template.md")).unwrap();
+        let c = cmds
+            .iter()
+            .find(|c| c.id.ends_with("first_template.md"))
+            .unwrap();
         assert_eq!(c.title, "New Note from Template: first_template");
-        assert_eq!(cmds.iter().find(|c| c.id == "select-theme:dracula").unwrap().title, "Theme: Dracula");
+        assert_eq!(
+            cmds.iter()
+                .find(|c| c.id == "select-theme:dracula")
+                .unwrap()
+                .title,
+            "Theme: Dracula"
+        );
         s.templates_folder = "/nope/".into();
-        assert!(!build_commands(&ctx_full(), &s).iter().any(|c| c.id.starts_with("new-from-template")));
+        assert!(
+            !build_commands(&ctx_full(), &s)
+                .iter()
+                .any(|c| c.id.starts_with("new-from-template"))
+        );
     }
 
     fn titles(r: &[Ranked]) -> Vec<&str> {
@@ -487,9 +645,16 @@ mod tests {
         let cmds = build_commands(&ctx_full(), &Settings::default());
         // `Mod-s` → "Mod s" keyword.
         let r = rank(&cmds, "mod s");
-        assert!(r.iter().any(|r| r.command.id == "save-file" && r.score == 0.));
+        assert!(
+            r.iter()
+                .any(|r| r.command.id == "save-file" && r.score == 0.)
+        );
         let formatted = display_binding("Mod-s");
-        assert!(rank(&cmds, &formatted).iter().any(|r| r.command.id == "save-file"));
+        assert!(
+            rank(&cmds, &formatted)
+                .iter()
+                .any(|r| r.command.id == "save-file")
+        );
     }
 
     #[test]
@@ -515,8 +680,14 @@ mod tests {
     fn bare_colon_lists_aliased_commands() {
         let cmds = build_commands(&ctx_full(), &Settings::default());
         let r = rank(&cmds, ":");
-        assert!(r.iter().all(|r| !r.command.aliases.is_empty() && r.score == 100.));
-        assert_eq!(r.len(), cmds.iter().filter(|c| !c.aliases.is_empty()).count());
+        assert!(
+            r.iter()
+                .all(|r| !r.command.aliases.is_empty() && r.score == 100.)
+        );
+        assert_eq!(
+            r.len(),
+            cmds.iter().filter(|c| !c.aliases.is_empty()).count()
+        );
         assert_eq!(r[0].command.id, "quick-open-file");
         assert_eq!(r[0].alias, Some(":o"));
     }
@@ -525,7 +696,10 @@ mod tests {
     fn colon_body_fuzzy_matches_titles_with_first_alias_chip() {
         let cmds = build_commands(&ctx_full(), &Settings::default());
         let r = rank(&cmds, ":close");
-        let c = r.iter().find(|r| r.command.id == "close-active-tab").unwrap();
+        let c = r
+            .iter()
+            .find(|r| r.command.id == "close-active-tab")
+            .unwrap();
         assert_eq!(c.alias, Some(":q"));
         assert!(!c.indices.is_empty());
         let c = r.iter().find(|r| r.command.id == "keyboard-shortcuts");
@@ -543,7 +717,10 @@ mod tests {
         assert_eq!(line_query(":"), None);
         assert_eq!(line_query(":99999999999"), Some(u32::MAX));
         // Listed even with no file open (a no-op then).
-        let r = rank(&build_commands(&CommandContext::default(), &Settings::default()), ":7");
+        let r = rank(
+            &build_commands(&CommandContext::default(), &Settings::default()),
+            ":7",
+        );
         assert_eq!(r[0].command.id, "go-to-line");
     }
 }

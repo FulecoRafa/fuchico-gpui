@@ -22,7 +22,10 @@ pub enum AppEvent {
     /// `fs:file-written`, `fs:changed`, `caldav:*`, `app:open-files`.
     Core(CoreEvent),
     /// `mermaid:update {blockKey, text|null}` — editor → diagram dock.
-    MermaidUpdate { block_key: String, text: Option<String> },
+    MermaidUpdate {
+        block_key: String,
+        text: Option<String>,
+    },
     /// `mermaid:request {blockKey}` — a diagram view asks the editor to re-send.
     MermaidRequest { block_key: String },
     /// `mermaid:closed {blockKey}` — the diagram dock/window went away.
@@ -151,11 +154,16 @@ pub fn subscribe_in<V: 'static>(
     mut f: impl FnMut(&mut V, &AppEvent, &mut Window, &mut Context<V>) + 'static,
 ) -> Subscription {
     let bus = cx.global::<BusGlobal>().0.clone();
-    cx.subscribe_in(&bus, window, move |this, _, ev, window, cx| f(this, ev, window, cx))
+    cx.subscribe_in(&bus, window, move |this, _, ev, window, cx| {
+        f(this, ev, window, cx)
+    })
 }
 
 /// App-level subscription (no view), e.g. background services.
-pub fn subscribe_app(cx: &mut App, mut f: impl FnMut(&AppEvent, &mut App) + 'static) -> Subscription {
+pub fn subscribe_app(
+    cx: &mut App,
+    mut f: impl FnMut(&AppEvent, &mut App) + 'static,
+) -> Subscription {
     let bus = cx.global::<BusGlobal>().0.clone();
     cx.subscribe(&bus, move |_, ev, cx| f(ev, cx))
 }

@@ -16,7 +16,11 @@ fn is_non_word(c: char) -> bool {
 /// Subsequence fuzzy match, VSCode-symbol-search style.
 pub fn fuzzy_match(query: &str, target: &str) -> FuzzyResult {
     if query.trim().is_empty() {
-        return FuzzyResult { matched: true, score: 0.0, indices: vec![] };
+        return FuzzyResult {
+            matched: true,
+            score: 0.0,
+            indices: vec![],
+        };
     }
     let q: Vec<char> = query.to_lowercase().chars().collect();
     let t: Vec<char> = target.to_lowercase().chars().collect();
@@ -33,7 +37,11 @@ pub fn fuzzy_match(query: &str, target: &str) -> FuzzyResult {
             continue;
         }
         indices.push(ti);
-        score += if prev.is_some_and(|p| p + 1 == ti) { 3.0 } else { 1.0 };
+        score += if prev.is_some_and(|p| p + 1 == ti) {
+            3.0
+        } else {
+            1.0
+        };
         if ti == 0 || is_non_word(t[ti - 1]) {
             score += 2.0;
         }
@@ -41,9 +49,17 @@ pub fn fuzzy_match(query: &str, target: &str) -> FuzzyResult {
         qi += 1;
     }
     if qi < q.len() {
-        return FuzzyResult { matched: false, score: 0.0, indices: vec![] };
+        return FuzzyResult {
+            matched: false,
+            score: 0.0,
+            indices: vec![],
+        };
     }
-    FuzzyResult { matched: true, score: score - t.len() as f64 * 0.01, indices }
+    FuzzyResult {
+        matched: true,
+        score: score - t.len() as f64 * 0.01,
+        indices,
+    }
 }
 
 #[cfg(test)]
@@ -60,7 +76,14 @@ mod tests {
 
     #[test]
     fn empty_query_matches_everything_and_misses_report_false() {
-        assert_eq!(fuzzy_match("  ", "x"), FuzzyResult { matched: true, score: 0.0, indices: vec![] });
+        assert_eq!(
+            fuzzy_match("  ", "x"),
+            FuzzyResult {
+                matched: true,
+                score: 0.0,
+                indices: vec![]
+            }
+        );
         assert!(!fuzzy_match("zz", "abc").matched);
     }
 

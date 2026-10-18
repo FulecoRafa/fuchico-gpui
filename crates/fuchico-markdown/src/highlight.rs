@@ -9,15 +9,17 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxReference, SyntaxSet};
 
-use crate::languages::{resolve_file_language, FileLanguage};
-use crate::style::{flatten_spans, StyleId, StyleRun};
+use crate::languages::{FileLanguage, resolve_file_language};
+use crate::style::{StyleId, StyleRun, flatten_spans};
 use crate::text::{LineIndex, TextEdit};
 
 /// The bundled syntax set: two-face's extended set (newline variant) plus
 /// the `grammars/` ports, precompiled by `build.rs` and decoded on first use.
 pub fn syntax_set() -> &'static SyntaxSet {
     static DUMP: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/syntaxes.packdump"));
-    static SET: LazyLock<SyntaxSet> = LazyLock::new(|| syntect::dumps::from_uncompressed_data(DUMP).expect("bundled syntax dump"));
+    static SET: LazyLock<SyntaxSet> = LazyLock::new(|| {
+        syntect::dumps::from_uncompressed_data(DUMP).expect("bundled syntax dump")
+    });
     &SET
 }
 
@@ -104,7 +106,11 @@ thread_local! {
 }
 
 fn classify(scope: Scope) -> Class {
-    CLASS_CACHE.with(|c| *c.borrow_mut().entry(scope).or_insert_with(|| classify_str(&scope.build_string())))
+    CLASS_CACHE.with(|c| {
+        *c.borrow_mut()
+            .entry(scope)
+            .or_insert_with(|| classify_str(&scope.build_string()))
+    })
 }
 
 /// Maps a scope stack to a style id (innermost scope first).
@@ -142,12 +148,13 @@ fn highlight_line(
         let _ = stack.apply(&op);
     }
     if line.len() > last
-        && let Some(id) = style_for_scopes(stack.as_slice()) {
-            let end = line.trim_end_matches(['\n', '\r']).len().max(last);
-            if end > last {
-                out.push((last..end, id));
-            }
+        && let Some(id) = style_for_scopes(stack.as_slice())
+    {
+        let end = line.trim_end_matches(['\n', '\r']).len().max(last);
+        if end > last {
+            out.push((last..end, id));
         }
+    }
 }
 
 /// Highlights a whole snippet; ranges are offsets into `code`.
@@ -160,7 +167,10 @@ pub fn highlight_snippet(code: &str, syntax: &SyntaxReference) -> Vec<(Range<usi
     for line in code.split_inclusive('\n') {
         tmp.clear();
         highlight_line(line, &mut state, &mut stack, &mut tmp);
-        out.extend(tmp.drain(..).map(|(r, id)| (r.start + off..r.end + off, id)));
+        out.extend(
+            tmp.drain(..)
+                .map(|(r, id)| (r.start + off..r.end + off, id)),
+        );
         off += line.len();
     }
     out
@@ -268,14 +278,23 @@ impl FileHighlighter {
             let i = self.runs.len();
             let (mut state, mut stack) = self.states[i].clone();
             let lr = self.lines.line_range(i);
-            let with_nl = if i + 1 < self.lines.len() { lr.start..lr.end + 1 } else { lr.clone() };
+            let with_nl = if i + 1 < self.lines.len() {
+                lr.start..lr.end + 1
+            } else {
+                lr.clone()
+            };
             let mut spans = Vec::new();
             highlight_line(&self.text[with_nl], &mut state, &mut stack, &mut spans);
-            let abs: Vec<_> = spans.into_iter().map(|(r, id)| (r.start + lr.start..r.end + lr.start, id)).collect();
+            let abs: Vec<_> = spans
+                .into_iter()
+                .map(|(r, id)| (r.start + lr.start..r.end + lr.start, id))
+                .collect();
             self.runs.push(flatten_spans(&abs));
             self.states.push((state, stack));
         }
-        (lines.start.min(end)..end).map(|i| self.runs[i].clone()).collect()
+        (lines.start.min(end)..end)
+            .map(|i| self.runs[i].clone())
+            .collect()
     }
 }
 
@@ -298,7 +317,10 @@ mod tests {
 
     #[test]
     fn rust_tokens() {
-        let s = highlight_snippet("fn main() { let x = \"hi\"; // c\n}\n", find_grammar("Rust").unwrap());
+        let s = highlight_snippet(
+            "fn main() { let x = \"hi\"; // c\n}\n",
+            find_grammar("Rust").unwrap(),
+        );
         let get = |id| s.iter().any(|(_, i)| *i == id);
         assert!(get(StyleId::Keyword));
         assert!(get(StyleId::String));
@@ -324,7 +346,10 @@ mod tests {
         h.update("x = 1\n'''doc\ny = 'z'\n", &[TextEdit::new(6..9, "'''doc")]);
         let r = h.highlight(0..3);
         // Line 2 is now inside the docstring.
-        assert!(r[2].iter().all(|r| r.styles.contains(StyleId::String) || r.styles.contains(StyleId::Comment)));
+        assert!(
+            r[2].iter()
+                .all(|r| r.styles.contains(StyleId::String) || r.styles.contains(StyleId::Comment))
+        );
         assert!(FileHighlighter::for_path("Makefile", "").is_none());
     }
 }

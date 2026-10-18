@@ -49,9 +49,10 @@ fn walk_markdown_files(dir: &Path, out: &mut Vec<PathBuf>) {
             }
         } else if ft.is_file()
             && let Some(ext) = path.extension().and_then(|e| e.to_str())
-                && (ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")) {
-                    out.push(path);
-                }
+            && (ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"))
+        {
+            out.push(path);
+        }
     }
 }
 

@@ -4,8 +4,8 @@
 
 use fuchico_mermaid::samples::SAMPLES;
 use fuchico_mermaid::{Chrome, MermaidTheme, MermaidView};
-use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::*;
 
 struct Gallery {
     view: Entity<MermaidView>,
@@ -44,34 +44,71 @@ impl Render for Gallery {
             .flex()
             .bg(bg)
             .text_color(fg)
-            .child(div().w(px(250.0)).flex_none().flex().flex_col().py_2().children(items))
+            .child(
+                div()
+                    .w(px(250.0))
+                    .flex_none()
+                    .flex()
+                    .flex_col()
+                    .py_2()
+                    .children(items),
+            )
             .child(div().flex_1().min_w_0().child(self.view.clone()))
     }
 }
 
 fn rgb_of(t: &MermaidTheme, css: &str) -> Hsla {
     let c = t.resolve(css);
-    gpui_kit::Rgba { r: c.r as f32 / 255.0, g: c.g as f32 / 255.0, b: c.b as f32 / 255.0, a: 1.0 }.into()
+    gpui_kit::Rgba {
+        r: c.r as f32 / 255.0,
+        g: c.g as f32 / 255.0,
+        b: c.b as f32 / 255.0,
+        a: 1.0,
+    }
+    .into()
 }
 
 fn main() {
     let dark = std::env::var("MERMAID_DARK").is_ok();
-    let theme = if dark { MermaidTheme::dark() } else { MermaidTheme::light() };
-    let start: usize = std::env::var("MERMAID_SAMPLE").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
-    let custom = std::env::var("MERMAID_SOURCE").ok().and_then(|p| std::fs::read_to_string(p).ok());
+    let theme = if dark {
+        MermaidTheme::dark()
+    } else {
+        MermaidTheme::light()
+    };
+    let start: usize = std::env::var("MERMAID_SAMPLE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let custom = std::env::var("MERMAID_SOURCE")
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok());
     gpui_kit::application().run(move |cx| {
         gpui_kit::init(cx);
         let opts = WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1100.0), px(720.0)), cx))),
+            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
+                None,
+                size(px(1100.0), px(720.0)),
+                cx,
+            ))),
             ..Default::default()
         };
         let theme2 = theme.clone();
         gpui_kit::open_window(opts, cx, move |_, cx| {
-            let src = custom.clone().unwrap_or_else(|| SAMPLES[start.min(SAMPLES.len() - 1)].1.to_string());
-            let view = cx.new(|cx| MermaidView::with_source("Diagram", Chrome::Pane, theme2.clone(), src, cx));
-            cx.new(|_| Gallery { view, selected: start, theme: theme2 })
+            let src = custom
+                .clone()
+                .unwrap_or_else(|| SAMPLES[start.min(SAMPLES.len() - 1)].1.to_string());
+            let view = cx.new(|cx| {
+                MermaidView::with_source("Diagram", Chrome::Pane, theme2.clone(), src, cx)
+            });
+            cx.new(|_| Gallery {
+                view,
+                selected: start,
+                theme: theme2,
+            })
         })
         .expect("window");
-        if std::env::var_os("FUCHICO_BACKGROUND").is_none() { cx.activate(true); }
+        if std::env::var_os("FUCHICO_BACKGROUND").is_none() {
+            cx.activate(true);
+        }
     });
 }

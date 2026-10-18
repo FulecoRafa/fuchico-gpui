@@ -12,8 +12,8 @@ use std::collections::{HashMap, HashSet};
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
 
-use crate::fractional::key_between;
 use crate::elbow;
+use crate::fractional::key_between;
 use crate::geom;
 use crate::model::{Binding, BoundElement, Element, Field, LoadError, Num, Roundness};
 use crate::text;
@@ -94,7 +94,9 @@ pub fn now_ms() -> f64 {
 
 pub fn random_id() -> String {
     const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
-    (0..21).map(|_| A[(rand::random::<u32>() as usize) % A.len()] as char).collect()
+    (0..21)
+        .map(|_| A[(rand::random::<u32>() as usize) % A.len()] as char)
+        .collect()
 }
 
 fn random_int() -> f64 {
@@ -121,8 +123,13 @@ impl Scene {
             return Ok(Self::default());
         }
         let v: Value = serde_json::from_str(t).map_err(|_| LoadError::Malformed)?;
-        let Value::Object(mut top) = v else { return Err(LoadError::Malformed) };
-        let mut s = Self { fresh: false, ..Self::default() };
+        let Value::Object(mut top) = v else {
+            return Err(LoadError::Malformed);
+        };
+        let mut s = Self {
+            fresh: false,
+            ..Self::default()
+        };
         match top.get_mut("elements") {
             Some(Value::Array(arr)) => {
                 for v in std::mem::take(arr) {
@@ -167,7 +174,12 @@ impl Scene {
     }
 
     fn files_json(&self) -> Value {
-        Value::Object(self.files.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+        Value::Object(
+            self.files
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        )
     }
 
     pub fn to_value(&self) -> Value {
@@ -247,7 +259,10 @@ impl Scene {
     }
 
     pub fn app_bool(&self, key: &str) -> bool {
-        self.app_state().and_then(|a| a.get(key)).and_then(|v| v.as_bool()).unwrap_or(false)
+        self.app_state()
+            .and_then(|a| a.get(key))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
     }
 
     pub fn grid_enabled(&self) -> bool {
@@ -380,7 +395,11 @@ impl Scene {
         f.group_ids.set(Vec::new());
         f.frame_id.set_null();
         f.index.set_null();
-        let roundness = |t: f64| Roundness { kind: Num(t), value: Field::Absent, extra: Map::new() };
+        let roundness = |t: f64| Roundness {
+            kind: Num(t),
+            value: Field::Absent,
+            extra: Map::new(),
+        };
         match kind {
             "rectangle" | "diamond" if d.round => f.roundness.set(roundness(3.0)),
             "arrow" if d.arrow_type == "round" => f.roundness.set(roundness(2.0)),
@@ -405,7 +424,8 @@ impl Scene {
                 f.container_id.set_null();
                 f.original_text.set(String::new());
                 f.auto_resize.set(true);
-                f.line_height.set(Num(text::default_line_height(d.font_family)));
+                f.line_height
+                    .set(Num(text::default_line_height(d.font_family)));
             }
             "line" | "arrow" => {
                 f.points.set(vec![[Num(0.0), Num(0.0)]]);
@@ -443,7 +463,11 @@ impl Scene {
             }
             _ => {}
         }
-        Element { id: random_id(), kind: kind.into(), f }
+        Element {
+            id: random_id(),
+            kind: kind.into(),
+            f,
+        }
     }
 
     /// Appends an element on top, assigning a fractional index.
@@ -458,9 +482,10 @@ impl Scene {
         let mut all = ids.clone();
         for el in self.elements() {
             if let Some(c) = el.container_id()
-                && ids.contains(c) {
-                    all.insert(el.id.clone());
-                }
+                && ids.contains(c)
+            {
+                all.insert(el.id.clone());
+            }
         }
         self.items
             .retain(|i| !matches!(i, Item::El(e) if all.contains(&e.id)));
@@ -475,18 +500,21 @@ impl Scene {
             }
             for binding in [&mut el.f.start_binding, &mut el.f.end_binding] {
                 if let Some(bd) = binding.get()
-                    && all.contains(&bd.element_id) {
-                        binding.set_null();
-                    }
+                    && all.contains(&bd.element_id)
+                {
+                    binding.set_null();
+                }
             }
             if let Some(c) = el.f.container_id.get()
-                && all.contains(c) {
-                    el.f.container_id.set_null();
-                }
+                && all.contains(c)
+            {
+                el.f.container_id.set_null();
+            }
             if let Some(fr) = el.f.frame_id.get()
-                && all.contains(fr) {
-                    el.f.frame_id.set_null();
-                }
+                && all.contains(fr)
+            {
+                el.f.frame_id.set_null();
+            }
         }
     }
 
@@ -494,7 +522,8 @@ impl Scene {
     pub fn add_file(&mut self, mime: &str, data_url: String) -> String {
         use sha2::Digest;
         let hash = sha2::Sha256::digest(data_url.as_bytes());
-        let id: String = hash.iter().map(|b| format!("{b:02x}")).collect::<String>()[..40].to_string();
+        let id: String =
+            hash.iter().map(|b| format!("{b:02x}")).collect::<String>()[..40].to_string();
         if !self.files.contains_key(&id) {
             let now = now_ms();
             self.files.insert(
@@ -528,7 +557,12 @@ impl Scene {
             .collect();
         if !groups.is_empty() {
             for el in self.elements() {
-                if el.group_ids().last().map(|g| groups.contains(g)).unwrap_or(false) {
+                if el
+                    .group_ids()
+                    .last()
+                    .map(|g| groups.contains(g))
+                    .unwrap_or(false)
+                {
                     out.insert(el.id.clone());
                 }
             }
@@ -567,8 +601,9 @@ impl Scene {
     pub fn reorder(&mut self, ids: &HashSet<String>, forward: bool, to_end: bool) {
         let sel = |i: &Item| matches!(i, Item::El(e) if ids.contains(&e.id));
         if to_end {
-            let (mut a, b): (Vec<Item>, Vec<Item>) =
-                std::mem::take(&mut self.items).into_iter().partition(|i| !sel(i));
+            let (mut a, b): (Vec<Item>, Vec<Item>) = std::mem::take(&mut self.items)
+                .into_iter()
+                .partition(|i| !sel(i));
             if forward {
                 a.extend(b);
                 self.items = a;
@@ -604,7 +639,9 @@ impl Scene {
     /// Re-assigns fractional indices of `ids` so they sort in array order.
     pub fn fix_indices(&mut self, ids: &HashSet<String>) {
         for i in 0..self.items.len() {
-            let Item::El(e) = &self.items[i] else { continue };
+            let Item::El(e) = &self.items[i] else {
+                continue;
+            };
             if !ids.contains(&e.id) {
                 continue;
             }
@@ -649,7 +686,9 @@ impl Scene {
             .filter(|e| e.kind == "arrow")
             .filter(|e| {
                 [&e.f.start_binding, &e.f.end_binding].iter().any(|b| {
-                    b.get().map(|b| ids.contains(&b.element_id)).unwrap_or(false)
+                    b.get()
+                        .map(|b| ids.contains(&b.element_id))
+                        .unwrap_or(false)
                 })
             })
             .map(|e| e.id.clone())
@@ -662,25 +701,34 @@ impl Scene {
     /// Recomputes a bound arrow's end points (focus bindings) or route
     /// (elbow arrows, fixed points), then its label.
     pub fn reroute_arrow(&mut self, aid: &str) {
-        let Some(arrow) = self.get(aid).cloned() else { return };
-        let mut world: Vec<geom::P> = arrow.points().iter().map(|p| geom::to_world(&arrow, *p)).collect();
+        let Some(arrow) = self.get(aid).cloned() else {
+            return;
+        };
+        let mut world: Vec<geom::P> = arrow
+            .points()
+            .iter()
+            .map(|p| geom::to_world(&arrow, *p))
+            .collect();
         if world.len() < 2 {
             return;
         }
         if arrow.f.elbowed.get().copied().unwrap_or(false) {
-            let end = |b: Option<&Binding>, fallback: geom::P| -> (geom::P, Option<elbow::Heading>) {
-                let Some(b) = b else { return (fallback, None) };
-                let Some(t) = self.get(&b.element_id) else { return (fallback, None) };
-                let gap = b.gap.get().map(|g| g.0).unwrap_or(4.0).clamp(0.0, 20.0);
-                let fp = b
-                    .fixed_point
-                    .get()
-                    .and_then(|v| v.as_array())
-                    .and_then(|a| Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?]))
-                    .unwrap_or_else(|| elbow::fixed_point_for(t, fallback));
-                let (p, h) = elbow::fixed_point_world(t, fp, gap);
-                (p, Some(h))
-            };
+            let end =
+                |b: Option<&Binding>, fallback: geom::P| -> (geom::P, Option<elbow::Heading>) {
+                    let Some(b) = b else { return (fallback, None) };
+                    let Some(t) = self.get(&b.element_id) else {
+                        return (fallback, None);
+                    };
+                    let gap = b.gap.get().map(|g| g.0).unwrap_or(4.0).clamp(0.0, 20.0);
+                    let fp = b
+                        .fixed_point
+                        .get()
+                        .and_then(|v| v.as_array())
+                        .and_then(|a| Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?]))
+                        .unwrap_or_else(|| elbow::fixed_point_for(t, fallback));
+                    let (p, h) = elbow::fixed_point_world(t, fp, gap);
+                    (p, Some(h))
+                };
             let (s, hs) = end(arrow.f.start_binding.get(), world[0]);
             let (e, he) = end(arrow.f.end_binding.get(), *world.last().unwrap());
             let pts = elbow::route(s, hs, e, he);
@@ -692,13 +740,22 @@ impl Scene {
             return;
         }
         let n = world.len();
-        for (start, b) in [(true, arrow.f.start_binding.get()), (false, arrow.f.end_binding.get())] {
+        for (start, b) in [
+            (true, arrow.f.start_binding.get()),
+            (false, arrow.f.end_binding.get()),
+        ] {
             let Some(b) = b else { continue };
-            let Some(target) = self.get(&b.element_id) else { continue };
+            let Some(target) = self.get(&b.element_id) else {
+                continue;
+            };
             let (i, j) = if start { (0, 1) } else { (n - 1, n - 2) };
             let adj = if n == 2 {
                 // Aim from the other end (or the other bound shape's centre).
-                let other = if start { arrow.f.end_binding.get() } else { arrow.f.start_binding.get() };
+                let other = if start {
+                    arrow.f.end_binding.get()
+                } else {
+                    arrow.f.start_binding.get()
+                };
                 other
                     .and_then(|o| self.get(&o.element_id))
                     .map(geom::center)
@@ -709,10 +766,14 @@ impl Scene {
             let gap = b.gap.get().map(|g| g.0).unwrap_or(4.0).clamp(0.0, 20.0);
             let focus = b.focus.get().map(|f| f.0).unwrap_or(0.0).clamp(-1.0, 1.0);
             let aim = geom::focus_point(target, adj, focus);
-            let p = geom::ray_outline(target, adj, aim).unwrap_or_else(|| geom::outline_toward_center(target, adj));
+            let p = geom::ray_outline(target, adj, aim)
+                .unwrap_or_else(|| geom::outline_toward_center(target, adj));
             let d = geom::dist(adj, p);
             world[i] = if d > 1e-6 {
-                [p[0] + (adj[0] - p[0]) / d * gap, p[1] + (adj[1] - p[1]) / d * gap]
+                [
+                    p[0] + (adj[0] - p[0]) / d * gap,
+                    p[1] + (adj[1] - p[1]) / d * gap,
+                ]
             } else {
                 p
             };
@@ -725,7 +786,13 @@ impl Scene {
 
     /// Route for an elbow arrow being drawn from `s` to `e`, attaching to
     /// the given targets (if any) at the sides nearest those points.
-    pub fn elbow_route(&self, s: geom::P, st: Option<&str>, e: geom::P, et: Option<&str>) -> Vec<geom::P> {
+    pub fn elbow_route(
+        &self,
+        s: geom::P,
+        st: Option<&str>,
+        e: geom::P,
+        et: Option<&str>,
+    ) -> Vec<geom::P> {
         let end = |t: Option<&str>, p: geom::P| -> (geom::P, Option<elbow::Heading>) {
             match t.and_then(|t| self.get(t)) {
                 Some(t) => {
@@ -742,7 +809,9 @@ impl Scene {
 
     /// Re-lays out text bound to `container` (wrap, centre, grow container).
     pub fn layout_bound_text(&mut self, container: &str) {
-        let Some(c) = self.get(container).cloned() else { return };
+        let Some(c) = self.get(container).cloned() else {
+            return;
+        };
         let Some(tid) = c
             .bound_elements()
             .iter()
@@ -751,16 +820,17 @@ impl Scene {
         else {
             return;
         };
-        let Some(t) = self.get(&tid).cloned() else { return };
+        let Some(t) = self.get(&tid).cloned() else {
+            return;
+        };
         let fam = t.font_family();
         let size = t.font_size();
         let lh = t.line_height();
-        let original = t
-            .f
-            .original_text
-            .get()
-            .cloned()
-            .unwrap_or_else(|| t.text().to_string());
+        let original =
+            t.f.original_text
+                .get()
+                .cloned()
+                .unwrap_or_else(|| t.text().to_string());
         if c.is_linear() {
             let w: Vec<geom::P> = c.points().iter().map(|p| geom::to_world(&c, *p)).collect();
             if w.is_empty() {
@@ -810,9 +880,10 @@ impl Scene {
             };
         }
         if (container_h - ch).abs() > 0.01
-            && let Some(cm) = self.get_mut(container) {
-                cm.f.height.set(Num(container_h));
-            }
+            && let Some(cm) = self.get_mut(container)
+        {
+            cm.f.height.set(Num(container_h));
+        }
         let c = self.get(container).cloned().unwrap();
         let cc = [c.x() + c.width() / 2.0, c.y() + c.height() / 2.0];
         let tw = tw.min(max_w.max(tw.min(max_w)));
@@ -850,8 +921,12 @@ impl Scene {
     /// Binds an arrow end to `target` (`start` or end).
     pub fn bind(&mut self, arrow: &str, start: bool, target: Option<&str>) {
         let old = self.get(arrow).and_then(|a| {
-            if start { a.f.start_binding.get() } else { a.f.end_binding.get() }
-                .map(|b| b.element_id.clone())
+            if start {
+                a.f.start_binding.get()
+            } else {
+                a.f.end_binding.get()
+            }
+            .map(|b| b.element_id.clone())
         });
         // Where the arrow currently meets the target decides the focus
         // (or, for elbow arrows, the fixed point on the target's box).
@@ -862,7 +937,11 @@ impl Scene {
             if w.len() < 2 {
                 return None;
             }
-            let (end, adj) = if start { (w[0], w[1]) } else { (w[w.len() - 1], w[w.len() - 2]) };
+            let (end, adj) = if start {
+                (w[0], w[1])
+            } else {
+                (w[w.len() - 1], w[w.len() - 2])
+            };
             if a.f.elbowed.get().copied().unwrap_or(false) {
                 let fp = elbow::fixed_point_for(te, end);
                 Some((0.0, Value::from(vec![fp[0], fp[1]])))
@@ -871,7 +950,11 @@ impl Scene {
             }
         });
         if let Some(a) = self.get_mut(arrow) {
-            let field = if start { &mut a.f.start_binding } else { &mut a.f.end_binding };
+            let field = if start {
+                &mut a.f.start_binding
+            } else {
+                &mut a.f.end_binding
+            };
             match target {
                 Some(t) => {
                     let (focus, fixed) = geo.unwrap_or((0.0, Value::Null));
@@ -880,7 +963,11 @@ impl Scene {
                         element_id: t.to_string(),
                         focus: Field::Value(Num(focus)),
                         gap: Field::Value(Num(4.0)),
-                        fixed_point: if fixed.is_null() { Field::Null } else { Field::Value(fixed) },
+                        fixed_point: if fixed.is_null() {
+                            Field::Null
+                        } else {
+                            Field::Value(fixed)
+                        },
                         extra: Map::new(),
                     })
                 }
@@ -899,19 +986,26 @@ impl Scene {
                 .unwrap_or(false)
         };
         if let Some(o) = old
-            && Some(o.as_str()) != target && !still(self, &o)
-                && let Some(t) = self.get_mut(&o)
-                    && let Some(b) = t.f.bound_elements.get_mut() {
-                        b.retain(|be| be.id != arrow);
-                    }
+            && Some(o.as_str()) != target
+            && !still(self, &o)
+            && let Some(t) = self.get_mut(&o)
+            && let Some(b) = t.f.bound_elements.get_mut()
+        {
+            b.retain(|be| be.id != arrow);
+        }
         if let Some(t) = target
-            && let Some(te) = self.get_mut(t) {
-                let mut b = te.bound_elements().to_vec();
-                if !b.iter().any(|be| be.id == arrow) {
-                    b.push(BoundElement { id: arrow.to_string(), kind: "arrow".into(), extra: Map::new() });
-                    te.f.bound_elements.set(b);
-                }
+            && let Some(te) = self.get_mut(t)
+        {
+            let mut b = te.bound_elements().to_vec();
+            if !b.iter().any(|be| be.id == arrow) {
+                b.push(BoundElement {
+                    id: arrow.to_string(),
+                    kind: "arrow".into(),
+                    extra: Map::new(),
+                });
+                te.f.bound_elements.set(b);
             }
+        }
     }
 }
 
@@ -989,14 +1083,25 @@ pub fn set_points_preserving(el: &mut Element, local: &[geom::P]) {
     let a = el.angle();
     let cl_old = geom::local_center(el);
     let shift = local[0];
-    let pts: Vec<geom::P> = local.iter().map(|p| [p[0] - shift[0], p[1] - shift[1]]).collect();
+    let pts: Vec<geom::P> = local
+        .iter()
+        .map(|p| [p[0] - shift[0], p[1] - shift[1]])
+        .collect();
     let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
     for p in &pts {
-        b = [b[0].min(p[0]), b[1].min(p[1]), b[2].max(p[0]), b[3].max(p[1])];
+        b = [
+            b[0].min(p[0]),
+            b[1].min(p[1]),
+            b[2].max(p[0]),
+            b[3].max(p[1]),
+        ];
     }
     let cl_new = [(b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0];
     // o' = o + cl - cl' + R(shift + cl' - cl)
-    let v = [shift[0] + cl_new[0] - cl_old[0], shift[1] + cl_new[1] - cl_old[1]];
+    let v = [
+        shift[0] + cl_new[0] - cl_old[0],
+        shift[1] + cl_new[1] - cl_old[1],
+    ];
     let rv = geom::rotate(v, [0.0, 0.0], a);
     let nx = el.x() + cl_old[0] - cl_new[0] + rv[0];
     let ny = el.y() + cl_old[1] - cl_new[1] + rv[1];

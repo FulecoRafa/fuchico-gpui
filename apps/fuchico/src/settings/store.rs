@@ -22,13 +22,17 @@ impl SettingsStore {
     /// Reads `helix.editorSettings` (startup, before any window).
     pub fn load() -> SettingsStore {
         let raw = persist::load_raw(persist::KEY_SETTINGS);
-        SettingsStore { settings: Arc::new(Settings::from_json(raw.as_deref())) }
+        SettingsStore {
+            settings: Arc::new(Settings::from_json(raw.as_deref())),
+        }
     }
 
     /// A store holding `settings`, not backed by the persisted file (tests).
     #[cfg(test)]
     pub fn with(settings: Settings) -> SettingsStore {
-        SettingsStore { settings: Arc::new(settings) }
+        SettingsStore {
+            settings: Arc::new(settings),
+        }
     }
 
     pub fn init(store: SettingsStore, cx: &mut App) {

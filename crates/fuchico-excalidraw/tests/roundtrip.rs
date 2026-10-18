@@ -39,7 +39,10 @@ fn scene_round_trip_is_exact_for_untouched() {
         let orig: Value = serde_json::from_str(&src).unwrap();
         let scene = Scene::parse(&src).unwrap();
         let out = scene.to_value();
-        assert_eq!(out, orig, "{name}: untouched scene must serialize to the identical value");
+        assert_eq!(
+            out, orig,
+            "{name}: untouched scene must serialize to the identical value"
+        );
         // And parse→serialize→parse is stable.
         let again = Scene::parse(&scene.to_json()).unwrap().to_value();
         assert_eq!(again, out, "{name}: second round trip differs");
@@ -62,7 +65,18 @@ fn typed_model_round_trip_is_semantic() {
 fn every_element_kind_parses() {
     let scene = Scene::parse(FIXTURE).unwrap();
     let kinds: HashSet<String> = scene.elements().map(|e| e.kind.clone()).collect();
-    for k in ["frame", "rectangle", "text", "diamond", "ellipse", "arrow", "line", "freedraw", "image", "embeddable"] {
+    for k in [
+        "frame",
+        "rectangle",
+        "text",
+        "diamond",
+        "ellipse",
+        "arrow",
+        "line",
+        "freedraw",
+        "image",
+        "embeddable",
+    ] {
         assert!(kinds.contains(k), "missing {k}");
     }
     // Deleted elements are kept in the file but hidden from the scene.
@@ -71,7 +85,12 @@ fn every_element_kind_parses() {
     let arrow = scene.get("arrow1").unwrap();
     assert_eq!(arrow.f.start_binding.get().unwrap().element_id, "rect1");
     assert_eq!(scene.get("text1").unwrap().container_id(), Some("rect1"));
-    assert!(scene.file_data_url("fileA").unwrap().starts_with("data:image/png;base64,"));
+    assert!(
+        scene
+            .file_data_url("fileA")
+            .unwrap()
+            .starts_with("data:image/png;base64,")
+    );
     for el in scene.elements() {
         let _ = fuchico_excalidraw::shape::generate(el);
     }

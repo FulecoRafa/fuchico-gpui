@@ -5,7 +5,9 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use gpui_kit::{App, Bounds, Context, Global, Subscription, Task, Window, WindowBounds, point, px, size};
+use gpui_kit::{
+    App, Bounds, Context, Global, Subscription, Task, Window, WindowBounds, point, px, size,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::persist;
@@ -40,12 +42,22 @@ impl Geometry {
     }
 
     pub fn to_bounds(self) -> WindowBounds {
-        let r = Bounds { origin: point(px(self.x), px(self.y)), size: size(px(self.width), px(self.height)) };
-        if self.maximized { WindowBounds::Maximized(r) } else { WindowBounds::Windowed(r) }
+        let r = Bounds {
+            origin: point(px(self.x), px(self.y)),
+            size: size(px(self.width), px(self.height)),
+        };
+        if self.maximized {
+            WindowBounds::Maximized(r)
+        } else {
+            WindowBounds::Windowed(r)
+        }
     }
 
     fn is_sane(&self) -> bool {
-        self.width >= MIN_RESTORE && self.height >= MIN_RESTORE && self.x.is_finite() && self.y.is_finite()
+        self.width >= MIN_RESTORE
+            && self.height >= MIN_RESTORE
+            && self.x.is_finite()
+            && self.y.is_finite()
     }
 }
 
@@ -60,21 +72,33 @@ impl Global for WindowStates {}
 impl WindowStates {
     /// Startup read.
     pub fn load() -> WindowStates {
-        WindowStates { map: persist::load(persist::KEY_WINDOW_STATE).unwrap_or_default(), save: None }
+        WindowStates {
+            map: persist::load(persist::KEY_WINDOW_STATE).unwrap_or_default(),
+            save: None,
+        }
     }
 }
 
 /// Bounds for a new window: the remembered ones, else `default` centered.
 pub fn initial_bounds(label: &str, default: (f32, f32), cx: &App) -> WindowBounds {
-    match cx.try_global::<WindowStates>().and_then(|s| s.map.get(label)) {
+    match cx
+        .try_global::<WindowStates>()
+        .and_then(|s| s.map.get(label))
+    {
         Some(g) if g.is_sane() => g.to_bounds(),
-        _ => WindowBounds::Windowed(Bounds::centered(None, size(px(default.0), px(default.1)), cx)),
+        _ => WindowBounds::Windowed(Bounds::centered(
+            None,
+            size(px(default.0), px(default.1)),
+            cx,
+        )),
     }
 }
 
 /// Records `window`'s bounds under `label` whenever they change.
 pub fn track<V: 'static>(label: String, window: &mut Window, cx: &mut Context<V>) -> Subscription {
-    cx.observe_window_bounds(window, move |_, window, cx| record(&label, window.window_bounds(), cx))
+    cx.observe_window_bounds(window, move |_, window, cx| {
+        record(&label, window.window_bounds(), cx)
+    })
 }
 
 pub fn record(label: &str, bounds: WindowBounds, cx: &mut App) {
@@ -107,7 +131,13 @@ mod tests {
 
     #[test]
     fn geometry_round_trips_and_rejects_tiny() {
-        let g = Geometry { x: 10., y: 20., width: 900., height: 650., maximized: false };
+        let g = Geometry {
+            x: 10.,
+            y: 20.,
+            width: 900.,
+            height: 650.,
+            maximized: false,
+        };
         assert_eq!(Geometry::from_bounds(g.to_bounds()), g);
         let json = serde_json::to_string(&g).unwrap();
         assert_eq!(serde_json::from_str::<Geometry>(&json).unwrap(), g);

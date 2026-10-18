@@ -59,9 +59,10 @@ fn walk_markdown_files(dir: &Path, out: &mut Vec<PathBuf>) {
             walk_markdown_files(&path, out);
         } else if ft.is_file()
             && let Some(ext) = path.extension().and_then(|e| e.to_str())
-                && (ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")) {
-                    out.push(path);
-                }
+            && (ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"))
+        {
+            out.push(path);
+        }
     }
 }
 
@@ -132,27 +133,28 @@ pub fn tasks_scan(root: String) -> Result<Vec<AgendaItem>, String> {
             }
 
             if trimmed.starts_with('📅')
-                && let Some(m) = patterns.date.find(trimmed) {
-                    let caps = patterns
-                        .date
-                        .captures(trimmed)
-                        .expect("find implies captures");
-                    let date = caps.get(1).map(|g| g.as_str().to_string());
-                    let time = caps.get(2).map(|g| g.as_str().to_string());
-                    let text = trimmed[m.end()..].trim().to_string();
-                    items.push(AgendaItem {
-                        kind: ItemKind::Event,
-                        checked: false,
-                        text,
-                        date,
-                        time,
-                        file: file_str.clone(),
-                        line: idx + 1,
-                        recurrence: None,
-                        recur_time: None,
-                    });
-                    continue;
-                }
+                && let Some(m) = patterns.date.find(trimmed)
+            {
+                let caps = patterns
+                    .date
+                    .captures(trimmed)
+                    .expect("find implies captures");
+                let date = caps.get(1).map(|g| g.as_str().to_string());
+                let time = caps.get(2).map(|g| g.as_str().to_string());
+                let text = trimmed[m.end()..].trim().to_string();
+                items.push(AgendaItem {
+                    kind: ItemKind::Event,
+                    checked: false,
+                    text,
+                    date,
+                    time,
+                    file: file_str.clone(),
+                    line: idx + 1,
+                    recurrence: None,
+                    recur_time: None,
+                });
+                continue;
+            }
 
             if let Some(caps) = patterns.checkbox.captures(trimmed) {
                 let checked = matches!(&caps[1], "x" | "X");
@@ -330,10 +332,22 @@ mod toggle_tests {
         let f = dir.path().join("t.md");
         std::fs::write(&f, "plain\n- [ ] a\n").unwrap();
         let path = f.to_string_lossy().into_owned();
-        assert_eq!(tasks_toggle(path.clone(), 0).unwrap_err(), "line out of range");
-        assert_eq!(tasks_toggle(path.clone(), 3).unwrap_err(), "line out of range");
+        assert_eq!(
+            tasks_toggle(path.clone(), 0).unwrap_err(),
+            "line out of range"
+        );
+        assert_eq!(
+            tasks_toggle(path.clone(), 3).unwrap_err(),
+            "line out of range"
+        );
         assert_eq!(tasks_toggle(path, 1).unwrap_err(), "line is not a checkbox");
         assert_eq!(std::fs::read_to_string(&f).unwrap(), "plain\n- [ ] a\n");
-        assert!(tasks_toggle(dir.path().join("missing.md").to_string_lossy().into_owned(), 1).is_err());
+        assert!(
+            tasks_toggle(
+                dir.path().join("missing.md").to_string_lossy().into_owned(),
+                1
+            )
+            .is_err()
+        );
     }
 }

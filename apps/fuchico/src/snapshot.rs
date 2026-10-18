@@ -26,13 +26,29 @@ pub struct SnapTheme {
 }
 
 impl SnapTheme {
-    pub const AYU_LIGHT: SnapTheme = SnapTheme { palette: PaletteId::Ayu, mode: ModePref::Light };
-    pub const AYU_DARK: SnapTheme = SnapTheme { palette: PaletteId::Ayu, mode: ModePref::Dark };
-    pub const DRACULA: SnapTheme = SnapTheme { palette: PaletteId::Dracula, mode: ModePref::Dark };
+    pub const AYU_LIGHT: SnapTheme = SnapTheme {
+        palette: PaletteId::Ayu,
+        mode: ModePref::Light,
+    };
+    pub const AYU_DARK: SnapTheme = SnapTheme {
+        palette: PaletteId::Ayu,
+        mode: ModePref::Dark,
+    };
+    pub const DRACULA: SnapTheme = SnapTheme {
+        palette: PaletteId::Dracula,
+        mode: ModePref::Dark,
+    };
 
     /// The default palette in light or dark mode.
     pub fn default_mode(dark: bool) -> SnapTheme {
-        SnapTheme { palette: PaletteId::default(), mode: if dark { ModePref::Dark } else { ModePref::Light } }
+        SnapTheme {
+            palette: PaletteId::default(),
+            mode: if dark {
+                ModePref::Dark
+            } else {
+                ModePref::Light
+            },
+        }
     }
 }
 
@@ -97,9 +113,10 @@ pub fn snapshot_with<V: Render>(
     prepare: impl FnOnce(&Entity<V>, &mut Window, &mut App),
 ) -> PathBuf {
     isolate_config(name);
-    let mut cx = HeadlessAppContext::with_platform(text_system(), Arc::new(crate::assets::Assets), || {
-        gpui_platform::current_headless_renderer()
-    });
+    let mut cx =
+        HeadlessAppContext::with_platform(text_system(), Arc::new(crate::assets::Assets), || {
+            gpui_platform::current_headless_renderer()
+        });
     cx.update(|cx| init_app(theme, cx));
     let mut content = None;
     let handle = cx
@@ -111,7 +128,8 @@ pub fn snapshot_with<V: Render>(
         .expect("open headless window");
     let view = content.expect("view built");
     cx.run_until_parked();
-    cx.update_window(handle.into(), |_, window, cx| prepare(&view, window, cx)).expect("prepare");
+    cx.update_window(handle.into(), |_, window, cx| prepare(&view, window, cx))
+        .expect("prepare");
     // Background work (file scans, the 200ms search debounce) may hop
     // threads or wait on timers; let it land.
     cx.allow_parking();
@@ -127,7 +145,9 @@ pub fn snapshot_with<V: Render>(
         window.draw(cx).clear(cx);
     })
     .expect("draw");
-    let image = cx.capture_screenshot(handle.into()).expect("headless capture (Metal renderer)");
+    let image = cx
+        .capture_screenshot(handle.into())
+        .expect("headless capture (Metal renderer)");
     let dir = snapshot_dir();
     std::fs::create_dir_all(&dir).expect("create target/snapshots");
     let path = dir.join(format!("{name}.png"));

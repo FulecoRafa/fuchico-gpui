@@ -32,7 +32,10 @@ pub fn basename_no_ext(path: &str) -> &str {
 /// Joins `relative` onto the directory of `base_path`, resolving `.`/`..`.
 pub fn resolve_relative_path(base_path: &str, relative: &str) -> String {
     let is_absolute = base_path.starts_with('/');
-    let mut parts: Vec<&str> = dirname_of(base_path).split('/').filter(|s| !s.is_empty()).collect();
+    let mut parts: Vec<&str> = dirname_of(base_path)
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
     for seg in relative.split('/') {
         match seg {
             "" | "." => {}
@@ -43,10 +46,15 @@ pub fn resolve_relative_path(base_path: &str, relative: &str) -> String {
         }
     }
     let joined = parts.join("/");
-    if is_absolute { format!("/{joined}") } else { joined }
+    if is_absolute {
+        format!("/{joined}")
+    } else {
+        joined
+    }
 }
 
-static SCHEME_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^[a-z][a-z0-9+.-]*:").unwrap());
+static SCHEME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^[a-z][a-z0-9+.-]*:").unwrap());
 
 pub fn is_external_link(href: &str) -> bool {
     SCHEME_RE.is_match(href) || href.starts_with("//")
@@ -91,12 +99,22 @@ pub fn resolve_relative_markdown_link(href: &str, current_path: &str) -> Option<
 /// without `.md`, case-insensitive; exact-case hit preferred). `#heading`
 /// and `|alias` suffixes are stripped first.
 pub fn resolve_wikilink_target<S: AsRef<str>>(target: &str, vault_files: &[S]) -> Option<String> {
-    let cleaned = target.split('|').next().unwrap_or("").split('#').next().unwrap_or("").trim();
+    let cleaned = target
+        .split('|')
+        .next()
+        .unwrap_or("")
+        .split('#')
+        .next()
+        .unwrap_or("")
+        .trim();
     if cleaned.is_empty() {
         return None;
     }
     let n = cleaned.len();
-    let want = if n >= 3 && cleaned.is_char_boundary(n - 3) && cleaned[n - 3..].eq_ignore_ascii_case(".md") {
+    let want = if n >= 3
+        && cleaned.is_char_boundary(n - 3)
+        && cleaned[n - 3..].eq_ignore_ascii_case(".md")
+    {
         &cleaned[..n - 3]
     } else {
         cleaned
@@ -116,7 +134,8 @@ pub fn resolve_wikilink_target<S: AsRef<str>>(target: &str, vault_files: &[S]) -
     ci.map(String::from)
 }
 
-static WIKILINK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\[\[([^\[\]\n]+)\]\]").unwrap());
+static WIKILINK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[\[([^\[\]\n]+)\]\]").unwrap());
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WikilinkSpan {
@@ -156,7 +175,8 @@ pub fn find_wikilinks(line: &str) -> Vec<WikilinkSpan> {
         .collect()
 }
 
-static WIKILINK_TRIGGER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\[\[([^\[\]]*)$").unwrap());
+static WIKILINK_TRIGGER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[\[([^\[\]]*)$").unwrap());
 pub const MAX_COMPLETIONS: usize = 50;
 
 /// True if the text before the cursor ends in an open `[[...` (completion
@@ -174,22 +194,35 @@ pub struct WikilinkCompletion {
 
 /// The query typed after `[[` in `before` (text before the cursor), if any.
 pub fn wikilink_query(before: &str) -> Option<String> {
-    WIKILINK_TRIGGER_RE.captures(before).map(|c| c[1].to_string())
+    WIKILINK_TRIGGER_RE
+        .captures(before)
+        .map(|c| c[1].to_string())
 }
 
 /// Completion candidates for `query`, best score first, capped at
 /// [`MAX_COMPLETIONS`].
-pub fn wikilink_completions<S: AsRef<str>>(query: &str, vault_files: &[S]) -> Vec<WikilinkCompletion> {
+pub fn wikilink_completions<S: AsRef<str>>(
+    query: &str,
+    vault_files: &[S],
+) -> Vec<WikilinkCompletion> {
     let mut scored: Vec<WikilinkCompletion> = vault_files
         .iter()
         .filter_map(|p| {
             let path = p.as_ref();
             let label = basename_no_ext(path);
             let m = fuzzy_match(query, label);
-            m.matched.then(|| WikilinkCompletion { label: label.to_string(), path: path.to_string(), score: m.score })
+            m.matched.then(|| WikilinkCompletion {
+                label: label.to_string(),
+                path: path.to_string(),
+                score: m.score,
+            })
         })
         .collect();
-    scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     scored.truncate(MAX_COMPLETIONS);
     scored
 }
@@ -208,9 +241,18 @@ mod tests {
 
     #[test]
     fn relative_markdown_links() {
-        assert_eq!(resolve_relative_markdown_link("./sub/b.md", "/v/c.md").as_deref(), Some("/v/sub/b.md"));
-        assert_eq!(resolve_relative_markdown_link("a%20b.md#h", "/v/c.md").as_deref(), Some("/v/a b.md"));
-        assert_eq!(resolve_relative_markdown_link("https://x.y", "/v/c.md"), None);
+        assert_eq!(
+            resolve_relative_markdown_link("./sub/b.md", "/v/c.md").as_deref(),
+            Some("/v/sub/b.md")
+        );
+        assert_eq!(
+            resolve_relative_markdown_link("a%20b.md#h", "/v/c.md").as_deref(),
+            Some("/v/a b.md")
+        );
+        assert_eq!(
+            resolve_relative_markdown_link("https://x.y", "/v/c.md"),
+            None
+        );
         assert_eq!(resolve_relative_markdown_link("#top", "/v/c.md"), None);
         assert_eq!(resolve_relative_markdown_link("  ", "/v/c.md"), None);
         assert!(is_external_link("//cdn.x/y") && is_external_link("mailto:a@b"));
@@ -219,9 +261,18 @@ mod tests {
     #[test]
     fn wikilink_resolution_prefers_exact_case() {
         let files = ["/v/note.md", "/v/Note.md"];
-        assert_eq!(resolve_wikilink_target("Note", &files).as_deref(), Some("/v/Note.md"));
-        assert_eq!(resolve_wikilink_target("NOTE.md|alias", &files).as_deref(), Some("/v/note.md"));
-        assert_eq!(resolve_wikilink_target("note b#h", &FILES).as_deref(), Some("/v/sub/Note B.md"));
+        assert_eq!(
+            resolve_wikilink_target("Note", &files).as_deref(),
+            Some("/v/Note.md")
+        );
+        assert_eq!(
+            resolve_wikilink_target("NOTE.md|alias", &files).as_deref(),
+            Some("/v/note.md")
+        );
+        assert_eq!(
+            resolve_wikilink_target("note b#h", &FILES).as_deref(),
+            Some("/v/sub/Note B.md")
+        );
         assert_eq!(resolve_wikilink_target("  ", &FILES), None);
         assert_eq!(resolve_wikilink_target("missing", &FILES), None);
     }
@@ -232,7 +283,10 @@ mod tests {
         assert_eq!(spans.len(), 2);
         assert_eq!(spans[0].target, "a");
         assert_eq!(spans[0].label, "Alias");
-        assert_eq!(&"x [[a|Alias]] y [[b]]"[spans[0].start..spans[0].end], "[[a|Alias]]");
+        assert_eq!(
+            &"x [[a|Alias]] y [[b]]"[spans[0].start..spans[0].end],
+            "[[a|Alias]]"
+        );
         assert_eq!(spans[1].label, "b");
     }
 

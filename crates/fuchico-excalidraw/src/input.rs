@@ -35,9 +35,17 @@ fn range_to_chars(s: &str, r: &Range<usize>) -> Range<usize> {
 impl ExcalidrawView {
     /// Replaces `range` (chars; default: marked text, else the caret) with
     /// `text`, optionally marking the inserted text as composition.
-    fn ime_replace(&mut self, range: Option<Range<usize>>, text: &str, mark: bool, cx: &mut Context<Self>) {
+    fn ime_replace(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        mark: bool,
+        cx: &mut Context<Self>,
+    ) {
         let Some(s) = self.edit_string() else { return };
-        let Some(caret) = self.editing.as_ref().map(|e| e.caret) else { return };
+        let Some(caret) = self.editing.as_ref().map(|e| e.caret) else {
+            return;
+        };
         let chars: Vec<char> = s.chars().collect();
         let n = chars.len();
         let r = range.or(self.marked.clone()).unwrap_or(caret..caret);
@@ -46,24 +54,42 @@ impl ExcalidrawView {
         out.push_str(text);
         out.extend(chars[b..].iter());
         let len = text.chars().count();
-        self.marked = if mark && len > 0 { Some(a..a + len) } else { None };
+        self.marked = if mark && len > 0 {
+            Some(a..a + len)
+        } else {
+            None
+        };
         self.set_edit_string(out, a + len);
         cx.notify();
     }
 }
 
 impl EntityInputHandler for ExcalidrawView {
-    fn text_for_range(&mut self, range: Range<usize>, adjusted: &mut Option<Range<usize>>, _: &mut Window, _: &mut Context<Self>) -> Option<String> {
+    fn text_for_range(
+        &mut self,
+        range: Range<usize>,
+        adjusted: &mut Option<Range<usize>>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<String> {
         let s = self.edit_string()?;
         let r = range_to_chars(&s, &range);
         *adjusted = Some(char_to_u16(&s, r.start)..char_to_u16(&s, r.end));
         Some(s.chars().skip(r.start).take(r.end - r.start).collect())
     }
 
-    fn selected_text_range(&mut self, _: bool, _: &mut Window, _: &mut Context<Self>) -> Option<UTF16Selection> {
+    fn selected_text_range(
+        &mut self,
+        _: bool,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<UTF16Selection> {
         let s = self.edit_string()?;
         let c = char_to_u16(&s, self.editing.as_ref()?.caret);
-        Some(UTF16Selection { range: c..c, reversed: false })
+        Some(UTF16Selection {
+            range: c..c,
+            reversed: false,
+        })
     }
 
     fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> {
@@ -76,7 +102,13 @@ impl EntityInputHandler for ExcalidrawView {
         self.marked = None;
     }
 
-    fn replace_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, _: &mut Window, cx: &mut Context<Self>) {
+    fn replace_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let s = self.edit_string().unwrap_or_default();
         let r = range.map(|r| range_to_chars(&s, &r));
         self.ime_replace(r, text, false, cx);
@@ -95,7 +127,13 @@ impl EntityInputHandler for ExcalidrawView {
         self.ime_replace(r, text, true, cx);
     }
 
-    fn bounds_for_range(&mut self, _: Range<usize>, _: Bounds<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<Bounds<Pixels>> {
+    fn bounds_for_range(
+        &mut self,
+        _: Range<usize>,
+        _: Bounds<Pixels>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
         // The candidate window sits at the caret.
         let (x, y, lh) = self.caret_local()?;
         let el = self.scene.get(&self.editing.as_ref()?.id)?;
@@ -105,7 +143,12 @@ impl EntityInputHandler for ExcalidrawView {
         Some(Bounds::new(a, size(px(2.0), h)))
     }
 
-    fn character_index_for_point(&mut self, _: Point<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<usize> {
+    fn character_index_for_point(
+        &mut self,
+        _: Point<Pixels>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<usize> {
         let s = self.edit_string()?;
         Some(char_to_u16(&s, self.editing.as_ref()?.caret))
     }

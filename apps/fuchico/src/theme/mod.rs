@@ -87,7 +87,8 @@ impl ColorTokens {
     pub fn from_variant(variant: &palettes::Variant) -> ColorTokens {
         let mut t = ColorTokens::transparent();
         for (name, value) in variant {
-            let c = parse_color(value, &|_| None).unwrap_or_else(|| panic!("bad built-in color {name}: {value}"));
+            let c = parse_color(value, &|_| None)
+                .unwrap_or_else(|| panic!("bad built-in color {name}: {value}"));
             t.set(name, c.to_hsla());
         }
         t
@@ -131,7 +132,13 @@ pub struct Radii {
 
 impl Radii {
     pub fn from_base(base: f32) -> Radii {
-        Radii { base, sm: base * 0.6, md: base * 0.8, lg: base, xl: base * 1.4 }
+        Radii {
+            base,
+            sm: base * 0.6,
+            md: base * 0.8,
+            lg: base,
+            xl: base * 1.4,
+        }
     }
 }
 
@@ -190,7 +197,10 @@ trait OpacityScaled {
 
 impl OpacityScaled for Hsla {
     fn opacity_scaled(self, factor: f32) -> Hsla {
-        Hsla { a: self.a * factor, ..self }
+        Hsla {
+            a: self.a * factor,
+            ..self
+        }
     }
 }
 
@@ -275,12 +285,21 @@ struct CustomOverrides {
 
 /// Applies `--var: value` overrides in order; `var()` sees earlier results
 /// (and custom, non-theme variables declared in the same block).
-fn apply_custom_css(colors: &mut ColorTokens, decls: &[(String, String)], ignored: &mut Vec<String>) -> CustomOverrides {
+fn apply_custom_css(
+    colors: &mut ColorTokens,
+    decls: &[(String, String)],
+    ignored: &mut Vec<String>,
+) -> CustomOverrides {
     let mut out = CustomOverrides::default();
     // Last declaration wins, like CSS; resolve lazily with a depth guard.
     let base = *colors;
 
-    fn resolve_var(name: &str, decls: &[(String, String)], base: &ColorTokens, depth: u8) -> Option<Color> {
+    fn resolve_var(
+        name: &str,
+        decls: &[(String, String)],
+        base: &ColorTokens,
+        depth: u8,
+    ) -> Option<Color> {
         if depth > 16 {
             return None;
         }
@@ -332,7 +351,12 @@ pub fn hex(h: Hsla) -> String {
 pub fn snapshot_css(colors: &ColorTokens) -> String {
     ColorTokens::NAMES
         .iter()
-        .map(|n| format!("{n}: {};", colors.get(n).map(hex).unwrap_or_else(|| "inherit".into())))
+        .map(|n| {
+            format!(
+                "{n}: {};",
+                colors.get(n).map(hex).unwrap_or_else(|| "inherit".into())
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -345,7 +369,11 @@ mod tests {
     fn custom(css: &str) -> Settings {
         Settings {
             palette: PaletteId::Custom,
-            custom_themes: vec![CustomTheme { id: "t".into(), name: "T".into(), css: css.into() }],
+            custom_themes: vec![CustomTheme {
+                id: "t".into(),
+                name: "T".into(),
+                css: css.into(),
+            }],
             custom_theme_id: Some("t".into()),
             ..Settings::default()
         }
@@ -359,18 +387,42 @@ mod tests {
                 assert!(t.background.a > 0.99, "{p:?} {a:?}");
             }
         }
-        assert_eq!(hex(ColorTokens::built_in(PaletteId::Dracula, Appearance::Light).background), "#282a36");
-        assert_eq!(hex(ColorTokens::built_in(PaletteId::Catppuccin, Appearance::Light).background), "#eff1f5");
-        assert_eq!(hex(ColorTokens::built_in(PaletteId::Catppuccin, Appearance::Dark).border), "#ffffff1a");
-        assert_eq!(hex(ColorTokens::built_in(PaletteId::Ayu, Appearance::Light).background), "#ffffff");
+        assert_eq!(
+            hex(ColorTokens::built_in(PaletteId::Dracula, Appearance::Light).background),
+            "#282a36"
+        );
+        assert_eq!(
+            hex(ColorTokens::built_in(PaletteId::Catppuccin, Appearance::Light).background),
+            "#eff1f5"
+        );
+        assert_eq!(
+            hex(ColorTokens::built_in(PaletteId::Catppuccin, Appearance::Dark).border),
+            "#ffffff1a"
+        );
+        assert_eq!(
+            hex(ColorTokens::built_in(PaletteId::Ayu, Appearance::Light).background),
+            "#ffffff"
+        );
     }
 
     #[test]
     fn mode_resolution() {
-        assert_eq!(resolve_appearance(PaletteId::Dracula, ModePref::Light, false), Appearance::Dark);
-        assert_eq!(resolve_appearance(PaletteId::Ayu, ModePref::System, true), Appearance::Dark);
-        assert_eq!(resolve_appearance(PaletteId::Ayu, ModePref::System, false), Appearance::Light);
-        assert_eq!(resolve_appearance(PaletteId::Catppuccin, ModePref::Dark, false), Appearance::Dark);
+        assert_eq!(
+            resolve_appearance(PaletteId::Dracula, ModePref::Light, false),
+            Appearance::Dark
+        );
+        assert_eq!(
+            resolve_appearance(PaletteId::Ayu, ModePref::System, true),
+            Appearance::Dark
+        );
+        assert_eq!(
+            resolve_appearance(PaletteId::Ayu, ModePref::System, false),
+            Appearance::Light
+        );
+        assert_eq!(
+            resolve_appearance(PaletteId::Catppuccin, ModePref::Dark, false),
+            Appearance::Dark
+        );
     }
 
     #[test]
@@ -394,7 +446,10 @@ mod tests {
 
     #[test]
     fn var_cycles_do_not_hang() {
-        let t = resolve(&custom("--primary: var(--ring);\n--ring: var(--primary);"), false);
+        let t = resolve(
+            &custom("--primary: var(--ring);\n--ring: var(--primary);"),
+            false,
+        );
         assert_eq!(t.ignored_css.len(), 2);
     }
 
@@ -412,9 +467,15 @@ mod tests {
 
     #[test]
     fn custom_without_theme_is_ayu_light() {
-        let s = Settings { palette: PaletteId::Custom, ..Settings::default() };
+        let s = Settings {
+            palette: PaletteId::Custom,
+            ..Settings::default()
+        };
         let t = resolve(&s, true);
-        assert_eq!(t.colors, ColorTokens::built_in(PaletteId::Ayu, Appearance::Light));
+        assert_eq!(
+            t.colors,
+            ColorTokens::built_in(PaletteId::Ayu, Appearance::Light)
+        );
     }
 
     #[test]
@@ -422,7 +483,11 @@ mod tests {
         let base = ColorTokens::built_in(PaletteId::Dracula, Appearance::Dark);
         let t = resolve(&custom(&snapshot_css(&base)), false);
         for n in ColorTokens::NAMES {
-            assert_eq!(hex(t.colors.get(n).unwrap()), hex(base.get(n).unwrap()), "{n}");
+            assert_eq!(
+                hex(t.colors.get(n).unwrap()),
+                hex(base.get(n).unwrap()),
+                "{n}"
+            );
         }
     }
 }

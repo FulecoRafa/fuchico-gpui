@@ -54,14 +54,20 @@ pub struct DocWorld {
 }
 
 impl DocWorld {
-    pub fn new(source: String, files: impl IntoIterator<Item = (String, Vec<u8>)>) -> Result<Self, String> {
+    pub fn new(
+        source: String,
+        files: impl IntoIterator<Item = (String, Vec<u8>)>,
+    ) -> Result<Self, String> {
         let main_id = file_id("/main.typ").ok_or("bad main path")?;
         let mut map = HashMap::new();
         for (name, bytes) in files {
             let id = file_id(&name).ok_or_else(|| format!("bad file path {name}"))?;
             map.insert(id, Bytes::new(bytes));
         }
-        Ok(DocWorld { main: Source::new(main_id, source), files: map })
+        Ok(DocWorld {
+            main: Source::new(main_id, source),
+            files: map,
+        })
     }
 }
 

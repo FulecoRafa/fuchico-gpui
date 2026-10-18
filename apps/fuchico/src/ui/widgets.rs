@@ -3,8 +3,8 @@
 use gpui_kit::component::Icon;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::{
-    App, ClickEvent, ElementId, Hsla, prelude::FluentBuilder, InteractiveElement, ParentElement, SharedString,
-    StatefulInteractiveElement, Styled, Window, div,
+    App, ClickEvent, ElementId, Hsla, InteractiveElement, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder,
 };
 
 use crate::theme::AppTheme;
@@ -24,8 +24,11 @@ pub fn icon_button(
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> gpui_kit::Stateful<gpui_kit::Div> {
     let th = AppTheme::get(cx);
-    let (bg, fg): (Option<Hsla>, Hsla) =
-        if active { (Some(th.colors.accent), th.colors.accent_foreground) } else { (None, th.colors.muted_foreground) };
+    let (bg, fg): (Option<Hsla>, Hsla) = if active {
+        (Some(th.colors.accent), th.colors.accent_foreground)
+    } else {
+        (None, th.colors.muted_foreground)
+    };
     let hover_bg = th.colors.accent;
     let hover_fg = th.colors.accent_foreground;
     let tooltip: SharedString = tooltip.into();
@@ -61,7 +64,11 @@ pub fn empty_state(text: impl Into<SharedString>, cx: &App) -> gpui_kit::Div {
 }
 
 /// A placeholder main view: title plus a note about what will live here.
-pub fn placeholder_view(title: impl Into<SharedString>, note: impl Into<SharedString>, cx: &App) -> gpui_kit::Div {
+pub fn placeholder_view(
+    title: impl Into<SharedString>,
+    note: impl Into<SharedString>,
+    cx: &App,
+) -> gpui_kit::Div {
     let th = AppTheme::get(cx);
     div()
         .flex()
@@ -69,8 +76,18 @@ pub fn placeholder_view(title: impl Into<SharedString>, note: impl Into<SharedSt
         .size_full()
         .p(u(24.))
         .gap(u(8.))
-        .child(div().text_size(u(18.)).font_weight(gpui_kit::FontWeight::SEMIBOLD).child(title.into()))
-        .child(div().text_size(u(13.)).text_color(th.colors.muted_foreground).child(note.into()))
+        .child(
+            div()
+                .text_size(u(18.))
+                .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                .child(title.into()),
+        )
+        .child(
+            div()
+                .text_size(u(13.))
+                .text_color(th.colors.muted_foreground)
+                .child(note.into()),
+        )
 }
 
 pub type SegmentHandler = std::rc::Rc<dyn Fn(&mut Window, &mut App)>;
@@ -84,8 +101,17 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub fn new(label: impl Into<SharedString>, active: bool, on_click: impl Fn(&mut Window, &mut App) + 'static) -> Self {
-        Segment { label: label.into(), active, disabled: false, on_click: std::rc::Rc::new(on_click) }
+    pub fn new(
+        label: impl Into<SharedString>,
+        active: bool,
+        on_click: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
+        Segment {
+            label: label.into(),
+            active,
+            disabled: false,
+            on_click: std::rc::Rc::new(on_click),
+        }
     }
     pub fn disabled(mut self, d: bool) -> Self {
         self.disabled = d;
@@ -96,8 +122,13 @@ impl Segment {
 /// A row of toggle buttons (the original's `.seg` groups).
 pub fn segmented(id: &'static str, segments: Vec<Segment>, cx: &App) -> gpui_kit::Div {
     let th = AppTheme::get(cx);
-    let (border, accent, accent_fg, fg, card) =
-        (th.colors.border, th.colors.primary, th.colors.primary_foreground, th.colors.foreground, th.colors.card);
+    let (border, accent, accent_fg, fg, card) = (
+        th.colors.border,
+        th.colors.primary,
+        th.colors.primary_foreground,
+        th.colors.foreground,
+        th.colors.card,
+    );
     let hover = th.colors.accent;
     div()
         .flex()
@@ -118,7 +149,9 @@ pub fn segmented(id: &'static str, segments: Vec<Segment>, cx: &App) -> gpui_kit
                 .when(s.active, |d| d.bg(accent).text_color(accent_fg))
                 .when(!s.active, |d| d.text_color(fg))
                 .when(s.disabled, |d| d.opacity(0.5))
-                .when(!s.disabled && !s.active, |d| d.cursor_pointer().hover(move |st| st.bg(hover)))
+                .when(!s.disabled && !s.active, |d| {
+                    d.cursor_pointer().hover(move |st| st.bg(hover))
+                })
                 .when(!s.disabled, |d| d.on_click(move |_, w, cx| on_click(w, cx)))
                 .child(s.label)
         }))

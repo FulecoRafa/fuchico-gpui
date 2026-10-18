@@ -38,8 +38,10 @@ fn date_marker() -> &'static Regex {
 fn recur_marker() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r"(?i)🔁\s*(?:daily|weekdays|weekends|[a-z]{3}(?:,[a-z]{3})*)(?:\s+\d{2}:\d{2})?")
-            .unwrap()
+        Regex::new(
+            r"(?i)🔁\s*(?:daily|weekdays|weekends|[a-z]{3}(?:,[a-z]{3})*)(?:\s+\d{2}:\d{2})?",
+        )
+        .unwrap()
     })
 }
 
@@ -157,9 +159,11 @@ pub fn match_tasks(scanned: &[ScannedTask], sidecar: &[SidecarTask]) -> MatchOut
             continue;
         }
         let hash = content_hash(&s.text);
-        if let Some(ti) = sidecar.iter().enumerate().position(|(ti, t)| {
-            !matched_sidecar[ti] && t.file == s.file && t.content_hash == hash
-        }) {
+        if let Some(ti) = sidecar
+            .iter()
+            .enumerate()
+            .position(|(ti, t)| !matched_sidecar[ti] && t.file == s.file && t.content_hash == hash)
+        {
             matched_scanned[si] = true;
             matched_sidecar[ti] = true;
             matched.push(MatchedPair {
@@ -190,8 +194,12 @@ pub fn match_tasks(scanned: &[ScannedTask], sidecar: &[SidecarTask]) -> MatchOut
         false,
     );
 
-    let new_scanned = (0..scanned.len()).filter(|&i| !matched_scanned[i]).collect();
-    let unmatched_sidecar = (0..sidecar.len()).filter(|&i| !matched_sidecar[i]).collect();
+    let new_scanned = (0..scanned.len())
+        .filter(|&i| !matched_scanned[i])
+        .collect();
+    let unmatched_sidecar = (0..sidecar.len())
+        .filter(|&i| !matched_sidecar[i])
+        .collect();
 
     MatchOutput {
         matched,
@@ -292,7 +300,13 @@ mod tests {
         let scanned_tasks = vec![scanned("Tasks.md", 3, "Buy milk", true)];
         let sidecar_tasks = vec![sidecar_entry("uid-1", "Tasks.md", 3, "Buy milk")];
         let out = match_tasks(&scanned_tasks, &sidecar_tasks);
-        assert_eq!(out.matched, vec![MatchedPair { scanned_index: 0, sidecar_index: 0 }]);
+        assert_eq!(
+            out.matched,
+            vec![MatchedPair {
+                scanned_index: 0,
+                sidecar_index: 0
+            }]
+        );
         assert!(out.new_scanned.is_empty());
         assert!(out.unmatched_sidecar.is_empty());
     }
@@ -300,7 +314,12 @@ mod tests {
     #[test]
     fn exact_hash_match_ignores_date_marker_edits() {
         let scanned_tasks = vec![scanned("Tasks.md", 3, "Buy milk 📅 2026-08-01", false)];
-        let sidecar_tasks = vec![sidecar_entry("uid-1", "Tasks.md", 3, "Buy milk 📅 2026-07-20")];
+        let sidecar_tasks = vec![sidecar_entry(
+            "uid-1",
+            "Tasks.md",
+            3,
+            "Buy milk 📅 2026-07-20",
+        )];
         let out = match_tasks(&scanned_tasks, &sidecar_tasks);
         assert_eq!(out.matched.len(), 1);
     }
@@ -348,7 +367,12 @@ mod tests {
 
     #[test]
     fn unrelated_text_does_not_match_even_at_same_line() {
-        let scanned_tasks = vec![scanned("Tasks.md", 3, "Schedule dentist appointment", false)];
+        let scanned_tasks = vec![scanned(
+            "Tasks.md",
+            3,
+            "Schedule dentist appointment",
+            false,
+        )];
         let sidecar_tasks = vec![sidecar_entry("uid-1", "Tasks.md", 3, "Buy milk")];
         let out = match_tasks(&scanned_tasks, &sidecar_tasks);
         assert!(out.matched.is_empty());

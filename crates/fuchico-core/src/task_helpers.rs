@@ -7,10 +7,14 @@ use std::sync::LazyLock;
 use chrono::{Datelike, Duration, NaiveDate};
 use regex::Regex;
 
-pub static DUE_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"📅\s*([0-9]{4}-[0-9]{2}-[0-9]{2})(?:\s+([0-9]{2}:[0-9]{2}))?").unwrap());
+pub static DUE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"📅\s*([0-9]{4}-[0-9]{2}-[0-9]{2})(?:\s+([0-9]{2}:[0-9]{2}))?").unwrap()
+});
 pub static RECUR_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)🔁\s*(daily|weekdays|weekends|[a-z]{3}(?:,[a-z]{3})*)(?:\s+([0-9]{2}:[0-9]{2}))?").unwrap()
+    Regex::new(
+        r"(?i)🔁\s*(daily|weekdays|weekends|[a-z]{3}(?:,[a-z]{3})*)(?:\s+([0-9]{2}:[0-9]{2}))?",
+    )
+    .unwrap()
 });
 static LIST_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(\s*)([-*+]|[0-9]+[.)])\s+(?:\[([ xX])\]\s*)?").unwrap());
@@ -42,7 +46,15 @@ pub fn iso_date(d: NaiveDate) -> String {
     d.format("%Y-%m-%d").to_string()
 }
 
-const WEEKDAYS: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const WEEKDAYS: [&str; 7] = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DueOption {
@@ -53,7 +65,10 @@ pub struct DueOption {
 
 /// Quick-pick due dates: Today, Tomorrow, weekday names, "In a week".
 pub fn due_date_options(now: NaiveDate) -> Vec<DueOption> {
-    let mut raw = vec![("Today".to_string(), now), ("Tomorrow".to_string(), now + Duration::days(1))];
+    let mut raw = vec![
+        ("Today".to_string(), now),
+        ("Tomorrow".to_string(), now + Duration::days(1)),
+    ];
     for i in 2..=7 {
         let d = now + Duration::days(i);
         let label = if i == 7 {
@@ -66,7 +81,11 @@ pub fn due_date_options(now: NaiveDate) -> Vec<DueOption> {
     raw.into_iter()
         .map(|(label, d)| {
             let date = iso_date(d);
-            DueOption { label, detail: date.clone(), date }
+            DueOption {
+                label,
+                detail: date.clone(),
+                date,
+            }
         })
         .collect()
 }
@@ -78,12 +97,36 @@ pub struct RecurrenceOption {
 }
 
 pub const RECURRENCE_OPTIONS: [RecurrenceOption; 6] = [
-    RecurrenceOption { label: "Daily", rule: "daily", detail: "every day" },
-    RecurrenceOption { label: "Weekdays", rule: "weekdays", detail: "Mon–Fri" },
-    RecurrenceOption { label: "Weekends", rule: "weekends", detail: "Sat–Sun" },
-    RecurrenceOption { label: "Weekly (Mon)", rule: "mon", detail: "every Monday" },
-    RecurrenceOption { label: "Mon, Wed, Fri", rule: "mon,wed,fri", detail: "" },
-    RecurrenceOption { label: "Tue, Thu", rule: "tue,thu", detail: "" },
+    RecurrenceOption {
+        label: "Daily",
+        rule: "daily",
+        detail: "every day",
+    },
+    RecurrenceOption {
+        label: "Weekdays",
+        rule: "weekdays",
+        detail: "Mon–Fri",
+    },
+    RecurrenceOption {
+        label: "Weekends",
+        rule: "weekends",
+        detail: "Sat–Sun",
+    },
+    RecurrenceOption {
+        label: "Weekly (Mon)",
+        rule: "mon",
+        detail: "every Monday",
+    },
+    RecurrenceOption {
+        label: "Mon, Wed, Fri",
+        rule: "mon,wed,fri",
+        detail: "",
+    },
+    RecurrenceOption {
+        label: "Tue, Thu",
+        rule: "tue,thu",
+        detail: "",
+    },
 ];
 
 /// (start, end) byte offsets of each line (without the `\n`).
@@ -98,7 +141,10 @@ fn line_spans(doc: &str) -> Vec<(usize, usize)> {
 }
 
 fn line_index_at(spans: &[(usize, usize)], pos: usize) -> usize {
-    spans.iter().position(|&(_, e)| pos <= e).unwrap_or(spans.len() - 1)
+    spans
+        .iter()
+        .position(|&(_, e)| pos <= e)
+        .unwrap_or(spans.len() - 1)
 }
 
 /// Add or remove the `[ ]` checkbox on every line touched by `selections`
@@ -124,7 +170,11 @@ pub fn toggle_task_line(doc: &str, selections: &[(usize, usize)]) -> Option<Vec<
             match LIST_RE.captures(text) {
                 None => {
                     let indent = text.len() - text.trim_start().len();
-                    changes.push(TextChange { from: ls + indent, to: ls + indent, insert: "- [ ] ".into() });
+                    changes.push(TextChange {
+                        from: ls + indent,
+                        to: ls + indent,
+                        insert: "- [ ] ".into(),
+                    });
                 }
                 Some(m) if m.get(3).is_some() => {
                     changes.push(TextChange {
@@ -135,7 +185,11 @@ pub fn toggle_task_line(doc: &str, selections: &[(usize, usize)]) -> Option<Vec<
                 }
                 Some(m) => {
                     let at = ls + m[0].len();
-                    changes.push(TextChange { from: at, to: at, insert: "[ ] ".into() });
+                    changes.push(TextChange {
+                        from: at,
+                        to: at,
+                        insert: "[ ] ".into(),
+                    });
                 }
             }
         }
@@ -154,24 +208,45 @@ pub struct LineTokenEdit {
 /// Replace the line's `📅 ...`/`🔁 ...` token with `emoji value [time]`
 /// (keeping an existing time when none is given), or append one at the end
 /// of the line containing `head`.
-pub fn line_token_edit(doc: &str, head: usize, re: &Regex, emoji: &str, value: &str, time: Option<&str>) -> LineTokenEdit {
+pub fn line_token_edit(
+    doc: &str,
+    head: usize,
+    re: &Regex,
+    emoji: &str,
+    value: &str,
+    time: Option<&str>,
+) -> LineTokenEdit {
     let spans = line_spans(doc);
     let (ls, le) = spans[line_index_at(&spans, head)];
     let text = &doc[ls..le];
     let m = re.captures(text);
     let t = time.or_else(|| m.as_ref().and_then(|c| c.get(2)).map(|x| x.as_str()));
-    let token = format!("{emoji} {value}{}", t.map(|t| format!(" {t}")).unwrap_or_default());
+    let token = format!(
+        "{emoji} {value}{}",
+        t.map(|t| format!(" {t}")).unwrap_or_default()
+    );
     if let Some(c) = m {
         let whole = c.get(0).unwrap();
         return LineTokenEdit {
-            change: TextChange { from: ls + whole.start(), to: ls + whole.end(), insert: token },
+            change: TextChange {
+                from: ls + whole.start(),
+                to: ls + whole.end(),
+                insert: token,
+            },
             cursor: None,
         };
     }
     let trimmed_end = text.trim_end().len();
     let insert = format!("{}{token}", if trimmed_end > 0 { " " } else { "" });
     let cursor = ls + trimmed_end + insert.len();
-    LineTokenEdit { change: TextChange { from: ls + trimmed_end, to: le, insert }, cursor: Some(cursor) }
+    LineTokenEdit {
+        change: TextChange {
+            from: ls + trimmed_end,
+            to: le,
+            insert,
+        },
+        cursor: Some(cursor),
+    }
 }
 
 // ─── Autocomplete: `@due`, `@repeat`, `📅`, `🔁` ────────────────────────────
@@ -180,7 +255,8 @@ static TASK_TRIGGER_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?:^|\s)(@(?:d(?:ue?)?|date|today|tom(?:orrow)?|r(?:ep(?:eat)?)?|every|recur)?(?:\s\S*)?|📅\s*\S*|🔁\s*\S*)$")
         .unwrap()
 });
-static DUE_KIND_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^@(d|date|today|tom)").unwrap());
+static DUE_KIND_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^@(d|date|today|tom)").unwrap());
 static RECUR_KIND_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^@(r|every|recur)").unwrap());
 static QUERY_STRIP_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(@\w*|📅|🔁)\s*").unwrap());
 
@@ -232,7 +308,11 @@ pub fn task_completions(before: &str, line: &str, today: NaiveDate) -> Option<Ta
     let text = caps.get(1).unwrap().as_str();
     let from = before.len() - text.len();
     let kind = kind_of(text)?;
-    let re: &Regex = if kind == TaskKind::Due { &DUE_RE } else { &RECUR_RE };
+    let re: &Regex = if kind == TaskKind::Due {
+        &DUE_RE
+    } else {
+        &RECUR_RE
+    };
     let existing_time = re.captures(line).and_then(|c| c.get(2)).map(|m| m.as_str());
     let suffix = existing_time.map(|t| format!(" {t}")).unwrap_or_default();
     let mk = |label: String, detail: String, token: String, boost: i32| TaskCompletion {
@@ -246,27 +326,52 @@ pub fn task_completions(before: &str, line: &str, today: NaiveDate) -> Option<Ta
         TaskKind::Due => due_date_options(today)
             .into_iter()
             .enumerate()
-            .map(|(i, o)| mk(o.label, o.date.clone(), format!("📅 {}", o.date), 10 - i as i32))
+            .map(|(i, o)| {
+                mk(
+                    o.label,
+                    o.date.clone(),
+                    format!("📅 {}", o.date),
+                    10 - i as i32,
+                )
+            })
             .collect(),
         TaskKind::Recur => RECURRENCE_OPTIONS
             .iter()
             .enumerate()
-            .map(|(i, o)| mk(o.label.into(), o.detail.into(), format!("🔁 {}", o.rule), 10 - i as i32))
+            .map(|(i, o)| {
+                mk(
+                    o.label.into(),
+                    o.detail.into(),
+                    format!("🔁 {}", o.rule),
+                    10 - i as i32,
+                )
+            })
             .collect(),
     };
     if text == "@" {
-        options.extend(
-            RECURRENCE_OPTIONS.iter().map(|o| mk(format!("Repeat: {}", o.label), o.detail.into(), format!("🔁 {}", o.rule), -1)),
-        );
+        options.extend(RECURRENCE_OPTIONS.iter().map(|o| {
+            mk(
+                format!("Repeat: {}", o.label),
+                o.detail.into(),
+                format!("🔁 {}", o.rule),
+                -1,
+            )
+        }));
     }
     let query = QUERY_STRIP_RE.replace(text, "").to_lowercase();
     if !query.is_empty() {
-        options.retain(|o| o.label.to_lowercase().contains(&query) || o.detail.to_lowercase().contains(&query));
+        options.retain(|o| {
+            o.label.to_lowercase().contains(&query) || o.detail.to_lowercase().contains(&query)
+        });
         if options.is_empty() {
             return None;
         }
     }
-    Some(TaskCompletions { kind, from, options })
+    Some(TaskCompletions {
+        kind,
+        from,
+        options,
+    })
 }
 
 #[cfg(test)]
@@ -280,7 +385,14 @@ mod tests {
         }
     }
 
-    fn with_token(doc: &str, re: &Regex, emoji: &str, v: &str, t: Option<&str>, cursor: Option<usize>) -> String {
+    fn with_token(
+        doc: &str,
+        re: &Regex,
+        emoji: &str,
+        v: &str,
+        t: Option<&str>,
+        cursor: Option<usize>,
+    ) -> String {
         let e = line_token_edit(doc, cursor.unwrap_or(doc.len()), re, emoji, v, t);
         apply_changes(doc, &[e.change])
     }
@@ -304,13 +416,23 @@ mod tests {
 
     #[test]
     fn appends_a_date_token() {
-        assert_eq!(with_token("- [ ] call vet", &DUE_RE, "📅", "2026-08-28", None, None), "- [ ] call vet 📅 2026-08-28");
+        assert_eq!(
+            with_token("- [ ] call vet", &DUE_RE, "📅", "2026-08-28", None, None),
+            "- [ ] call vet 📅 2026-08-28"
+        );
     }
 
     #[test]
     fn replaces_existing_date_and_keeps_time() {
         assert_eq!(
-            with_token("- [ ] x 📅 2026-01-01 10:00 tail", &DUE_RE, "📅", "2026-02-02", None, Some(3)),
+            with_token(
+                "- [ ] x 📅 2026-01-01 10:00 tail",
+                &DUE_RE,
+                "📅",
+                "2026-02-02",
+                None,
+                Some(3)
+            ),
             "- [ ] x 📅 2026-02-02 10:00 tail"
         );
     }
@@ -318,7 +440,14 @@ mod tests {
     #[test]
     fn appends_a_recurrence_token_with_a_time() {
         assert_eq!(
-            with_token("- [ ] trash", &RECUR_RE, "🔁", "mon,wed,fri", Some("08:00"), None),
+            with_token(
+                "- [ ] trash",
+                &RECUR_RE,
+                "🔁",
+                "mon,wed,fri",
+                Some("08:00"),
+                None
+            ),
             "- [ ] trash 🔁 mon,wed,fri 08:00"
         );
     }
@@ -326,11 +455,20 @@ mod tests {
     #[test]
     fn due_date_options_span_a_week() {
         let opts = due_date_options(NaiveDate::from_ymd_opt(2026, 8, 27).unwrap());
-        assert_eq!((opts[0].label.as_str(), opts[0].date.as_str()), ("Today", "2026-08-27"));
-        assert_eq!((opts[1].label.as_str(), opts[1].date.as_str()), ("Tomorrow", "2026-08-28"));
+        assert_eq!(
+            (opts[0].label.as_str(), opts[0].date.as_str()),
+            ("Today", "2026-08-27")
+        );
+        assert_eq!(
+            (opts[1].label.as_str(), opts[1].date.as_str()),
+            ("Tomorrow", "2026-08-28")
+        );
         assert_eq!(opts[2].label, "Saturday");
         let last = opts.last().unwrap();
-        assert_eq!((last.label.as_str(), last.date.as_str()), ("In a week", "2026-09-03"));
+        assert_eq!(
+            (last.label.as_str(), last.date.as_str()),
+            ("In a week", "2026-09-03")
+        );
     }
 
     #[test]

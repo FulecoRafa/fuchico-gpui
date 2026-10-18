@@ -42,7 +42,9 @@ mod unix_socket {
 
     /// Tries to hand `paths` to a running instance; otherwise becomes primary.
     pub fn acquire(paths: &[String]) -> Instance {
-        let Some(sock) = socket_path() else { return Instance::Primary(None) };
+        let Some(sock) = socket_path() else {
+            return Instance::Primary(None);
+        };
         if let Ok(mut stream) = UnixStream::connect(&sock) {
             let msg = encode(paths);
             if stream.write_all(msg.as_bytes()).is_ok() {
@@ -211,7 +213,10 @@ fn encode(paths: &[String]) -> String {
 }
 
 fn decode(r: impl BufRead) -> Vec<String> {
-    r.lines().map_while(Result::ok).filter(|l| !l.is_empty()).collect()
+    r.lines()
+        .map_while(Result::ok)
+        .filter(|l| !l.is_empty())
+        .collect()
 }
 
 #[cfg(test)]
@@ -237,18 +242,30 @@ mod tests {
         loopback::serve(listener, move |p| tx.send(p).unwrap());
 
         let paths = vec!["C:/v/a b.md".to_string(), "C:/x/c.md".to_string()];
-        assert!(matches!(loopback::acquire_in(dir.path(), &paths), Instance::Forwarded));
+        assert!(matches!(
+            loopback::acquire_in(dir.path(), &paths),
+            Instance::Forwarded
+        ));
         assert_eq!(rx.recv_timeout(Duration::from_secs(3)).unwrap(), paths);
         // A bare relaunch forwards an empty batch (focus only).
-        assert!(matches!(loopback::acquire_in(dir.path(), &[]), Instance::Forwarded));
-        assert_eq!(rx.recv_timeout(Duration::from_secs(3)).unwrap(), Vec::<String>::new());
+        assert!(matches!(
+            loopback::acquire_in(dir.path(), &[]),
+            Instance::Forwarded
+        ));
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(3)).unwrap(),
+            Vec::<String>::new()
+        );
 
         // A wrong token is ignored, and the launch becomes primary instead.
         let port_file = dir.path().join("fuchico.port");
         let raw = std::fs::read_to_string(&port_file).unwrap();
         let port = raw.split(' ').next().unwrap().to_string();
         std::fs::write(&port_file, format!("{port} forged\n")).unwrap();
-        assert!(matches!(loopback::acquire_in(dir.path(), &paths), Instance::Primary(Some(_))));
+        assert!(matches!(
+            loopback::acquire_in(dir.path(), &paths),
+            Instance::Primary(Some(_))
+        ));
         assert!(rx.recv_timeout(Duration::from_millis(300)).is_err());
 
         loopback::release_in(dir.path());
@@ -260,10 +277,20 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let port_file = dir.path().join("fuchico.port");
         // Grab a free port, then close it so nothing listens there.
-        let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
         std::fs::write(&port_file, format!("{port} abc\n")).unwrap();
-        assert!(matches!(loopback::acquire_in(dir.path(), &[]), Instance::Primary(Some(_))));
+        assert!(matches!(
+            loopback::acquire_in(dir.path(), &[]),
+            Instance::Primary(Some(_))
+        ));
         std::fs::write(&port_file, "garbage").unwrap();
-        assert!(matches!(loopback::acquire_in(dir.path(), &[]), Instance::Primary(Some(_))));
+        assert!(matches!(
+            loopback::acquire_in(dir.path(), &[]),
+            Instance::Primary(Some(_))
+        ));
     }
 }

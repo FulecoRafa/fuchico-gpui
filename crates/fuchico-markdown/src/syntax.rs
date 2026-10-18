@@ -11,7 +11,7 @@ use std::sync::LazyLock;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, LinkType, Options, Parser, Tag, TagEnd};
 use regex::Regex;
 
-use crate::languages::{language_for_info, LanguageDesc};
+use crate::languages::{LanguageDesc, language_for_info};
 use crate::style::{CalloutKind, LineClass, LineHeight, StyleId};
 use crate::text::LineIndex;
 
@@ -21,10 +21,15 @@ pub enum NodeKind {
     Document,
     /// YAML frontmatter (kept out of the Markdown parse, see the README).
     Frontmatter,
-    Heading { level: u8, setext: bool },
+    Heading {
+        level: u8,
+        setext: bool,
+    },
     Paragraph,
     Blockquote,
-    List { ordered: bool },
+    List {
+        ordered: bool,
+    },
     ListItem,
     FencedCode,
     IndentedCode,
@@ -38,7 +43,10 @@ impl NodeKind {
     /// headings and lists (headings fold through the heading service).
     /// Frontmatter is foldable too (our addition).
     pub fn is_foldable(self) -> bool {
-        !matches!(self, NodeKind::Document | NodeKind::Heading { .. } | NodeKind::List { .. })
+        !matches!(
+            self,
+            NodeKind::Document | NodeKind::Heading { .. } | NodeKind::List { .. }
+        )
     }
 }
 
@@ -59,21 +67,36 @@ pub enum BlockKind {
     Blank,
     Paragraph,
     /// ATX heading line, or the text lines of a setext heading.
-    Heading { level: u8, setext: bool },
+    Heading {
+        level: u8,
+        setext: bool,
+    },
     /// The `===` / `---` underline of a setext heading.
-    SetextUnderline { level: u8 },
+    SetextUnderline {
+        level: u8,
+    },
     /// First line of a list item. `task` is `Some(checked)` for `- [ ]`.
-    ListItem { ordered: bool, task: Option<bool> },
+    ListItem {
+        ordered: bool,
+        task: Option<bool>,
+    },
     /// Opening fence line. `language` is the first word of the info string
     /// (as typed), `resolved` the language-data name it maps to.
-    FenceOpen { language: String, resolved: Option<&'static str> },
+    FenceOpen {
+        language: String,
+        resolved: Option<&'static str>,
+    },
     FenceBody,
     FenceClose,
     IndentedCode,
     /// A table line; `header` for the first row.
-    Table { header: bool },
+    Table {
+        header: bool,
+    },
     /// A frontmatter line; `fence` for the opening/closing `---`.
-    Frontmatter { fence: bool },
+    Frontmatter {
+        fence: bool,
+    },
     HorizontalRule,
     Html,
 }
@@ -187,16 +210,20 @@ pub struct Parsed {
     pub line_nodes: Vec<Vec<u32>>,
 }
 
-static CALLOUT_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)^(>\s*)(\[!(NOTE|WARNING|TIP|IMPORTANT|CAUTION)\])").unwrap());
-static LINK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\[([^\]]*)\]\(([^)]*)\)$").unwrap());
-static IMAGE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^!\[([^\]]*)\]\(([^)]*)\)$").unwrap());
+static CALLOUT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^(>\s*)(\[!(NOTE|WARNING|TIP|IMPORTANT|CAUTION)\])").unwrap()
+});
+static LINK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\[([^\]]*)\]\(([^)]*)\)$").unwrap());
+static IMAGE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^!\[([^\]]*)\]\(([^)]*)\)$").unwrap());
 static EMOJI_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r":[a-zA-Z_0-9]+:").unwrap());
 static BARE_URL_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?:https?://|www\.)[^\s<]*[^\s<?!.,:*_~'`)\]]|[A-Za-z0-9.+_-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
         .unwrap()
 });
-static FM_KEY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([ \t]*)([^:\s][^:]*)(:)").unwrap());
+static FM_KEY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([ \t]*)([^:\s][^:]*)(:)").unwrap());
 
 /// pulldown-cmark options matching the original Lezer `markdownLanguage`
 /// (CommonMark + GFM tables, strikethrough, task lists, plus the
@@ -230,7 +257,10 @@ impl Builder<'_> {
         if r.start >= r.end {
             return;
         }
-        let (l0, l1) = (self.idx.line_of(r.start), self.idx.line_of(r.end.saturating_sub(1).max(r.start)));
+        let (l0, l1) = (
+            self.idx.line_of(r.start),
+            self.idx.line_of(r.end.saturating_sub(1).max(r.start)),
+        );
         for l in l0..=l1 {
             let lr = self.idx.line_range(l);
             let (a, b) = (r.start.max(lr.start), r.end.min(lr.end));
@@ -242,7 +272,9 @@ impl Builder<'_> {
 
     fn item(&mut self, range: Range<usize>, line: usize, kind: InlineKind) {
         let l = self.idx.line_of(range.start);
-        self.out.lines[l].items.push(InlineItem { range, line, kind });
+        self.out.lines[l]
+            .items
+            .push(InlineItem { range, line, kind });
     }
 
     fn hide(&mut self, range: Range<usize>) {
@@ -254,7 +286,11 @@ impl Builder<'_> {
 
     /// Hides `range` plus one following space (HeaderMark / QuoteMark).
     fn hide_with_space(&mut self, range: Range<usize>) {
-        let end = if self.text.as_bytes().get(range.end) == Some(&b' ') { range.end + 1 } else { range.end };
+        let end = if self.text.as_bytes().get(range.end) == Some(&b' ') {
+            range.end + 1
+        } else {
+            range.end
+        };
         self.hide(range.start..end);
     }
 
@@ -267,7 +303,12 @@ impl Builder<'_> {
 
     fn add_node(&mut self, kind: NodeKind, range: Range<usize>, parent: usize) -> usize {
         let id = self.out.nodes.len();
-        self.out.nodes.push(Node { kind, range, parent: Some(parent), children: Vec::new() });
+        self.out.nodes.push(Node {
+            kind,
+            range,
+            parent: Some(parent),
+            children: Vec::new(),
+        });
         self.out.nodes[parent].children.push(id);
         let l = self.idx.line_of(self.out.nodes[id].range.start);
         self.out.line_nodes[l].push(id as u32);
@@ -292,7 +333,12 @@ pub fn plain(text: &str, idx: &LineIndex) -> Parsed {
     Parsed {
         lines: vec![LineInfo::default(); idx.len()],
         line_nodes: vec![Vec::new(); idx.len()],
-        nodes: vec![Node { kind: NodeKind::Document, range: 0..text.len(), parent: None, children: Vec::new() }],
+        nodes: vec![Node {
+            kind: NodeKind::Document,
+            range: 0..text.len(),
+            parent: None,
+            children: Vec::new(),
+        }],
         ..Default::default()
     }
 }
@@ -309,7 +355,12 @@ pub fn parse(text: &str, idx: &LineIndex, inline_images: bool) -> Parsed {
             ..Default::default()
         },
     };
-    b.out.nodes.push(Node { kind: NodeKind::Document, range: 0..text.len(), parent: None, children: Vec::new() });
+    b.out.nodes.push(Node {
+        kind: NodeKind::Document,
+        range: 0..text.len(),
+        parent: None,
+        children: Vec::new(),
+    });
 
     // --- Frontmatter (not Markdown-parsed) ---
     let mut cut = text.len().min(20_000);
@@ -331,12 +382,19 @@ pub fn parse(text: &str, idx: &LineIndex, inline_images: bool) -> Parsed {
                 let lr = idx.line_range(l);
                 if let Some(c) = FM_KEY_RE.captures(&text[lr.clone()]) {
                     let k = c.get(2).unwrap();
-                    b.span(lr.start + k.start()..lr.start + k.end(), StyleId::FrontmatterKey);
+                    b.span(
+                        lr.start + k.start()..lr.start + k.end(),
+                        StyleId::FrontmatterKey,
+                    );
                 }
             }
         }
         body_start = fm.body_start;
-        b.out.frontmatter = Some(FrontmatterBlock { close_line, body_start, range });
+        b.out.frontmatter = Some(FrontmatterBlock {
+            close_line,
+            body_start,
+            range,
+        });
     }
 
     parse_body(&mut b, body_start);
@@ -395,7 +453,8 @@ fn parse_body(b: &mut Builder, off: usize) {
                         let level = heading_level(level);
                         let lines = b.lines_of(&tr);
                         let setext = lines.len() > 1 || !is_atx_start(text, tr.start);
-                        let id = b.add_node(NodeKind::Heading { level, setext }, tr.clone(), parent);
+                        let id =
+                            b.add_node(NodeKind::Heading { level, setext }, tr.clone(), parent);
                         heading(b, tr.clone(), level, setext);
                         parents.push(id);
                         stack.push(Frame::Block);
@@ -407,7 +466,13 @@ fn parse_body(b: &mut Builder, off: usize) {
                         stack.push(Frame::Block);
                     }
                     Tag::List(start) => {
-                        let id = b.add_node(NodeKind::List { ordered: start.is_some() }, tr.clone(), parent);
+                        let id = b.add_node(
+                            NodeKind::List {
+                                ordered: start.is_some(),
+                            },
+                            tr.clone(),
+                            parent,
+                        );
                         for l in b.lines_of(&tr) {
                             b.out.lines[l].list_depth += 1;
                         }
@@ -419,7 +484,10 @@ fn parse_body(b: &mut Builder, off: usize) {
                         let id = b.add_node(NodeKind::ListItem, tr.clone(), parent);
                         let l = b.idx.line_of(tr.start);
                         let ordered = list_ordered.last().copied().unwrap_or(false);
-                        b.out.lines[l].kind = BlockKind::ListItem { ordered, task: None };
+                        b.out.lines[l].kind = BlockKind::ListItem {
+                            ordered,
+                            task: None,
+                        };
                         item_lines.push(l);
                         parents.push(id);
                         stack.push(Frame::Block);
@@ -457,7 +525,9 @@ fn parse_body(b: &mut Builder, off: usize) {
                         let quoted = b.out.lines[lines.start].quote_depth > 0;
                         let ti = b.out.tables.len() as u32;
                         for l in lines.clone() {
-                            b.out.lines[l].kind = BlockKind::Table { header: l == lines.start };
+                            b.out.lines[l].kind = BlockKind::Table {
+                                header: l == lines.start,
+                            };
                             b.out.lines[l].table = Some(ti);
                         }
                         b.out.tables.push(TableBlock {
@@ -475,7 +545,11 @@ fn parse_body(b: &mut Builder, off: usize) {
                                 Tag::Emphasis => (StyleId::Emphasis, 1),
                                 Tag::Strong => (StyleId::Strong, 2),
                                 _ => {
-                                    let n = text[tr.clone()].bytes().take_while(|c| *c == b'~').count().min(2);
+                                    let n = text[tr.clone()]
+                                        .bytes()
+                                        .take_while(|c| *c == b'~')
+                                        .count()
+                                        .min(2);
                                     (StyleId::Strikethrough, n)
                                 }
                             };
@@ -504,28 +578,26 @@ fn parse_body(b: &mut Builder, off: usize) {
                     _ => stack.push(Frame::Inline),
                 }
             }
-            Event::End(end) => {
-                match stack.pop() {
-                    Some(Frame::Block) => {
-                        parents.pop();
-                        if matches!(end, TagEnd::List(_)) {
-                            list_ordered.pop();
-                        }
-                        if matches!(end, TagEnd::Item) {
-                            item_lines.pop();
-                        }
+            Event::End(end) => match stack.pop() {
+                Some(Frame::Block) => {
+                    parents.pop();
+                    if matches!(end, TagEnd::List(_)) {
+                        list_ordered.pop();
                     }
-                    Some(Frame::CodeBlock) => {
-                        in_code = false;
-                        if let Some(fi) = cur_fence.take() {
-                            fence_end(b, fi);
-                        }
+                    if matches!(end, TagEnd::Item) {
+                        item_lines.pop();
                     }
-                    Some(Frame::Table) => in_table -= 1,
-                    Some(Frame::Link) => in_link -= 1,
-                    _ => {}
                 }
-            }
+                Some(Frame::CodeBlock) => {
+                    in_code = false;
+                    if let Some(fi) = cur_fence.take() {
+                        fence_end(b, fi);
+                    }
+                }
+                Some(Frame::Table) => in_table -= 1,
+                Some(Frame::Link) => in_link -= 1,
+                _ => {}
+            },
             Event::Text(t) => {
                 if in_code {
                     if let Some(fi) = cur_fence {
@@ -572,9 +644,10 @@ fn parse_body(b: &mut Builder, off: usize) {
                 let l = b.idx.line_of(r.start);
                 b.item(r.clone(), l, InlineKind::Checkbox { checked });
                 if let Some(&il) = item_lines.last()
-                    && let BlockKind::ListItem { task, .. } = &mut b.out.lines[il].kind {
-                        *task = Some(checked);
-                    }
+                    && let BlockKind::ListItem { task, .. } = &mut b.out.lines[il].kind
+                {
+                    *task = Some(checked);
+                }
             }
             Event::Rule => {
                 let tr = trim_range(text, r.clone());
@@ -611,7 +684,10 @@ fn heading(b: &mut Builder, tr: Range<usize>, level: u8, setext: bool) {
     let lines = b.lines_of(&tr);
     if !setext {
         let l = lines.start;
-        b.out.lines[l].kind = BlockKind::Heading { level, setext: false };
+        b.out.lines[l].kind = BlockKind::Heading {
+            level,
+            setext: false,
+        };
         b.class(l, LineClass::Heading(level));
         b.out.lines[l].height = LineHeight::for_heading(level);
         let mut p = tr.start;
@@ -631,7 +707,10 @@ fn heading(b: &mut Builder, tr: Range<usize>, level: u8, setext: bool) {
     } else {
         let under = lines.end - 1;
         for l in lines.start..under {
-            b.out.lines[l].kind = BlockKind::Heading { level, setext: true };
+            b.out.lines[l].kind = BlockKind::Heading {
+                level,
+                setext: true,
+            };
         }
         b.out.lines[under].kind = BlockKind::SetextUnderline { level };
         let lr = b.idx.line_range(under);
@@ -659,8 +738,16 @@ fn blockquote(b: &mut Builder, tr: Range<usize>) {
             Some((kind, marker)) => {
                 b.class(l, LineClass::Callout(*kind));
                 if b.out.lines[l].callout.is_none() {
-                    let title = if l == lines.start { text[marker.end..first.end].trim().to_string() } else { String::new() };
-                    b.out.lines[l].callout = Some(CalloutLine { kind: *kind, title, header: l == lines.start });
+                    let title = if l == lines.start {
+                        text[marker.end..first.end].trim().to_string()
+                    } else {
+                        String::new()
+                    };
+                    b.out.lines[l].callout = Some(CalloutLine {
+                        kind: *kind,
+                        title,
+                        header: l == lines.start,
+                    });
                 }
             }
             None => b.class(l, LineClass::Blockquote),
@@ -727,11 +814,21 @@ fn fence_start(b: &mut Builder, tr: Range<usize>) -> usize {
     for l in open_line..=last_line {
         let (kind, class) = if l == open_line {
             (
-                BlockKind::FenceOpen { language: word.clone(), resolved: language.map(|d| d.name) },
+                BlockKind::FenceOpen {
+                    language: word.clone(),
+                    resolved: language.map(|d| d.name),
+                },
                 LineClass::FenceHeader,
             )
         } else if l == last_line {
-            (if closed { BlockKind::FenceClose } else { BlockKind::FenceBody }, LineClass::FenceFooter)
+            (
+                if closed {
+                    BlockKind::FenceClose
+                } else {
+                    BlockKind::FenceBody
+                },
+                LineClass::FenceFooter,
+            )
         } else {
             (BlockKind::FenceBody, LineClass::FenceBody)
         };
@@ -801,56 +898,73 @@ fn link(b: &mut Builder, tr: Range<usize>, link_type: LinkType, image: bool) {
             let bytes = raw.as_bytes();
             let open = if image { 1 } else { 0 };
             if let Some(close) = link_text_end(bytes, open)
-                && bytes.get(close + 1) == Some(&b'(') && raw.ends_with(')') {
-                    let inner_end = raw.len() - 1;
-                    let mut p = close + 2;
-                    while p < inner_end && bytes[p].is_ascii_whitespace() {
+                && bytes.get(close + 1) == Some(&b'(')
+                && raw.ends_with(')')
+            {
+                let inner_end = raw.len() - 1;
+                let mut p = close + 2;
+                while p < inner_end && bytes[p].is_ascii_whitespace() {
+                    p += 1;
+                }
+                let us = p;
+                if bytes.get(p) == Some(&b'<') {
+                    while p < inner_end && bytes[p] != b'>' {
                         p += 1;
                     }
-                    let us = p;
-                    if bytes.get(p) == Some(&b'<') {
-                        while p < inner_end && bytes[p] != b'>' {
-                            p += 1;
+                    p = (p + 1).min(inner_end);
+                } else {
+                    let mut depth = 0;
+                    while p < inner_end && !bytes[p].is_ascii_whitespace() {
+                        match bytes[p] {
+                            b'(' => depth += 1,
+                            b')' if depth == 0 => break,
+                            b')' => depth -= 1,
+                            b'\\' => p += 1,
+                            _ => {}
                         }
-                        p = (p + 1).min(inner_end);
-                    } else {
-                        let mut depth = 0;
-                        while p < inner_end && !bytes[p].is_ascii_whitespace() {
-                            match bytes[p] {
-                                b'(' => depth += 1,
-                                b')' if depth == 0 => break,
-                                b')' => depth -= 1,
-                                b'\\' => p += 1,
-                                _ => {}
-                            }
-                            p += 1;
-                        }
-                    }
-                    let p = p.min(inner_end);
-                    if p > us {
-                        b.span(tr.start + us..tr.start + p, StyleId::Url);
-                    }
-                    let mut t = p;
-                    while t < inner_end && bytes[t].is_ascii_whitespace() {
-                        t += 1;
-                    }
-                    if t < inner_end && matches!(bytes[t], b'"' | b'\'' | b'(') {
-                        let mut te = inner_end;
-                        while te > t && bytes[te - 1].is_ascii_whitespace() {
-                            te -= 1;
-                        }
-                        b.span(tr.start + t..tr.start + te, StyleId::String);
+                        p += 1;
                     }
                 }
+                let p = p.min(inner_end);
+                if p > us {
+                    b.span(tr.start + us..tr.start + p, StyleId::Url);
+                }
+                let mut t = p;
+                while t < inner_end && bytes[t].is_ascii_whitespace() {
+                    t += 1;
+                }
+                if t < inner_end && matches!(bytes[t], b'"' | b'\'' | b'(') {
+                    let mut te = inner_end;
+                    while te > t && bytes[te - 1].is_ascii_whitespace() {
+                        te -= 1;
+                    }
+                    b.span(tr.start + t..tr.start + te, StyleId::String);
+                }
+            }
             if single_line {
                 if image {
                     if b.inline_images
-                        && let Some(c) = IMAGE_RE.captures(raw) {
-                            let url = c[2].split_whitespace().next().unwrap_or("").to_string();
-                            b.item(tr, line, InlineKind::Image { alt: c[1].to_string(), url });
-                        }
+                        && let Some(c) = IMAGE_RE.captures(raw)
+                    {
+                        let url = c[2].split_whitespace().next().unwrap_or("").to_string();
+                        b.item(
+                            tr,
+                            line,
+                            InlineKind::Image {
+                                alt: c[1].to_string(),
+                                url,
+                            },
+                        );
+                    }
                 } else if let Some(c) = LINK_RE.captures(raw) {
-                    b.item(tr, line, InlineKind::Link { text: c[1].to_string(), url: c[2].to_string() });
+                    b.item(
+                        tr,
+                        line,
+                        InlineKind::Link {
+                            text: c[1].to_string(),
+                            url: c[2].to_string(),
+                        },
+                    );
                 }
             }
         }
@@ -867,7 +981,10 @@ fn html_spans(b: &mut Builder, r: Range<usize>) {
     let name_char = |c: u8| c.is_ascii_alphanumeric() || matches!(c, b'-' | b':' | b'_' | b'.');
     while i < r.end {
         if text[i..r.end].starts_with("<!--") {
-            let end = text[i + 4..r.end].find("-->").map(|e| i + 4 + e + 3).unwrap_or(r.end);
+            let end = text[i + 4..r.end]
+                .find("-->")
+                .map(|e| i + 4 + e + 3)
+                .unwrap_or(r.end);
             b.span(i..end, StyleId::Comment);
             i = end;
             continue;
@@ -901,7 +1018,10 @@ fn html_spans(b: &mut Builder, r: Range<usize>) {
                     break;
                 }
                 let an = j;
-                while j < r.end && !s[j].is_ascii_whitespace() && !matches!(s[j], b'=' | b'>' | b'/') {
+                while j < r.end
+                    && !s[j].is_ascii_whitespace()
+                    && !matches!(s[j], b'=' | b'>' | b'/')
+                {
                     j += 1;
                 }
                 if j == an {

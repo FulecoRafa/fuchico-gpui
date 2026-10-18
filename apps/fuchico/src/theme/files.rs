@@ -4,12 +4,17 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-static HEADER: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^\s*/\*\s*fuchico-theme:\s*(.+?)\s*\*/\s*\n?").expect("valid regex"));
+static HEADER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*/\*\s*fuchico-theme:\s*(.+?)\s*\*/\s*\n?").expect("valid regex")
+});
 
 /// `/* fuchico-theme: <name> */\n<css.trim()>\n`, with `*/` removed from the name.
 pub fn serialize_theme(name: &str, css: &str) -> String {
-    format!("/* fuchico-theme: {} */\n{}\n", name.replace("*/", ""), css.trim())
+    format!(
+        "/* fuchico-theme: {} */\n{}\n",
+        name.replace("*/", ""),
+        css.trim()
+    )
 }
 
 /// `(name, css)`; `fallback_name` (usually the file stem) when there is no header.
@@ -18,7 +23,11 @@ pub fn parse_theme_file(content: &str, fallback_name: &str) -> (String, String) 
         Some(c) => {
             let name = c[1].trim().to_string();
             let rest = &content[c.get(0).map_or(0, |m| m.end())..];
-            let name = if name.is_empty() { fallback_name.to_string() } else { name };
+            let name = if name.is_empty() {
+                fallback_name.to_string()
+            } else {
+                name
+            };
             (name, rest.trim().to_string())
         }
         None => (fallback_name.to_string(), content.trim().to_string()),
@@ -39,7 +48,10 @@ pub fn theme_file_name(name: &str) -> String {
         }
     }
     let slug = slug.trim_matches('-');
-    format!("{}.fuchico-theme.css", if slug.is_empty() { "theme" } else { slug })
+    format!(
+        "{}.fuchico-theme.css",
+        if slug.is_empty() { "theme" } else { slug }
+    )
 }
 
 /// File stem with `.fuchico-theme.css` or `.css` removed (case-insensitive).
@@ -47,12 +59,18 @@ pub fn theme_file_name(name: &str) -> String {
 /// gpui's path prompts take no filters, so the import checks the pick
 /// instead.
 pub fn is_css_path(path: &str) -> bool {
-    std::path::Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case("css"))
+    std::path::Path::new(path)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("css"))
 }
 
 /// A save target typed without an extension gets `.css`.
 pub fn with_css_extension(p: std::path::PathBuf) -> std::path::PathBuf {
-    if p.extension().is_some() { p } else { p.with_extension("css") }
+    if p.extension().is_some() {
+        p
+    } else {
+        p.with_extension("css")
+    }
 }
 
 pub fn theme_stem(path: &str) -> String {
@@ -72,7 +90,10 @@ pub fn unique_name<'a>(base: &str, existing: impl IntoIterator<Item = &'a str> +
     if !taken(base) {
         return base.to_string();
     }
-    (2..).map(|i| format!("{base} {i}")).find(|n| !taken(n)).expect("infinite range")
+    (2..)
+        .map(|i| format!("{base} {i}"))
+        .find(|n| !taken(n))
+        .expect("infinite range")
 }
 
 #[cfg(test)]
@@ -83,12 +104,18 @@ mod tests {
     fn round_trip() {
         let s = serialize_theme("Night */ Owl", "  --background: #000;\n");
         assert_eq!(s, "/* fuchico-theme: Night  Owl */\n--background: #000;\n");
-        assert_eq!(parse_theme_file(&s, "x"), ("Night  Owl".into(), "--background: #000;".into()));
+        assert_eq!(
+            parse_theme_file(&s, "x"),
+            ("Night  Owl".into(), "--background: #000;".into())
+        );
     }
 
     #[test]
     fn no_header_uses_fallback() {
-        assert_eq!(parse_theme_file("  --a: 1px; ", "stem"), ("stem".into(), "--a: 1px;".into()));
+        assert_eq!(
+            parse_theme_file("  --a: 1px; ", "stem"),
+            ("stem".into(), "--a: 1px;".into())
+        );
     }
 
     #[test]
@@ -113,7 +140,13 @@ mod tests {
         assert!(is_css_path("/t/x.CSS"));
         assert!(!is_css_path("/t/x.md"));
         assert!(!is_css_path("/t/css"));
-        assert_eq!(with_css_extension("/t/mine".into()), std::path::PathBuf::from("/t/mine.css"));
-        assert_eq!(with_css_extension("/t/a.css".into()), std::path::PathBuf::from("/t/a.css"));
+        assert_eq!(
+            with_css_extension("/t/mine".into()),
+            std::path::PathBuf::from("/t/mine.css")
+        );
+        assert_eq!(
+            with_css_extension("/t/a.css".into()),
+            std::path::PathBuf::from("/t/a.css")
+        );
     }
 }

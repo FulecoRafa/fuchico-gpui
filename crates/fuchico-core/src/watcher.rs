@@ -95,7 +95,10 @@ mod tests {
 
     #[test]
     fn changed_dir_is_parent_and_filters_noise() {
-        assert_eq!(changed_dir(Path::new("/v/notes/a.md")), Some("/v/notes".to_string()));
+        assert_eq!(
+            changed_dir(Path::new("/v/notes/a.md")),
+            Some("/v/notes".to_string())
+        );
         assert_eq!(changed_dir(Path::new("/v/.git/HEAD")), None);
         assert_eq!(changed_dir(Path::new("/v/node_modules/x/y.js")), None);
         assert_eq!(changed_dir(Path::new("/v/notes/.tmpAbC123")), None);

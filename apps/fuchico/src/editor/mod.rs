@@ -37,12 +37,13 @@ use fuchico_core::doc_stats::{DocStats, compute_doc_stats};
 use fuchico_core::events::CoreEvent;
 use fuchico_core::fs::file::{ReadResult, fs_read_file, fs_write_file};
 use fuchico_editor::{
-    EditorEvent, EditorOptions, EditorStyle, EditorView, EngineKind, LineNumbers, MermaidBlock, ZoomDirection,
+    EditorEvent, EditorOptions, EditorStyle, EditorView, EngineKind, LineNumbers, MermaidBlock,
+    ZoomDirection,
 };
 use gpui_kit::{
     App, AppContext, Context, Entity, EventEmitter, ExternalPaths, FocusHandle, Focusable, Global,
-    InteractiveElement, IntoElement, ObjectFit, ParentElement, Render, StatefulInteractiveElement, Styled,
-    StyledImage, Subscription, Task, WeakEntity, Window, div, img, px,
+    InteractiveElement, IntoElement, ObjectFit, ParentElement, Render, StatefulInteractiveElement,
+    Styled, StyledImage, Subscription, Task, WeakEntity, Window, div, img, px,
 };
 
 use crate::bus::{self, AppEvent};
@@ -68,7 +69,8 @@ const IMAGE_EXTENSIONS: [&str; 7] = ["png", "jpg", "jpeg", "gif", "webp", "svg",
 pub fn init(cx: &mut App) {
     fuchico_editor::init(cx);
     sync_editor_shortcuts(cx);
-    cx.observe_global::<SettingsStore>(sync_editor_shortcuts).detach();
+    cx.observe_global::<SettingsStore>(sync_editor_shortcuts)
+        .detach();
     crate::export::set_buffer_provider(cx, |path, cx| {
         let open = cx.try_global::<OpenBuffers>()?;
         let view = open.0.get(path)?.upgrade()?;
@@ -90,7 +92,10 @@ fn register_buffer(path: &str, view: &Entity<EditorView>, cx: &mut App) {
 
 fn unregister_buffer(path: &str, view: Option<&Entity<EditorView>>, cx: &mut App) {
     if let Some(open) = cx.try_global::<OpenBuffers>()
-        && open.0.get(path).is_some_and(|w| view.is_none_or(|v| w.entity_id() == v.entity_id()))
+        && open
+            .0
+            .get(path)
+            .is_some_and(|w| view.is_none_or(|v| w.entity_id() == v.entity_id()))
     {
         cx.global_mut::<OpenBuffers>().0.remove(path);
     }
@@ -103,8 +108,17 @@ struct BoundShortcuts(HashMap<&'static str, Vec<String>>);
 impl Global for BoundShortcuts {}
 
 fn editor_binding(ks: &str, action: Box<dyn gpui_kit::Action>) -> Option<gpui_kit::KeyBinding> {
-    let predicate = gpui_kit::KeyBindingContextPredicate::parse(fuchico_editor::KEY_CONTEXT).ok()?;
-    gpui_kit::KeyBinding::load(ks, action, Some(predicate.into()), false, None, &gpui_kit::DummyKeyboardMapper).ok()
+    let predicate =
+        gpui_kit::KeyBindingContextPredicate::parse(fuchico_editor::KEY_CONTEXT).ok()?;
+    gpui_kit::KeyBinding::load(
+        ks,
+        action,
+        Some(predicate.into()),
+        false,
+        None,
+        &gpui_kit::DummyKeyboardMapper,
+    )
+    .ok()
 }
 
 /// Re-binds the `SHORTCUT_ACTIONS` whose binding changed in settings:
@@ -116,7 +130,12 @@ pub fn sync_editor_shortcuts(cx: &mut App) {
         let def = Settings::default();
         let bound = crate::keymap::SHORTCUT_ACTIONS
             .iter()
-            .map(|a| (a.id, crate::keymap::binding_to_keystrokes(def.shortcut(a.id))))
+            .map(|a| {
+                (
+                    a.id,
+                    crate::keymap::binding_to_keystrokes(def.shortcut(a.id)),
+                )
+            })
             .collect();
         cx.set_global(BoundShortcuts(bound));
     }
@@ -124,14 +143,27 @@ pub fn sync_editor_shortcuts(cx: &mut App) {
     let mut changed = Vec::new();
     for a in crate::keymap::SHORTCUT_ACTIONS {
         let want = crate::keymap::binding_to_keystrokes(settings.shortcut(a.id));
-        let have = cx.global::<BoundShortcuts>().0.get(a.id).cloned().unwrap_or_default();
+        let have = cx
+            .global::<BoundShortcuts>()
+            .0
+            .get(a.id)
+            .cloned()
+            .unwrap_or_default();
         if want == have {
             continue;
         }
-        let Some(action) = crate::actions::editor_action_for(a.id) else { continue };
+        let Some(action) = crate::actions::editor_action_for(a.id) else {
+            continue;
+        };
         let name = gpui_kit::SharedString::from(action.name());
-        bindings.extend(have.iter().filter_map(|ks| editor_binding(ks, Box::new(gpui_kit::Unbind(name.clone())))));
-        bindings.extend(want.iter().filter_map(|ks| editor_binding(ks, action.boxed_clone())));
+        bindings.extend(
+            have.iter()
+                .filter_map(|ks| editor_binding(ks, Box::new(gpui_kit::Unbind(name.clone())))),
+        );
+        bindings.extend(
+            want.iter()
+                .filter_map(|ks| editor_binding(ks, action.boxed_clone())),
+        );
         changed.push((a.id, want));
     }
     if !bindings.is_empty() {
@@ -157,11 +189,20 @@ pub fn engine_for(mode: KeybindingMode) -> EngineKind {
 
 /// `EditorOptions` from the settings and the pane context. `vault` is the
 /// current file / tag index.
-pub fn options_for(s: &Settings, path: &str, pcx: &PaneContext, vault: (Vec<String>, Vec<String>)) -> EditorOptions {
+pub fn options_for(
+    s: &Settings,
+    path: &str,
+    pcx: &PaneContext,
+    vault: (Vec<String>, Vec<String>),
+) -> EditorOptions {
     let helix = s.keybinding_mode == KeybindingMode::Helix;
     let main = !pcx.in_window;
     EditorOptions {
-        line_numbers: if s.relative_line_numbers { LineNumbers::Relative } else { LineNumbers::Absolute },
+        line_numbers: if s.relative_line_numbers {
+            LineNumbers::Relative
+        } else {
+            LineNumbers::Absolute
+        },
         rulers: s.rulers.clone(),
         vault_files: vault.0,
         all_tags: vault.1,
@@ -182,7 +223,30 @@ pub fn options_for(s: &Settings, path: &str, pcx: &PaneContext, vault: (Vec<Stri
         },
         tab_size: s.tab_size.max(1),
         engine: engine_for(s.keybinding_mode),
+        strings: editor_strings(),
         ..EditorOptions::default()
+    }
+}
+
+/// The editor's own UI labels in the current locale.
+pub fn editor_strings() -> fuchico_editor::EditorStrings {
+    use crate::i18n::Msg;
+    let t = |m: Msg| crate::i18n::tr(m, &[]);
+    fuchico_editor::EditorStrings {
+        find: t(Msg::EditorFind),
+        replace: t(Msg::EditorReplace),
+        next: t(Msg::EditorFindNext),
+        previous: t(Msg::EditorFindPrevious),
+        all: t(Msg::EditorFindAll),
+        match_case: t(Msg::EditorMatchCase),
+        regexp: t(Msg::EditorRegexp),
+        by_word: t(Msg::EditorByWord),
+        replace_one: t(Msg::EditorReplaceOne),
+        replace_all: t(Msg::EditorReplaceAll),
+        go_to_line: t(Msg::EditorGoToLine),
+        go: t(Msg::EditorGo),
+        go_to_header: t(Msg::EditorGoToHeader),
+        no_headers: t(Msg::EditorNoHeaders),
     }
 }
 
@@ -241,7 +305,10 @@ pub fn format_bytes(n: u64) -> String {
 }
 
 fn extension(path: &str) -> Option<String> {
-    Path::new(path).extension().and_then(|e| e.to_str()).map(str::to_lowercase)
+    Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_lowercase)
 }
 
 fn is_image_path(path: &str) -> bool {
@@ -296,7 +363,8 @@ fn read_note(root: Option<&str>, path: &str) -> Option<String> {
 }
 
 fn scan_vault(root: &str) -> (Vec<String>, Vec<String>) {
-    let files = fuchico_core::fs::tree::fs_list_markdown_files(root.to_string()).unwrap_or_default();
+    let files =
+        fuchico_core::fs::tree::fs_list_markdown_files(root.to_string()).unwrap_or_default();
     let tags = fuchico_core::tags::tags_scan(root.to_string())
         .map(|t| t.into_iter().map(|e| e.tag).collect())
         .unwrap_or_default();
@@ -318,7 +386,10 @@ enum State {
     Loading,
     Failed(String),
     /// Binary or too large, with its size in bytes.
-    NotText { size: u64, too_large: bool },
+    NotText {
+        size: u64,
+        too_large: bool,
+    },
     Ready(Entity<EditorView>),
 }
 
@@ -351,7 +422,12 @@ pub struct EditorPane {
 }
 
 impl EditorPane {
-    pub fn new(path: String, pcx: PaneContext, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        path: String,
+        pcx: PaneContext,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let p = path.clone();
         let read = cx.background_spawn(async move { (fs_read_file(p.clone()), parent_dirs(&p)) });
         cx.spawn_in(window, async move |this, cx| {
@@ -360,8 +436,18 @@ impl EditorPane {
                 this.dirs = dirs;
                 match res {
                     Ok(ReadResult::Text { content, .. }) => this.mount(content, window, cx),
-                    Ok(ReadResult::Binary { size }) => this.state = State::NotText { size, too_large: false },
-                    Ok(ReadResult::TooLarge { size, .. }) => this.state = State::NotText { size, too_large: true },
+                    Ok(ReadResult::Binary { size }) => {
+                        this.state = State::NotText {
+                            size,
+                            too_large: false,
+                        }
+                    }
+                    Ok(ReadResult::TooLarge { size, .. }) => {
+                        this.state = State::NotText {
+                            size,
+                            too_large: true,
+                        }
+                    }
                     Err(e) => this.state = State::Failed(e),
                 }
                 cx.notify();
@@ -394,14 +480,20 @@ impl EditorPane {
                 }
             }),
         ];
-        let dirs = Path::new(&path).parent().map(|p| vec![p.to_string_lossy().into_owned()]).unwrap_or_default();
+        let dirs = Path::new(&path)
+            .parent()
+            .map(|p| vec![p.to_string_lossy().into_owned()])
+            .unwrap_or_default();
         let mut pane = EditorPane {
             path,
             pcx,
             state: State::Loading,
             dirs,
             focus: cx.focus_handle(),
-            stats: DocStats { words: 0, reading_time_min: 0 },
+            stats: DocStats {
+                words: 0,
+                reading_time_min: 0,
+            },
             disk_text: String::new(),
             dirty: false,
             save_failed: false,
@@ -427,14 +519,21 @@ impl EditorPane {
         let had_focus = self.focus.is_focused(window);
         let view = cx.new(|cx| EditorView::new(&content, options, style, window, cx));
         let root = self.pcx.root.clone();
-        view.update(cx, |v, _| v.set_note_reader(Some(Rc::new(move |p: &str| read_note(root.as_deref(), p)))));
+        view.update(cx, |v, _| {
+            v.set_note_reader(Some(Rc::new(move |p: &str| read_note(root.as_deref(), p))))
+        });
         self.disk_text = view.read(cx).text();
         self.stats = compute_doc_stats(&self.disk_text);
-        self._view_subs = vec![cx.subscribe_in(&view, window, |this, _, ev, window, cx| this.on_editor(ev, window, cx))];
+        self._view_subs = vec![cx.subscribe_in(&view, window, |this, _, ev, window, cx| {
+            this.on_editor(ev, window, cx)
+        })];
         register_buffer(&self.path, &view, cx);
         if let Some(line) = self.pending_line.take() {
             Self::focus_line(&view, line, cx);
-        } else if let Some(y) = cx.try_global::<UiState>().and_then(|s| s.scroll.get(&self.path)) {
+        } else if let Some(y) = cx
+            .try_global::<UiState>()
+            .and_then(|s| s.scroll.get(&self.path))
+        {
             view.update(cx, |v, cx| v.set_scroll_position(y as f32, cx));
         }
         if had_focus {
@@ -473,7 +572,9 @@ impl EditorPane {
 
     /// Re-indexes the vault's files and tags after `delay`.
     fn refresh_vault(&mut self, delay: Duration, cx: &mut Context<Self>) {
-        let Some(root) = self.pcx.root.clone() else { return };
+        let Some(root) = self.pcx.root.clone() else {
+            return;
+        };
         self.vault_task = Some(cx.spawn(async move |this, cx| {
             if !delay.is_zero() {
                 cx.background_executor().timer(delay).await;
@@ -507,18 +608,28 @@ impl EditorPane {
             EditorEvent::Save => self.save_now(cx),
             EditorEvent::Quit => cx.emit(PaneEvent::Close),
             EditorEvent::OpenWikilink { resolved, target } => match resolved {
-                Some(p) => cx.emit(PaneEvent::OpenFile { path: p.clone(), line: None }),
+                Some(p) => cx.emit(PaneEvent::OpenFile {
+                    path: p.clone(),
+                    line: None,
+                }),
                 None => log::debug!("editor: unresolved wikilink [[{target}]]"),
             },
             EditorEvent::OpenLink(href) => {
                 if fuchico_core::wikilinks::is_external_link(href) {
                     cx.open_url(href);
-                } else if let Some(p) = fuchico_core::wikilinks::resolve_relative_markdown_link(href, &self.path) {
-                    cx.emit(PaneEvent::OpenFile { path: p, line: None });
+                } else if let Some(p) =
+                    fuchico_core::wikilinks::resolve_relative_markdown_link(href, &self.path)
+                {
+                    cx.emit(PaneEvent::OpenFile {
+                        path: p,
+                        line: None,
+                    });
                 }
             }
             EditorEvent::TagClicked(tag) => cx.emit(PaneEvent::OpenTag(tag.clone())),
-            EditorEvent::OpenCommandLine { .. } => cx.emit(PaneEvent::OpenCommandPalette(":".into())),
+            EditorEvent::OpenCommandLine { .. } => {
+                cx.emit(PaneEvent::OpenCommandPalette(":".into()))
+            }
             EditorEvent::External(ext) => {
                 use fuchico_helix::External as X;
                 cx.emit(match ext {
@@ -570,9 +681,17 @@ impl EditorPane {
         };
         crate::mermaid::open_block(&bk, &block.source, cx);
         if self.pcx.in_window {
-            crate::mermaid::window::open_mermaid_window(bk, t!(AppDiagram), Some(block.source.clone()), cx);
+            crate::mermaid::window::open_mermaid_window(
+                bk,
+                t!(AppDiagram),
+                Some(block.source.clone()),
+                cx,
+            );
         } else {
-            cx.emit(PaneEvent::OpenMermaid { block_key: bk, initial_text: block.source.clone() });
+            cx.emit(PaneEvent::OpenMermaid {
+                block_key: bk,
+                initial_text: block.source.clone(),
+            });
         }
     }
 
@@ -587,7 +706,9 @@ impl EditorPane {
 
     fn schedule_autosave(&mut self, cx: &mut Context<Self>) {
         self.autosave = Some(cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(AUTOSAVE_MS)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(AUTOSAVE_MS))
+                .await;
             this.update(cx, |this, cx| {
                 this.autosave = None;
                 this.write(cx);
@@ -598,9 +719,16 @@ impl EditorPane {
 
     fn schedule_stats(&mut self, cx: &mut Context<Self>) {
         self.stats_task = Some(cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(STATS_MS)).await;
-            let Ok(Some(text)) = this.update(cx, |this, cx| this.view().map(|v| v.read(cx).text())) else { return };
-            let stats = cx.background_spawn(async move { compute_doc_stats(&text) }).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(STATS_MS))
+                .await;
+            let Ok(Some(text)) = this.update(cx, |this, cx| this.view().map(|v| v.read(cx).text()))
+            else {
+                return;
+            };
+            let stats = cx
+                .background_spawn(async move { compute_doc_stats(&text) })
+                .await;
             this.update(cx, |this, cx| {
                 this.stats = stats;
                 cx.notify();
@@ -624,7 +752,9 @@ impl EditorPane {
         let text = v.read(cx).text();
         let path = self.path.clone();
         let body = text.clone();
-        let write = cx.background_spawn(async move { fs_write_file(path, body, Some("editor".into()), &*bus::sink()) });
+        let write = cx.background_spawn(async move {
+            fs_write_file(path, body, Some("editor".into()), &*bus::sink())
+        });
         cx.spawn(async move |this, cx| {
             let res = write.await;
             this.update(cx, |this, cx| {
@@ -648,7 +778,9 @@ impl EditorPane {
                         let name = crate::workspace::tabs::basename(&this.path).to_string();
                         let msg = t!(EditorSaveFailed, name = name, error = e);
                         if let Some(w) = cx.active_window() {
-                            let _ = w.update(cx, |_, window, cx| crate::ui::toast::toast_error(window, cx, msg));
+                            let _ = w.update(cx, |_, window, cx| {
+                                crate::ui::toast::toast_error(window, cx, msg)
+                            });
                         }
                     }
                 }
@@ -662,7 +794,9 @@ impl EditorPane {
     /// Starts writing pending edits (the pane is going away, so nothing
     /// waits on the result). Returns the write task.
     fn flush(&mut self, cx: &mut App) -> Option<Task<()>> {
-        let State::Ready(v) = &self.state else { return None };
+        let State::Ready(v) = &self.state else {
+            return None;
+        };
         let v = v.read(cx);
         if !v.is_dirty() && !self.save_failed {
             return None;
@@ -703,10 +837,13 @@ impl EditorPane {
         match ev {
             AppEvent::Core(core) => {
                 let (ours, vault) = match core {
-                    CoreEvent::FsChanged { dir, .. } => (self.dirs.iter().any(|d| same_dir(d, dir)), true),
-                    CoreEvent::FileWritten { path, source } => {
-                        (*path == self.path && source.as_deref() != Some("editor"), path.ends_with(".md"))
+                    CoreEvent::FsChanged { dir, .. } => {
+                        (self.dirs.iter().any(|d| same_dir(d, dir)), true)
                     }
+                    CoreEvent::FileWritten { path, source } => (
+                        *path == self.path && source.as_deref() != Some("editor"),
+                        path.ends_with(".md"),
+                    ),
                     _ => (false, false),
                 };
                 if ours {
@@ -781,8 +918,14 @@ impl EditorPane {
     /// for the binary / too-large / error screen, as `setDoc` does.
     fn unmount(&mut self, res: Result<ReadResult, String>, cx: &mut Context<Self>) {
         let state = match res {
-            Ok(ReadResult::Binary { size }) => State::NotText { size, too_large: false },
-            Ok(ReadResult::TooLarge { size, .. }) => State::NotText { size, too_large: true },
+            Ok(ReadResult::Binary { size }) => State::NotText {
+                size,
+                too_large: false,
+            },
+            Ok(ReadResult::TooLarge { size, .. }) => State::NotText {
+                size,
+                too_large: true,
+            },
             Err(e) => State::Failed(e),
             Ok(ReadResult::Text { .. }) => return,
         };
@@ -847,7 +990,10 @@ impl EditorPane {
     /// Saves `(file_name, mime, bytes)` images into `<root>/attachments`
     /// and links them. Nothing without a vault.
     fn save_images(&mut self, images: Vec<(String, String, Vec<u8>)>, cx: &mut Context<Self>) {
-        let sources = images.into_iter().map(|(n, m, b)| ImageSource::Bytes(n, m, b)).collect();
+        let sources = images
+            .into_iter()
+            .map(|(n, m, b)| ImageSource::Bytes(n, m, b))
+            .collect();
         self.upload_images(sources, cx);
     }
 
@@ -858,8 +1004,12 @@ impl EditorPane {
     /// {e} -->` and stops; a placeholder the user removed meanwhile means
     /// nothing is inserted.
     fn upload_images(&mut self, images: Vec<ImageSource>, cx: &mut Context<Self>) {
-        let Some(root) = self.pcx.root.clone() else { return };
-        let State::Ready(view) = &self.state else { return };
+        let Some(root) = self.pcx.root.clone() else {
+            return;
+        };
+        let State::Ready(view) = &self.state else {
+            return;
+        };
         if images.is_empty() {
             return;
         }
@@ -886,8 +1036,12 @@ impl EditorPane {
     /// Finder files dropped on the editor: images are copied into the
     /// attachments folder and linked.
     pub fn drop_external(&mut self, paths: &[PathBuf], cx: &mut Context<Self>) {
-        let files: Vec<ImageSource> =
-            paths.iter().filter(|p| is_image_path(&p.to_string_lossy())).cloned().map(ImageSource::File).collect();
+        let files: Vec<ImageSource> = paths
+            .iter()
+            .filter(|p| is_image_path(&p.to_string_lossy()))
+            .cloned()
+            .map(ImageSource::File)
+            .collect();
         self.upload_images(files, cx);
     }
 }
@@ -899,20 +1053,36 @@ enum ImageSource {
 }
 
 fn upload_placeholder(n: usize) -> String {
-    if n > 1 { format!("![uploading {n} images…]()") } else { "![uploading image…]()".to_string() }
+    if n > 1 {
+        format!("![uploading {n} images…]()")
+    } else {
+        "![uploading image…]()".to_string()
+    }
 }
 
 /// Saves the images in order; the first failure becomes an
 /// `<!-- image upload failed: … -->` line and stops the rest.
-fn save_all(images: Vec<ImageSource>, dir: &str, current: &str, now: &chrono::NaiveDateTime) -> Vec<String> {
+fn save_all(
+    images: Vec<ImageSource>,
+    dir: &str,
+    current: &str,
+    now: &chrono::NaiveDateTime,
+) -> Vec<String> {
     let mut links = Vec::new();
     for img in images {
         let saved = match img {
             ImageSource::Bytes(name, mime, bytes) => save_image(&bytes, &name, &mime, dir, now),
-            ImageSource::File(p) => std::fs::read(&p).map_err(|e| e.to_string()).and_then(|bytes| {
-                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                save_image(&bytes, &name, image_mime(&p.to_string_lossy()), dir, now)
-            }),
+            ImageSource::File(p) => {
+                std::fs::read(&p)
+                    .map_err(|e| e.to_string())
+                    .and_then(|bytes| {
+                        let name = p
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default();
+                        save_image(&bytes, &name, image_mime(&p.to_string_lossy()), dir, now)
+                    })
+            }
         };
         match saved {
             Ok(saved) => links.push(image_link(&saved, current)),
@@ -948,7 +1118,10 @@ impl PaneItem for EditorPane {
         if let Some(v) = &view {
             register_buffer(&path, v, cx);
         }
-        self.dirs = Path::new(&path).parent().map(|p| vec![p.to_string_lossy().into_owned()]).unwrap_or_default();
+        self.dirs = Path::new(&path)
+            .parent()
+            .map(|p| vec![p.to_string_lossy().into_owned()])
+            .unwrap_or_default();
         self.path = path;
         self.apply_settings(cx);
         cx.notify();
@@ -969,7 +1142,12 @@ impl PaneItem for EditorPane {
         self.dirty
     }
 
-    fn insert_dropped_paths(&mut self, paths: &[String], _window: &mut Window, cx: &mut Context<Self>) {
+    fn insert_dropped_paths(
+        &mut self,
+        paths: &[String],
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if let State::Ready(v) = &self.state {
             v.update(cx, |v, cx| v.insert_dropped_paths(paths, cx));
         }
@@ -989,7 +1167,11 @@ impl Render for EditorPane {
                 .p(u(24.))
                 .bg(th.colors.background)
                 .text_size(u(13.))
-                .text_color(if error { th.colors.destructive } else { th.colors.muted_foreground })
+                .text_color(if error {
+                    th.colors.destructive
+                } else {
+                    th.colors.muted_foreground
+                })
                 .child(child)
                 .into_any_element()
         };
@@ -1005,7 +1187,11 @@ impl Render for EditorPane {
                         .into_any_element()
                 } else {
                     let size = format_bytes(*size);
-                    let text = if *too_large { t!(EditorTooLarge, size = size) } else { t!(EditorBinaryFile, size = size) };
+                    let text = if *too_large {
+                        t!(EditorTooLarge, size = size)
+                    } else {
+                        t!(EditorBinaryFile, size = size)
+                    };
                     text.into_any_element()
                 };
                 return status(child, false);
@@ -1033,7 +1219,10 @@ impl Render for EditorPane {
                 .px(u(10.))
                 .py(u(4.))
                 .text_size(u(12.))
-                .bg(th.colors.background.blend(th.colors.destructive.opacity(0.12)))
+                .bg(th
+                    .colors
+                    .background
+                    .blend(th.colors.destructive.opacity(0.12)))
                 .border_b_1()
                 .border_color(th.colors.border)
                 .child(t!(EditorConflict))
@@ -1053,7 +1242,9 @@ impl Render for EditorPane {
             .size_full()
             .bg(th.colors.background)
             .text_color(th.colors.foreground)
-            .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| this.drop_external(paths.paths(), cx)))
+            .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
+                this.drop_external(paths.paths(), cx)
+            }))
             .children(banner)
             .child(div().flex_1().min_h_0().child(view))
             .child(StatusBar { stats: self.stats })

@@ -17,17 +17,20 @@ pub mod actions;
 pub mod commands;
 pub mod display;
 mod element;
+mod find;
 mod host;
 mod images;
+pub mod search;
 pub mod style;
 mod view;
 
 pub use actions::*;
 pub use commands::{CommandEdit, TokenKind};
+pub use find::{EditorStrings, FindField};
 pub use style::EditorStyle;
 pub use view::{
-    EditorEvent, EditorOptions, EditorView, EngineKind, InsertCursor, LineNumbers, MermaidBlock, ZoomDirection,
-    NoteReader, prompt_grid,
+    EditorEvent, EditorOptions, EditorView, EngineKind, InsertCursor, LineNumbers, MermaidBlock,
+    NoteReader, ZoomDirection, prompt_grid,
 };
 
 /// Key context of the editor (`key_context("FuchicoEditor")`).
@@ -64,7 +67,30 @@ pub fn init(cx: &mut gpui_kit::App) {
         KeyBinding::new("tab", EditorTab, c),
         KeyBinding::new("shift-tab", EditorBacktab, c),
         KeyBinding::new("secondary-z", Undo, c),
-        KeyBinding::new("secondary-shift-z", Redo, c),
         KeyBinding::new("secondary-a", SelectAll, c),
+        // `searchKeymap`
+        KeyBinding::new("f3", FindNext, c),
+        KeyBinding::new("secondary-g", FindNext, c),
+        KeyBinding::new("shift-f3", FindPrevious, c),
+        KeyBinding::new("secondary-shift-g", FindPrevious, c),
+        KeyBinding::new("secondary-shift-l", SelectSelectionMatches, c),
+        KeyBinding::new("secondary-d", SelectNextOccurrence, c),
+        KeyBinding::new("secondary-alt-g", OpenGotoLine, c),
+        KeyBinding::new("secondary-u", UndoSelection, c),
     ]);
+    // `historyKeymap`: redo is Mod-Shift-z on macOS, Mod-y elsewhere (plus
+    // Ctrl-Shift-z on Linux); redoSelection is Mod-Shift-u on macOS, Alt-u
+    // elsewhere.
+    #[cfg(target_os = "macos")]
+    cx.bind_keys([
+        KeyBinding::new("secondary-shift-z", Redo, c),
+        KeyBinding::new("secondary-shift-u", RedoSelection, c),
+    ]);
+    #[cfg(not(target_os = "macos"))]
+    cx.bind_keys([
+        KeyBinding::new("ctrl-y", Redo, c),
+        KeyBinding::new("alt-u", RedoSelection, c),
+    ]);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    cx.bind_keys([KeyBinding::new("ctrl-shift-z", Redo, c)]);
 }

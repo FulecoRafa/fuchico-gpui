@@ -137,9 +137,7 @@ fn advance(family: u32, c: char, size: f64) -> f64 {
         return advance(family, ' ', size) * 4.0;
     }
     match glyph(family, c) {
-        Some((f, g)) => {
-            f.face.glyph_hor_advance(g).unwrap_or(0) as f64 * size / f.upm as f64
-        }
+        Some((f, g)) => f.face.glyph_hor_advance(g).unwrap_or(0) as f64 * size / f.upm as f64,
         None => size * 0.5,
     }
 }

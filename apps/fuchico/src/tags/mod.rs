@@ -14,8 +14,8 @@ use std::rc::Rc;
 
 use fuchico_core::events::CoreEvent;
 use fuchico_core::tags::{TagEntry, tags_scan};
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::Icon;
+use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::prelude::*;
 use gpui_kit::{AnyElement, Context, EventEmitter, SharedString, Subscription, Window, div};
 
@@ -53,7 +53,8 @@ pub struct TagsView {
 impl TagsView {
     pub fn new(root: Option<String>, _window: &mut Window, cx: &mut Context<Self>) -> Self {
         let sub = bus::subscribe(cx, |this: &mut TagsView, ev, cx| {
-            if let AppEvent::Core(CoreEvent::FileWritten { .. } | CoreEvent::FsChanged { .. }) = ev {
+            if let AppEvent::Core(CoreEvent::FileWritten { .. } | CoreEvent::FsChanged { .. }) = ev
+            {
                 this.scan(cx);
             }
         });
@@ -93,7 +94,9 @@ impl TagsView {
     /// `scan(root)`: "loading" only before the first result; errors replace
     /// the list.
     fn scan(&mut self, cx: &mut Context<Self>) {
-        let Some(root) = self.root.clone() else { return };
+        let Some(root) = self.root.clone() else {
+            return;
+        };
         if self.scanning {
             self.rescan = true;
             return;
@@ -131,18 +134,33 @@ impl TagsView {
     }
 
     fn open(&self, file: &str, cx: &mut Context<Self>) {
-        cx.emit(ViewEvent::OpenFile { path: file.to_string(), line: None });
+        cx.emit(ViewEvent::OpenFile {
+            path: file.to_string(),
+            line: None,
+        });
     }
 
     fn render_list(&self, cx: &mut Context<Self>) -> AnyElement {
         let th = AppTheme::get(cx).clone();
-        let status = |d: gpui_kit::Div| d.px(u(4.)).py(u(8.)).text_size(u(12.)).text_color(th.colors.muted_foreground);
+        let status = |d: gpui_kit::Div| {
+            d.px(u(4.))
+                .py(u(8.))
+                .text_size(u(12.))
+                .text_color(th.colors.muted_foreground)
+        };
         let mut children: Vec<AnyElement> = Vec::new();
         match &self.index {
-            TagIndex::Loading => children.push(status(div()).child(crate::t!(CommonScanning)).into_any_element()),
-            TagIndex::Error(e) => {
-                children.push(status(div()).text_color(th.colors.destructive).child(e.clone()).into_any_element())
-            }
+            TagIndex::Loading => children.push(
+                status(div())
+                    .child(crate::t!(CommonScanning))
+                    .into_any_element(),
+            ),
+            TagIndex::Error(e) => children.push(
+                status(div())
+                    .text_color(th.colors.destructive)
+                    .child(e.clone())
+                    .into_any_element(),
+            ),
             TagIndex::Loaded(entries) if entries.is_empty() => {
                 children.push(status(div()).child(no_tags_message(&th)).into_any_element())
             }
@@ -168,9 +186,13 @@ impl TagsView {
                             .cursor_pointer()
                             .map(|d| {
                                 if on {
-                                    d.bg(alpha(kw, 0.18)).border_color(alpha(kw, 0.45)).text_color(kw)
+                                    d.bg(alpha(kw, 0.18))
+                                        .border_color(alpha(kw, 0.45))
+                                        .text_color(kw)
                                 } else {
-                                    d.border_color(th.colors.border).text_color(th.colors.foreground).hover(move |s| s.bg(hover))
+                                    d.border_color(th.colors.border)
+                                        .text_color(th.colors.foreground)
+                                        .hover(move |s| s.bg(hover))
                                 }
                             })
                             .child(Icon::new(AppIcon::Hash).size(u(11.)).flex_none())
@@ -178,7 +200,13 @@ impl TagsView {
                             .child(
                                 div()
                                     .text_size(u(11.))
-                                    .map(|d| if on { d.opacity(0.75) } else { d.text_color(th.colors.muted_foreground) })
+                                    .map(|d| {
+                                        if on {
+                                            d.opacity(0.75)
+                                        } else {
+                                            d.text_color(th.colors.muted_foreground)
+                                        }
+                                    })
                                     .child(entry.count.to_string()),
                             )
                             .on_click(move |_, _, cx| {
@@ -231,42 +259,50 @@ impl TagsView {
                     let (f1, f2, v1, v2) = (file.clone(), file.clone(), view.clone(), view.clone());
                     let tip: SharedString = file.clone().into();
                     let row = div()
-                            .id(("tag-file", i))
-                            .flex()
-                            .flex_col()
-                            .items_start()
-                            .gap(u(2.))
-                            .w_full()
-                            .px(u(8.))
-                            .py(u(6.))
-                            .rounded(u(th.radius.sm))
-                            .cursor_pointer()
-                            .hover(move |s| s.bg(hover))
-                            .text_size(u(12.))
-                            .child(div().text_color(th.colors.foreground).child(basename(file).to_string()))
-                            .child(
-                                div()
-                                    .id(("tag-file-path", i))
-                                    .max_w_full()
-                                    .overflow_hidden()
-                                    .whitespace_nowrap()
-                                    .text_ellipsis()
-                                    .text_size(u(11.))
-                                    .text_color(th.colors.muted_foreground)
-                                    .child(file.clone())
-                                    .tooltip(move |w, cx| Tooltip::new(tip.clone()).build(w, cx)),
-                            )
-                            .on_click(move |_, _, cx| {
-                                v1.update(cx, |this, cx| this.open(&f1, cx)).ok();
-                            })
-                            .debug_selector(|| format!("tag-file:{i}"));
-                    children.push(with_context_menu(("tag-file-menu", i), row, move |menu, _, _| {
-                        let (v, f) = (v2.clone(), f2.clone());
-                        let open = move |_: &mut Window, cx: &mut gpui_kit::App| {
-                            v.update(cx, |this, cx| this.open(&f, cx)).ok();
-                        };
-                        build_menu(menu, file_row_menu(&f2, open, Vec::new()))
-                    }));
+                        .id(("tag-file", i))
+                        .flex()
+                        .flex_col()
+                        .items_start()
+                        .gap(u(2.))
+                        .w_full()
+                        .px(u(8.))
+                        .py(u(6.))
+                        .rounded(u(th.radius.sm))
+                        .cursor_pointer()
+                        .hover(move |s| s.bg(hover))
+                        .text_size(u(12.))
+                        .child(
+                            div()
+                                .text_color(th.colors.foreground)
+                                .child(basename(file).to_string()),
+                        )
+                        .child(
+                            div()
+                                .id(("tag-file-path", i))
+                                .max_w_full()
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis()
+                                .text_size(u(11.))
+                                .text_color(th.colors.muted_foreground)
+                                .child(file.clone())
+                                .tooltip(move |w, cx| Tooltip::new(tip.clone()).build(w, cx)),
+                        )
+                        .on_click(move |_, _, cx| {
+                            v1.update(cx, |this, cx| this.open(&f1, cx)).ok();
+                        })
+                        .debug_selector(|| format!("tag-file:{i}"));
+                    children.push(with_context_menu(
+                        ("tag-file-menu", i),
+                        row,
+                        move |menu, _, _| {
+                            let (v, f) = (v2.clone(), f2.clone());
+                            let open = move |_: &mut Window, cx: &mut gpui_kit::App| {
+                                v.update(cx, |this, cx| this.open(&f, cx)).ok();
+                            };
+                            build_menu(menu, file_row_menu(&f2, open, Vec::new()))
+                        },
+                    ));
                 }
             }
         }
@@ -284,7 +320,11 @@ impl TagsView {
 
 /// Chip click: select `tag`, or clear it when it is already active.
 fn toggled(active: Option<&str>, tag: &str) -> Option<String> {
-    if active == Some(tag) { None } else { Some(tag.to_string()) }
+    if active == Some(tag) {
+        None
+    } else {
+        Some(tag.to_string())
+    }
 }
 
 /// "No tags yet. Use `#tag` in a note or a frontmatter `tags:` list.",
@@ -299,13 +339,23 @@ fn no_tags_message(th: &AppTheme) -> AnyElement {
             .child(s)
             .into_any_element()
     };
-    let words = |s: String| s.split_whitespace().map(|w| div().child(w.to_string()).into_any_element()).collect::<Vec<_>>();
+    let words = |s: String| {
+        s.split_whitespace()
+            .map(|w| div().child(w.to_string()).into_any_element())
+            .collect::<Vec<_>>()
+    };
     let mut parts = words(crate::t!(TagsNoTagsPrefix));
     parts.push(code("#tag"));
     parts.extend(words(crate::t!(TagsNoTagsMid)));
     parts.push(code("tags:"));
     parts.extend(words(crate::t!(TagsNoTagsSuffix)));
-    div().flex().flex_wrap().items_center().gap_x(u(4.)).children(parts).into_any_element()
+    div()
+        .flex()
+        .flex_wrap()
+        .items_center()
+        .gap_x(u(4.))
+        .children(parts)
+        .into_any_element()
 }
 
 impl EventEmitter<ViewEvent> for TagsView {}
@@ -387,13 +437,21 @@ mod ui_tests {
         std::fs::write(root.join("a.md"), "# A\n#alpha #beta\n").unwrap();
         std::fs::write(root.join("b.md"), "---\ntags: [alpha]\n---\nbody #alpha\n").unwrap();
         let root_s = root.to_string_lossy().into_owned();
-        let (mut ui, view) = test_ui::open(cx, (900., 640.), |window, cx| TagsView::new(Some(root_s.clone()), window, cx));
+        let (mut ui, view) = test_ui::open(cx, (900., 640.), |window, cx| {
+            TagsView::new(Some(root_s.clone()), window, cx)
+        });
         let events: Rc<RefCell<Vec<ViewEvent>>> = Rc::default();
         let ev = events.clone();
-        cx.update(|cx| cx.subscribe(&view, move |_, e: &ViewEvent, _| ev.borrow_mut().push(e.clone())).detach());
+        cx.update(|cx| {
+            cx.subscribe(&view, move |_, e: &ViewEvent, _| {
+                ev.borrow_mut().push(e.clone())
+            })
+            .detach()
+        });
 
         let v = view.clone();
-        ui.wait("tag index", move |cx| tags(v.read(cx)).is_some()).await;
+        ui.wait("tag index", move |cx| tags(v.read(cx)).is_some())
+            .await;
         let list = cx.update(|cx| tags(view.read(cx)).unwrap());
         assert_eq!(list[0].0, "alpha");
         assert!(list.iter().any(|(t, _)| t == "beta"));
@@ -409,7 +467,10 @@ mod ui_tests {
         cx.update(|cx| assert_eq!(view.read(cx).active(), None));
         {
             let evs = events.borrow();
-            assert!(matches!(evs.last(), Some(ViewEvent::OpenFile { line: None, .. })));
+            assert!(matches!(
+                evs.last(),
+                Some(ViewEvent::OpenFile { line: None, .. })
+            ));
         }
 
         // `selectedTag` from elsewhere; re-applied after the view is hidden.
@@ -417,15 +478,25 @@ mod ui_tests {
         cx.update(|cx| assert_eq!(view.read(cx).active(), Some("beta")));
         ui.click("tag-chip:0");
         ui.cx.update(|window, cx| {
-            view.update(cx, |v, cx| crate::workspace::view::MainView::on_hide(v, window, cx));
+            view.update(cx, |v, cx| {
+                crate::workspace::view::MainView::on_hide(v, window, cx)
+            });
             assert_eq!(view.read(cx).active(), Some("beta"));
         });
 
         // fs:file-written triggers a rescan.
         std::fs::write(root.join("c.md"), "#gamma\n").unwrap();
         let path = root.join("c.md").to_string_lossy().into_owned();
-        cx.update(|cx| bus::emit(cx, AppEvent::Core(CoreEvent::FileWritten { path, source: None })));
+        cx.update(|cx| {
+            bus::emit(
+                cx,
+                AppEvent::Core(CoreEvent::FileWritten { path, source: None }),
+            )
+        });
         let v = view.clone();
-        ui.wait("rescan", move |cx| tags(v.read(cx)).is_some_and(|t| t.iter().any(|(t, _)| t == "gamma"))).await;
+        ui.wait("rescan", move |cx| {
+            tags(v.read(cx)).is_some_and(|t| t.iter().any(|(t, _)| t == "gamma"))
+        })
+        .await;
     }
 }

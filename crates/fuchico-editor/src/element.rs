@@ -26,7 +26,7 @@ use crate::images::{IMAGE_PAD, ImageContext, fit};
 
 use crate::display::{DisplayLine, SpanStyle, WidgetKind};
 use crate::style::{EditorStyle, mix};
-use crate::view::{EditorView, EngineKind, InsertCursor, LineNumbers, Overlay};
+use crate::view::{EditorView, EngineKind, InsertCursor, LineNumbers};
 
 /// Something clickable in the last frame.
 #[derive(Debug, Clone)]
@@ -905,16 +905,16 @@ impl EditorView {
                 }
             }
         }
-        if let Overlay::Find(f) = &self.overlay
-            && let (Some(fl0), Some(fl1)) = (lines.first(), lines.last())
-        {
-            let (vs, ve) = (fl0.disp.src.start, fl1.disp.src.end);
-            let start = f.matches.partition_point(|m| m.end < vs);
-            for (k, m) in f.matches.iter().enumerate().skip(start) {
-                if m.start > ve {
-                    break;
-                }
-                let color = st.search_match(k == f.current);
+        // Search matches (`.cm-searchMatch`) and `highlightSelectionMatches`.
+        if let (Some(fl0), Some(fl1)) = (lines.first(), lines.last()) {
+            let vis = fl0.disp.src.start..fl1.disp.src.end;
+            let found = self.search_highlights(vis.clone());
+            let same = self.selection_match_ranges(vis, &found);
+            let marks = found
+                .iter()
+                .map(|(m, sel)| (m.clone(), st.search_match(*sel)))
+                .chain(same.into_iter().map(|m| (m, st.selection_match())));
+            for (m, color) in marks {
                 for fl in lines.iter().filter(|fl| {
                     !fl.table && fl.disp.src.start <= m.end && m.start <= fl.disp.src.end
                 }) {

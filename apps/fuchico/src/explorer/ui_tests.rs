@@ -10,9 +10,9 @@ use std::time::Duration;
 
 use fuchico_core::events::CoreEvent;
 use gpui_kit::{
-    AnyWindowHandle, App, AppContext, Bounds, Entity, ExternalPaths, FileDropEvent, Modifiers, MouseButton,
-    MouseDownEvent, MouseUpEvent, Pixels, Point, TestAppContext, VisualTestContext, WindowBounds, WindowOptions,
-    px, size,
+    AnyWindowHandle, App, AppContext, Bounds, Entity, ExternalPaths, FileDropEvent, Modifiers,
+    MouseButton, MouseDownEvent, MouseUpEvent, Pixels, Point, TestAppContext, VisualTestContext,
+    WindowBounds, WindowOptions, px, size,
 };
 
 use super::Explorer;
@@ -21,8 +21,14 @@ use crate::settings::ui_state::UiState;
 use crate::workspace::Workspace;
 
 fn temp_vault() -> PathBuf {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let dir = std::env::temp_dir().join(format!("fuchico-explorer-test-{}-{nanos}", std::process::id()));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!(
+        "fuchico-explorer-test-{}-{nanos}",
+        std::process::id()
+    ));
     std::fs::create_dir_all(dir.join("a")).unwrap();
     std::fs::create_dir_all(dir.join("b")).unwrap();
     std::fs::write(dir.join("a/x.md"), "x\n").unwrap();
@@ -77,20 +83,38 @@ impl Ui {
     }
 
     fn names(&mut self) -> Vec<String> {
-        self.ex(|e| e.entries().iter().map(|p| super::tree::basename(p).to_string()).collect())
+        self.ex(|e| {
+            e.entries()
+                .iter()
+                .map(|p| super::tree::basename(p).to_string())
+                .collect()
+        })
     }
 
     fn selected(&mut self) -> Vec<String> {
-        self.ex(|e| e.sel.paths.iter().map(|p| super::tree::basename(p).to_string()).collect())
+        self.ex(|e| {
+            e.sel
+                .paths
+                .iter()
+                .map(|p| super::tree::basename(p).to_string())
+                .collect()
+        })
     }
 
     fn focused(&mut self) -> Option<String> {
-        self.ex(|e| e.sel.focus.as_deref().map(|p| super::tree::basename(p).to_string()))
+        self.ex(|e| {
+            e.sel
+                .focus
+                .as_deref()
+                .map(|p| super::tree::basename(p).to_string())
+        })
     }
 
     fn bounds(&mut self, sel: &str) -> Bounds<Pixels> {
         self.frame();
-        self.cx.debug_bounds(sel.to_string().leak()).unwrap_or_else(|| panic!("no element {sel}"))
+        self.cx
+            .debug_bounds(sel.to_string().leak())
+            .unwrap_or_else(|| panic!("no element {sel}"))
     }
 
     fn row(&mut self, name: &str) -> Point<Pixels> {
@@ -106,7 +130,8 @@ impl Ui {
 
     fn focus_explorer(&mut self) {
         let ex = self.ex.clone();
-        self.cx.update(|window, cx| window.focus(&ex.read(cx).focus.clone(), cx));
+        self.cx
+            .update(|window, cx| window.focus(&ex.read(cx).focus.clone(), cx));
         self.settle();
     }
 
@@ -146,25 +171,42 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
         UiState::set_last_root(cx, None);
     });
     let (handle, ws): (AnyWindowHandle, Entity<Workspace>) = cx.update(|cx| {
-        let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
+        let bounds = Bounds {
+            origin: Point::default(),
+            size: size(px(1200.), px(800.)),
+        };
         gpui_kit::open_window(
-            WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() },
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                ..Default::default()
+            },
             cx,
             |window, cx| cx.new(|cx| Workspace::new(window, cx)),
         )
         .expect("open test window")
     });
     let ex = cx.update(|cx| ws.read(cx).explorer().clone());
-    let mut ui = Ui { cx: VisualTestContext::from_window(handle, cx), ws: ws.clone(), ex, root: root.clone() };
+    let mut ui = Ui {
+        cx: VisualTestContext::from_window(handle, cx),
+        ws: ws.clone(),
+        ex,
+        root: root.clone(),
+    };
     ui.settle();
-    ui.cx.update(|window, cx| ws.update(cx, |ws, cx| ws.set_root(Some(root.clone()), window, cx)));
+    ui.cx
+        .update(|window, cx| ws.update(cx, |ws, cx| ws.set_root(Some(root.clone()), window, cx)));
     ui.wait("root listing", |ui| ui.names().len() == 6).await;
-    assert_eq!(ui.names(), ["a", "b", "apple.md", "avocado.md", "beta.md", "zeta.md"], "folders first");
+    assert_eq!(
+        ui.names(),
+        ["a", "b", "apple.md", "avocado.md", "beta.md", "zeta.md"],
+        "folders first"
+    );
 
     // --- Click a folder: select + expand (lazy load), focus the tree ----------
     let at = ui.row("a");
     ui.click(at, Modifiers::none());
-    ui.wait("a expanded", |ui| ui.names().contains(&"x.md".to_string())).await;
+    ui.wait("a expanded", |ui| ui.names().contains(&"x.md".to_string()))
+        .await;
     assert_eq!(ui.selected(), ["a"]);
     let a = ui.p("a");
     assert!(ui.ex(|e| e.expanded.contains(&a)));
@@ -174,9 +216,17 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     assert_eq!(ui.selected(), ["x.md"]);
     ui.press("shift-down");
     ui.press("shift-down");
-    assert_eq!(ui.selected(), ["x.md", "b", "apple.md"], "shift extends from the anchor");
+    assert_eq!(
+        ui.selected(),
+        ["x.md", "b", "apple.md"],
+        "shift extends from the anchor"
+    );
     ui.press("up");
-    assert_eq!(ui.selected(), ["b"], "plain arrow collapses to a single selection");
+    assert_eq!(
+        ui.selected(),
+        ["b"],
+        "plain arrow collapses to a single selection"
+    );
     ui.press("cmd-a");
     assert_eq!(ui.selected().len(), 7);
     // Left on a top-level entry does nothing; on x.md it moves the cursor only.
@@ -184,18 +234,36 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     ui.press("up");
     assert_eq!(ui.focused().as_deref(), Some("a"));
     ui.press("left");
-    assert!(!ui.names().contains(&"x.md".to_string()), "left collapses an expanded folder");
+    assert!(
+        !ui.names().contains(&"x.md".to_string()),
+        "left collapses an expanded folder"
+    );
     ui.press("right");
-    ui.wait("right expands", |ui| ui.names().contains(&"x.md".to_string())).await;
+    ui.wait("right expands", |ui| {
+        ui.names().contains(&"x.md".to_string())
+    })
+    .await;
     ui.press("right");
-    assert_eq!(ui.focused().as_deref(), Some("x.md"), "right on an expanded folder moves to the first child");
+    assert_eq!(
+        ui.focused().as_deref(),
+        Some("x.md"),
+        "right on an expanded folder moves to the first child"
+    );
     ui.press("left");
-    assert_eq!(ui.focused().as_deref(), Some("a"), "left on a file moves the cursor to the parent");
+    assert_eq!(
+        ui.focused().as_deref(),
+        Some("a"),
+        "left on a file moves the cursor to the parent"
+    );
     assert_eq!(ui.selected(), ["x.md"], "quirk: the highlight stays");
 
     // --- Type-ahead ------------------------------------------------------------
     ui.press("a");
-    assert_eq!(ui.selected(), ["apple.md"], "single letter searches after the cursor");
+    assert_eq!(
+        ui.selected(),
+        ["apple.md"],
+        "single letter searches after the cursor"
+    );
     ui.press("a");
     assert_eq!(ui.selected(), ["avocado.md"], "repeating the letter cycles");
     ui.press("z");
@@ -219,14 +287,22 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     let moved = ui.p("b/zeta.md");
     ui.wait("paste moved zeta into b", |_| exists(&moved)).await;
     assert!(!exists(&ui.p("zeta.md")));
-    ui.wait("zeta row gone", |ui| !ui.names().contains(&"zeta.md".to_string())).await;
+    ui.wait("zeta row gone", |ui| {
+        !ui.names().contains(&"zeta.md".to_string())
+    })
+    .await;
     assert!(ui.ex(|e| e.cut.is_empty()));
 
     // --- Active file auto-select + rename (F2) with tab sync -------------------
     let beta = ui.p("beta.md");
-    ui.cx.update(|window, cx| ws.update(cx, |ws, cx| ws.open_file(beta.clone(), None, window, cx)));
+    ui.cx
+        .update(|window, cx| ws.update(cx, |ws, cx| ws.open_file(beta.clone(), None, window, cx)));
     ui.settle();
-    assert_eq!(ui.selected(), ["beta.md"], "the active tab's file is auto-selected");
+    assert_eq!(
+        ui.selected(),
+        ["beta.md"],
+        "the active tab's file is auto-selected"
+    );
     ui.focus_explorer();
     ui.press("f2");
     assert!(ui.ex(|e| e.renaming.is_some() && e.input.is_some()));
@@ -235,7 +311,10 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     ui.press("enter");
     let gamma = ui.p("gamma.md");
     ui.wait("renamed on disk", |_| exists(&gamma)).await;
-    ui.wait("tab follows the rename", |ui| ui.ws(|ws, _| ws.tabs().active.clone()) == Some(gamma.clone())).await;
+    ui.wait("tab follows the rename", |ui| {
+        ui.ws(|ws, _| ws.tabs().active.clone()) == Some(gamma.clone())
+    })
+    .await;
     assert!(ui.ex(|e| e.input.is_none() && e.renaming.is_none()));
 
     // --- Header: new file (no extension added), new drawing, escape cancels ---
@@ -246,36 +325,55 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     ui.press("enter");
     let todo = ui.p("todo");
     ui.wait("new file created", |_| exists(&todo)).await;
-    ui.wait("new file row", |ui| ui.names().contains(&"todo".to_string())).await;
+    ui.wait("new file row", |ui| {
+        ui.names().contains(&"todo".to_string())
+    })
+    .await;
 
     let at = ui.bounds("ex-new-drawing").center();
     ui.click(at, Modifiers::none());
     ui.type_text("sketch");
     ui.press("enter");
     let sketch = ui.p("sketch.excalidraw");
-    ui.wait("drawing created", |_| std::fs::metadata(&sketch).is_ok_and(|m| m.len() > 0)).await;
+    ui.wait("drawing created", |_| {
+        std::fs::metadata(&sketch).is_ok_and(|m| m.len() > 0)
+    })
+    .await;
     let scene = std::fs::read_to_string(&sketch).unwrap();
-    assert_eq!(scene, crate::excalidraw::drawing_template(), "new drawing is the excalidraw template");
+    assert_eq!(
+        scene,
+        crate::excalidraw::drawing_template(),
+        "new drawing is the excalidraw template"
+    );
 
     let at = ui.bounds("ex-new-folder").center();
     ui.click(at, Modifiers::none());
     ui.type_text("never");
     ui.press("escape");
-    assert!(ui.ex(|e| e.pending.is_none() && e.input.is_none()), "escape cancels the create");
+    assert!(
+        ui.ex(|e| e.pending.is_none() && e.input.is_none()),
+        "escape cancels the create"
+    );
     ui.settle();
     assert!(!exists(&ui.p("never")));
 
     // Create inside a folder from the context-menu action: expands the parent.
     let b = ui.p("b");
     ui.cx.update(|window, cx| {
-        ui.ex.update(cx, |e, cx| e.begin_create(b.clone(), super::PendingKind::Dir, None, None, window, cx))
+        ui.ex.update(cx, |e, cx| {
+            e.begin_create(b.clone(), super::PendingKind::Dir, None, None, window, cx)
+        })
     });
     ui.settle();
     ui.type_text("inner");
     ui.press("enter");
     let inner = ui.p("b/inner");
-    ui.wait("folder created inside b", |_| Path::new(&inner).is_dir()).await;
-    ui.wait("b expanded with inner", |ui| ui.names().contains(&"inner".to_string())).await;
+    ui.wait("folder created inside b", |_| Path::new(&inner).is_dir())
+        .await;
+    ui.wait("b expanded with inner", |ui| {
+        ui.names().contains(&"inner".to_string())
+    })
+    .await;
 
     // --- Double-click starts the rename ----------------------------------------
     let at = ui.row("todo");
@@ -296,7 +394,11 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
         });
         ui.settle();
     }
-    assert_eq!(ui.ex(|e| e.renaming.clone()), Some(ui.p("todo")), "double-click renames");
+    assert_eq!(
+        ui.ex(|e| e.renaming.clone()),
+        Some(ui.p("todo")),
+        "double-click renames"
+    );
     ui.press("escape");
     assert!(ui.ex(|e| e.renaming.is_none()));
 
@@ -306,35 +408,66 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     ui.click(at, Modifiers::secondary_key());
     let at = ui.row("avocado.md");
     ui.click(at, Modifiers::secondary_key());
-    assert!(ui.selected().contains(&"apple.md".to_string()) && ui.selected().contains(&"avocado.md".to_string()));
+    assert!(
+        ui.selected().contains(&"apple.md".to_string())
+            && ui.selected().contains(&"avocado.md".to_string())
+    );
     let at = ui.row("todo");
     ui.click(at, Modifiers::shift());
     let sel = ui.selected();
-    assert!(sel.len() >= 2 && sel.contains(&"todo".to_string()), "shift-click range: {sel:?}");
+    assert!(
+        sel.len() >= 2 && sel.contains(&"todo".to_string()),
+        "shift-click range: {sel:?}"
+    );
     // Right-click inside the selection keeps it; menu targets the whole selection.
     let apple = ui.p("apple.md");
     let avocado = ui.p("avocado.md");
     let at = ui.row("avocado.md");
     ui.click(at, Modifiers::none());
-    ui.cx.update(|_, cx| ui.ex.update(cx, |e, cx| {
-        e.sel.select(&apple, false, true, &e.entries());
-        cx.notify()
-    }));
+    ui.cx.update(|_, cx| {
+        ui.ex.update(cx, |e, cx| {
+            e.sel.select(&apple, false, true, &e.entries());
+            cx.notify()
+        })
+    });
     ui.settle();
     assert_eq!(ui.selected(), ["avocado.md", "apple.md"]);
     let entry = ui.ex(|e| e.entry_at(&avocado).unwrap().1.clone());
     let labels: Vec<String> = ui.cx.update(|_, cx| {
-        ui.ex.update(cx, |e, cx| e.row_menu(&entry, cx)).into_iter().map(menu_label).collect()
+        ui.ex
+            .update(cx, |e, cx| e.row_menu(&entry, cx))
+            .into_iter()
+            .map(menu_label)
+            .collect()
     });
     assert_eq!(
         labels,
-        ["Open in new window", "Rename", "Cut 2 items", "-", "Reveal in file manager", "Open with default app", "Copy 2 paths", "-", "Delete 2 items"]
+        [
+            "Open in new window",
+            "Rename",
+            "Cut 2 items",
+            "-",
+            "Reveal in file manager",
+            "Open with default app",
+            "Copy 2 paths",
+            "-",
+            "Delete 2 items"
+        ]
     );
     let folder = ui.ex(|e| e.entry_at(&b).unwrap().1.clone());
-    ui.cx.update(|_, cx| ui.ex.update(cx, |e, _| e.cut = vec![apple.clone()]));
-    let labels: Vec<String> =
-        ui.cx.update(|_, cx| ui.ex.update(cx, |e, cx| e.row_menu(&folder, cx)).into_iter().map(menu_label).collect());
-    assert_eq!(labels[..5], ["New file", "New folder", "New drawing", "-", "Rename"]);
+    ui.cx
+        .update(|_, cx| ui.ex.update(cx, |e, _| e.cut = vec![apple.clone()]));
+    let labels: Vec<String> = ui.cx.update(|_, cx| {
+        ui.ex
+            .update(cx, |e, cx| e.row_menu(&folder, cx))
+            .into_iter()
+            .map(menu_label)
+            .collect()
+    });
+    assert_eq!(
+        labels[..5],
+        ["New file", "New folder", "New drawing", "-", "Rename"]
+    );
     assert!(labels.contains(&"Paste apple.md here".to_string()));
     ui.cx.update(|_, cx| ui.ex.update(cx, |e, _| e.cut.clear()));
 
@@ -346,18 +479,35 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     let from = ui.row("apple.md");
     let to = ui.row("b");
     ui.cx.simulate_mouse_move(from, None, Modifiers::none());
-    ui.cx.simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
-    ui.cx.simulate_mouse_move(from + Point::new(px(0.), px(10.)), MouseButton::Left, Modifiers::none());
+    ui.cx
+        .simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
+    ui.cx.simulate_mouse_move(
+        from + Point::new(px(0.), px(10.)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
     ui.settle();
-    ui.cx.simulate_mouse_move(to, MouseButton::Left, Modifiers::none());
+    ui.cx
+        .simulate_mouse_move(to, MouseButton::Left, Modifiers::none());
     ui.settle();
-    assert_eq!(ui.ex(|e| e.drop_target.clone()), Some(b.clone()), "folder row is the drop target");
-    ui.cx.executor().advance_clock(Duration::from_millis(super::tree::DROP_EXPAND_MS + 50));
+    assert_eq!(
+        ui.ex(|e| e.drop_target.clone()),
+        Some(b.clone()),
+        "folder row is the drop target"
+    );
+    ui.cx
+        .executor()
+        .advance_clock(Duration::from_millis(super::tree::DROP_EXPAND_MS + 50));
     ui.settle();
-    assert!(ui.ex(|e| e.expanded.contains(&b)), "spring-loaded folder opened");
+    assert!(
+        ui.ex(|e| e.expanded.contains(&b)),
+        "spring-loaded folder opened"
+    );
     let to = ui.row("b");
-    ui.cx.simulate_mouse_move(to, MouseButton::Left, Modifiers::none());
-    ui.cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+    ui.cx
+        .simulate_mouse_move(to, MouseButton::Left, Modifiers::none());
+    ui.cx
+        .simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
     ui.settle();
     let moved = ui.p("b/apple.md");
     ui.wait("drag moved apple into b", |_| exists(&moved)).await;
@@ -367,42 +517,80 @@ async fn explorer_end_to_end(cx: &mut TestAppContext) {
     let from = ui.row("apple.md");
     let header = ui.bounds("ex-header").center();
     ui.cx.simulate_mouse_move(from, None, Modifiers::none());
-    ui.cx.simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
-    ui.cx.simulate_mouse_move(from + Point::new(px(0.), px(10.)), MouseButton::Left, Modifiers::none());
+    ui.cx
+        .simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
+    ui.cx.simulate_mouse_move(
+        from + Point::new(px(0.), px(10.)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
     ui.settle();
-    ui.cx.simulate_mouse_move(header, MouseButton::Left, Modifiers::none());
+    ui.cx
+        .simulate_mouse_move(header, MouseButton::Left, Modifiers::none());
     ui.settle();
-    assert_eq!(ui.ex(|e| e.drop_target.clone()), Some(root.clone()), "header targets the root");
-    ui.cx.simulate_mouse_up(header, MouseButton::Left, Modifiers::none());
+    assert_eq!(
+        ui.ex(|e| e.drop_target.clone()),
+        Some(root.clone()),
+        "header targets the root"
+    );
+    ui.cx
+        .simulate_mouse_up(header, MouseButton::Left, Modifiers::none());
     ui.settle();
     let back = ui.p("apple.md");
-    ui.wait("drag to header moved apple to the root", |_| exists(&back)).await;
+    ui.wait("drag to header moved apple to the root", |_| exists(&back))
+        .await;
 
     // --- Finder import (ExternalPaths) onto a folder row ------------------------
-    let outside = std::env::temp_dir().join(format!("fuchico-ex-import-{}.png", std::process::id()));
+    let outside =
+        std::env::temp_dir().join(format!("fuchico-ex-import-{}.png", std::process::id()));
     std::fs::write(&outside, b"png").unwrap();
     let target = ui.row("a");
-    ui.cx.simulate_event(FileDropEvent::Entered { position: target, paths: ExternalPaths(vec![outside.clone()].into()) });
-    ui.cx.simulate_event(FileDropEvent::Pending { position: target });
+    ui.cx.simulate_event(FileDropEvent::Entered {
+        position: target,
+        paths: ExternalPaths(vec![outside.clone()].into()),
+    });
+    ui.cx
+        .simulate_event(FileDropEvent::Pending { position: target });
     ui.settle();
     assert_eq!(ui.ex(|e| e.drop_target.clone()), Some(ui.p("a")));
-    ui.cx.simulate_event(FileDropEvent::Submit { position: target });
+    ui.cx
+        .simulate_event(FileDropEvent::Submit { position: target });
     ui.settle();
     let name = outside.file_name().unwrap().to_string_lossy().to_string();
     let imported = ui.p(&format!("a/{name}"));
     ui.wait("imported into a", |_| exists(&imported)).await;
-    ui.wait("notice", |ui| ui.ex(|e| e.notice.clone()).is_some()).await;
-    assert_eq!(ui.ex(|e| e.notice.clone()), Some(("Imported 1 file into a".to_string(), false)));
-    assert!(exists(outside.to_str().unwrap()), "import copies, the source stays");
-    ui.cx.executor().advance_clock(Duration::from_millis(super::tree::NOTICE_MS + 10));
+    ui.wait("notice", |ui| ui.ex(|e| e.notice.clone()).is_some())
+        .await;
+    assert_eq!(
+        ui.ex(|e| e.notice.clone()),
+        Some(("Imported 1 file into a".to_string(), false))
+    );
+    assert!(
+        exists(outside.to_str().unwrap()),
+        "import copies, the source stays"
+    );
+    ui.cx
+        .executor()
+        .advance_clock(Duration::from_millis(super::tree::NOTICE_MS + 10));
     ui.settle();
     assert!(ui.ex(|e| e.notice.is_none()), "notice clears after 4s");
     std::fs::remove_file(&outside).ok();
 
     // --- fs:changed from the bus refreshes a loaded folder --------------------
     std::fs::write(vault.join("external.md"), "x").unwrap();
-    ui.cx.update(|_, cx| crate::bus::emit(cx, crate::bus::AppEvent::Core(CoreEvent::FsChanged { dir: root.clone(), from: None })));
-    ui.wait("external file appears", |ui| ui.names().contains(&"external.md".to_string())).await;
+    ui.cx.update(|_, cx| {
+        crate::bus::emit(
+            cx,
+            crate::bus::AppEvent::Core(CoreEvent::FsChanged {
+                dir: root.clone(),
+                from: None,
+            }),
+        )
+    });
+    ui.wait("external file appears", |ui| {
+        ui.names().contains(&"external.md".to_string())
+    })
+    .await;
 
     // --- Delete with confirmation (Backspace → dialog → OK) --------------------
     ui.focus_explorer();

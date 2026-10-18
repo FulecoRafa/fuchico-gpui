@@ -160,7 +160,6 @@ pub fn fs_stat(path: String) -> Result<FileStat, String> {
     })
 }
 
-
 /// Writes raw bytes (base64-encoded over IPC) — used for pasted/dropped
 /// image attachments. Creates the parent directory as needed and refuses to
 /// overwrite an existing file so attachments are never clobbered.
@@ -279,7 +278,10 @@ mod tests {
             _ => panic!("expected toolarge"),
         }
         let json = serde_json::to_value(fs_read_file(s(&f)).unwrap()).unwrap();
-        assert_eq!(json, serde_json::json!({"kind": "toolarge", "size": 10_485_761u64, "limit": 10_485_760u64}));
+        assert_eq!(
+            json,
+            serde_json::json!({"kind": "toolarge", "size": 10_485_761u64, "limit": 10_485_760u64})
+        );
     }
 
     #[test]
@@ -289,7 +291,9 @@ mod tests {
         let file = std::fs::File::create(&f).unwrap();
         file.set_len(MAX_READ_BYTES).unwrap();
         // All NULs, so it is read and classified as binary (not toolarge).
-        assert!(matches!(fs_read_file(s(&f)).unwrap(), ReadResult::Binary { size } if size == MAX_READ_BYTES));
+        assert!(
+            matches!(fs_read_file(s(&f)).unwrap(), ReadResult::Binary { size } if size == MAX_READ_BYTES)
+        );
     }
 
     #[test]
@@ -305,7 +309,10 @@ mod tests {
         let f = dir.path().join("a.md");
         std::fs::write(&f, "hi").unwrap();
         let json = serde_json::to_value(fs_read_file(s(&f)).unwrap()).unwrap();
-        assert_eq!(json, serde_json::json!({"kind": "text", "content": "hi", "size": 2}));
+        assert_eq!(
+            json,
+            serde_json::json!({"kind": "text", "content": "hi", "size": 2})
+        );
     }
 
     #[test]
@@ -315,13 +322,22 @@ mod tests {
         let (tx, rx) = crossbeam_channel::unbounded();
         fs_write_file(s(&f), "body".into(), Some("editor".into()), &tx).unwrap();
         assert_eq!(std::fs::read_to_string(&f).unwrap(), "body");
-        assert_eq!(rx.try_recv().unwrap(), CoreEvent::FileWritten { path: s(&f), source: Some("editor".into()) });
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            CoreEvent::FileWritten {
+                path: s(&f),
+                source: Some("editor".into())
+            }
+        );
         assert!(rx.try_recv().is_err());
 
         // No source -> omitted from the payload.
         fs_write_file(s(&f), "again".into(), None, &tx).unwrap();
         let ev = rx.try_recv().unwrap();
-        assert_eq!(serde_json::to_value(&ev).unwrap(), serde_json::json!({"path": s(&f)}));
+        assert_eq!(
+            serde_json::to_value(&ev).unwrap(),
+            serde_json::json!({"path": s(&f)})
+        );
     }
 
     #[test]
@@ -343,11 +359,17 @@ mod tests {
         std::fs::write(&f, "old").unwrap();
         std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).unwrap();
         fs_write_file(s(&f), "new".into(), None, &NullSink).unwrap();
-        assert_eq!(std::fs::metadata(&f).unwrap().permissions().mode() & 0o777, 0o644);
+        assert_eq!(
+            std::fs::metadata(&f).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
 
         let fresh = dir.path().join("fresh.md");
         fs_write_file(s(&fresh), "x".into(), None, &NullSink).unwrap();
-        assert_eq!(std::fs::metadata(&fresh).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            std::fs::metadata(&fresh).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
     }
 
     #[test]
@@ -358,7 +380,11 @@ mod tests {
         let st = fs_stat(s(&f)).unwrap();
         assert!(matches!(st.kind, StatKind::File));
         assert_eq!(st.size, 5);
-        assert!(st.mtime > 1_600_000_000_000, "mtime is ms since epoch: {}", st.mtime);
+        assert!(
+            st.mtime > 1_600_000_000_000,
+            "mtime is ms since epoch: {}",
+            st.mtime
+        );
 
         let d = fs_stat(s(dir.path())).unwrap();
         assert!(matches!(d.kind, StatKind::Dir));
@@ -400,7 +426,11 @@ mod tests {
         assert!(err.starts_with("invalid base64: "), "{err}");
         assert!(!bad.exists());
         // STANDARD alphabet requires padding.
-        assert!(fs_write_binary(s(&bad), "AAEC/w".into()).unwrap_err().starts_with("invalid base64: "));
+        assert!(
+            fs_write_binary(s(&bad), "AAEC/w".into())
+                .unwrap_err()
+                .starts_with("invalid base64: ")
+        );
     }
 
     #[cfg(unix)]
@@ -410,7 +440,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let f = dir.path().join("img.png");
         fs_write_binary(s(&f), "AA==".into()).unwrap();
-        assert_eq!(std::fs::metadata(&f).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            std::fs::metadata(&f).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
     }
 
     #[cfg(unix)]

@@ -42,7 +42,11 @@ fn trim_end(text: &str, r: Range<usize>) -> Range<usize> {
 }
 
 fn run_len(text: &str, at: usize, ch: u8, max: usize) -> usize {
-    text.as_bytes()[at.min(text.len())..].iter().take(max).take_while(|c| **c == ch).count()
+    text.as_bytes()[at.min(text.len())..]
+        .iter()
+        .take(max)
+        .take_while(|c| **c == ch)
+        .count()
 }
 
 fn line_ranges(text: &str, r: Range<usize>) -> Vec<Range<usize>> {
@@ -76,14 +80,20 @@ impl Spans<'_> {
 enum Open {
     Block(&'static str, Range<usize>),
     Inline(&'static str, Range<usize>, usize),
-    Code { range: Range<usize>, body: Option<Range<usize>> },
+    Code {
+        range: Range<usize>,
+        body: Option<Range<usize>>,
+    },
     Item,
 }
 
 impl SyntaxTree {
     /// Parses `text` (frontmatter becomes one `Frontmatter` node).
     pub fn parse(text: &str) -> Self {
-        let mut s = Spans { text, spans: Vec::new() };
+        let mut s = Spans {
+            text,
+            spans: Vec::new(),
+        };
         let mut cut = text.len().min(20_000);
         while !text.is_char_boundary(cut) {
             cut -= 1;
@@ -100,8 +110,12 @@ impl SyntaxTree {
     fn build(len: usize, mut spans: Vec<(&'static str, Range<usize>)>) -> Self {
         // Stable: equal ranges keep their (outer-first) emission order.
         spans.sort_by(|a, b| a.1.start.cmp(&b.1.start).then(b.1.end.cmp(&a.1.end)));
-        let mut nodes =
-            vec![TreeNode { name: "Document", range: 0..len, parent: None, children: Vec::new() }];
+        let mut nodes = vec![TreeNode {
+            name: "Document",
+            range: 0..len,
+            parent: None,
+            children: Vec::new(),
+        }];
         let mut stack = vec![0usize];
         for (name, r) in spans {
             while stack.len() > 1 {
@@ -113,7 +127,12 @@ impl SyntaxTree {
             }
             let parent = *stack.last().unwrap();
             let id = nodes.len();
-            nodes.push(TreeNode { name, range: r, parent: Some(parent), children: Vec::new() });
+            nodes.push(TreeNode {
+                name,
+                range: r,
+                parent: Some(parent),
+                children: Vec::new(),
+            });
             nodes[parent].children.push(id);
             stack.push(id);
         }
@@ -177,7 +196,11 @@ impl SyntaxTree {
             let Some(p) = n.parent else { continue };
             let sibs = &self.nodes[p].children;
             let i = sibs.iter().position(|c| *c == id)?;
-            let j = if forward { sibs.get(i + 1) } else { i.checked_sub(1).and_then(|k| sibs.get(k)) };
+            let j = if forward {
+                sibs.get(i + 1)
+            } else {
+                i.checked_sub(1).and_then(|k| sibs.get(k))
+            };
             if let Some(&j) = j {
                 return Some(self.nodes[j].range.clone());
             }
@@ -239,7 +262,11 @@ fn body(s: &mut Spans, off: usize) {
     let mut tight: Option<Range<usize>> = None;
     let mut quote_depth = 0usize;
 
-    let inline_depth = |open: &[Open]| open.iter().filter(|o| matches!(o, Open::Inline(..))).count();
+    let inline_depth = |open: &[Open]| {
+        open.iter()
+            .filter(|o| matches!(o, Open::Inline(..)))
+            .count()
+    };
     let close_tight = |s: &mut Spans, tight: &mut Option<Range<usize>>| {
         if let Some(r) = tight.take() {
             s.add("Paragraph", trim_end(s.text, r));
@@ -327,11 +354,19 @@ fn body(s: &mut Spans, off: usize) {
                         }
                         open.push(Open::Block("Blockquote", tr));
                     }
-                    Tag::List(start) => {
-                        open.push(Open::Block(if start.is_some() { "OrderedList" } else { "BulletList" }, tr))
-                    }
+                    Tag::List(start) => open.push(Open::Block(
+                        if start.is_some() {
+                            "OrderedList"
+                        } else {
+                            "BulletList"
+                        },
+                        tr,
+                    )),
                     Tag::Item => {
-                        let n = text[tr.clone()].bytes().take_while(|c| !c.is_ascii_whitespace()).count();
+                        let n = text[tr.clone()]
+                            .bytes()
+                            .take_while(|c| !c.is_ascii_whitespace())
+                            .count();
                         s.add("ListMark", tr.start..tr.start + n);
                         s.add("ListItem", tr);
                         open.push(Open::Item);
@@ -340,7 +375,8 @@ fn body(s: &mut Spans, off: usize) {
                         if let CodeBlockKind::Fenced(_) = kind {
                             let lines = line_ranges(text, tr.clone());
                             let first = lines[0].clone();
-                            let lead = text[first.clone()].len() - text[first.clone()].trim_start().len();
+                            let lead =
+                                text[first.clone()].len() - text[first.clone()].trim_start().len();
                             let at = first.start + lead;
                             let ch = text.as_bytes().get(at).copied().unwrap_or(b'`');
                             let n = run_len(text, at, ch, usize::MAX);
@@ -358,9 +394,15 @@ fn body(s: &mut Spans, off: usize) {
                                     s.add("CodeMark", i..i + lt.len());
                                 }
                             }
-                            open.push(Open::Code { range: tr, body: None });
+                            open.push(Open::Code {
+                                range: tr,
+                                body: None,
+                            });
                         } else {
-                            open.push(Open::Code { range: tr, body: None });
+                            open.push(Open::Code {
+                                range: tr,
+                                body: None,
+                            });
                         }
                     }
                     Tag::HtmlBlock => open.push(Open::Block("HTMLBlock", tr)),
@@ -410,7 +452,9 @@ fn body(s: &mut Spans, off: usize) {
                             let cells: Vec<Range<usize>> = s
                                 .spans
                                 .iter()
-                                .filter(|(n, c)| *n == "TableCell" && c.start >= r.start && c.end <= r.end)
+                                .filter(|(n, c)| {
+                                    *n == "TableCell" && c.start >= r.start && c.end <= r.end
+                                })
                                 .map(|(_, c)| c.clone())
                                 .collect();
                             for (i, c) in text[r.clone()].bytes().enumerate() {
@@ -425,14 +469,22 @@ fn body(s: &mut Spans, off: usize) {
                         }
                     }
                     Some(Open::Inline(name, r, children_end)) => {
-                        inline_marks(s, if name == "Autolink" { "Link" } else { name }, &r, children_end);
+                        inline_marks(
+                            s,
+                            if name == "Autolink" { "Link" } else { name },
+                            &r,
+                            children_end,
+                        );
                         s.add(name, r);
                     }
                     Some(Open::Code { range, body }) => {
                         if let Some(b) = body {
                             s.add("CodeText", trim_end(text, b));
                         }
-                        let fenced = s.spans.iter().any(|(n, c)| *n == "CodeMark" && c.start == range.start)
+                        let fenced = s
+                            .spans
+                            .iter()
+                            .any(|(n, c)| *n == "CodeMark" && c.start == range.start)
                             || text[range.clone()].trim_start().starts_with(['`', '~']);
                         s.add(if fenced { "FencedCode" } else { "CodeBlock" }, range);
                     }
@@ -486,10 +538,25 @@ mod tests {
         let src = "# Title *x*\n\n- a **b** [l](u)\n- c\n";
         let t = SyntaxTree::parse(src);
         let at = |s: &str| src.find(s).unwrap();
-        assert_eq!(names(&t, src, at("x")), ["Emphasis:*x*", "ATXHeading:# Title *x*", &("Document:".to_string() + src)]);
+        assert_eq!(
+            names(&t, src, at("x")),
+            [
+                "Emphasis:*x*",
+                "ATXHeading:# Title *x*",
+                &("Document:".to_string() + src)
+            ]
+        );
         assert_eq!(names(&t, src, 0)[0], "HeaderMark:#");
         let b = names(&t, src, at("b"));
-        assert_eq!(&b[..4], ["StrongEmphasis:**b**", "Paragraph:a **b** [l](u)", "ListItem:- a **b** [l](u)", "BulletList:- a **b** [l](u)\n- c"]);
+        assert_eq!(
+            &b[..4],
+            [
+                "StrongEmphasis:**b**",
+                "Paragraph:a **b** [l](u)",
+                "ListItem:- a **b** [l](u)",
+                "BulletList:- a **b** [l](u)\n- c"
+            ]
+        );
         assert_eq!(names(&t, src, at("u)"))[0], "URL:u");
         assert_eq!(names(&t, src, at("- c"))[0], "ListMark:-");
     }
@@ -522,9 +589,15 @@ mod tests {
         let src = "```rust\nfn x() {}\n```\n\n| a | b |\n| - | - |\n| 1 | 2 |\n";
         let t = SyntaxTree::parse(src);
         let at = |s: &str| src.find(s).unwrap();
-        assert_eq!(&names(&t, src, at("fn"))[..2], ["CodeText:fn x() {}", "FencedCode:```rust\nfn x() {}\n```"]);
+        assert_eq!(
+            &names(&t, src, at("fn"))[..2],
+            ["CodeText:fn x() {}", "FencedCode:```rust\nfn x() {}\n```"]
+        );
         assert_eq!(names(&t, src, at("rust"))[0], "CodeInfo:rust");
-        assert_eq!(names(&t, src, at("2"))[..2], ["TableCell:2".to_string(), "TableRow:| 1 | 2 |".into()]);
+        assert_eq!(
+            names(&t, src, at("2"))[..2],
+            ["TableCell:2".to_string(), "TableRow:| 1 | 2 |".into()]
+        );
         assert_eq!(names(&t, src, at("| a"))[0], "TableDelimiter:|");
     }
 }

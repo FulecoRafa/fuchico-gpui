@@ -24,8 +24,8 @@ use fuchico_core::open_files::{OpenRequestHandlers, route_open_request};
 use fuchico_core::watcher::VaultWatcher;
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    App, Context, Entity, EventEmitter, FocusHandle, Focusable, MouseButton, MouseDownEvent, MouseMoveEvent,
-    PathPromptOptions, Subscription, Window, div, px,
+    App, Context, Entity, EventEmitter, FocusHandle, Focusable, MouseButton, MouseDownEvent,
+    MouseMoveEvent, PathPromptOptions, Subscription, Window, div, px,
 };
 
 use crate::actions::*;
@@ -106,7 +106,9 @@ impl Workspace {
             cx.subscribe_in(&explorer, window, |this, _, ev: &ViewEvent, window, cx| {
                 this.on_view_event(ev, window, cx)
             }),
-            bus::subscribe_in(window, cx, |this, ev, window, cx| this.on_bus(ev, window, cx)),
+            bus::subscribe_in(window, cx, |this, ev, window, cx| {
+                this.on_bus(ev, window, cx)
+            }),
             cx.observe_window_appearance(window, |_, _, cx| crate::theme::apply::refresh(cx)),
         ];
         let focus = cx.focus_handle();
@@ -157,7 +159,9 @@ impl Workspace {
     /// The active tab's editor pane, if it is one.
     #[cfg(test)]
     pub fn active_editor(&self) -> Option<Entity<crate::editor::EditorPane>> {
-        self.pane.as_ref().and_then(|p| p.handle.view().downcast::<crate::editor::EditorPane>().ok())
+        self.pane
+            .as_ref()
+            .and_then(|p| p.handle.view().downcast::<crate::editor::EditorPane>().ok())
     }
 
     /// The `blockKey` of the docked mermaid preview.
@@ -180,7 +184,9 @@ impl Workspace {
     /// until it answers, then drains queued open requests.
     fn restore_vault(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(last) = UiState::get(cx).last_root.clone() else {
-            cx.defer_in(window, |this, window, cx| this.drain_open_requests(window, cx));
+            cx.defer_in(window, |this, window, cx| {
+                this.drain_open_requests(window, cx)
+            });
             return;
         };
         self.restoring = true;
@@ -233,7 +239,8 @@ impl Workspace {
             })
             .detach();
         }
-        self.explorer.update(cx, |e, cx| e.set_root(root.clone(), cx));
+        self.explorer
+            .update(cx, |e, cx| e.set_root(root.clone(), cx));
         fn push<V: MainView>(v: &Option<Entity<V>>, root: &Option<String>, cx: &mut App) {
             if let Some(v) = v {
                 v.update(cx, |v, cx| v.set_root(root.clone(), cx));
@@ -262,7 +269,8 @@ impl Workspace {
                 && let Some(dir) = paths.pop()
             {
                 let dir = dir.to_string_lossy().into_owned();
-                this.update_in(cx, |this, window, cx| this.set_root(Some(dir), window, cx)).ok();
+                this.update_in(cx, |this, window, cx| this.set_root(Some(dir), window, cx))
+                    .ok();
             }
         })
         .detach();
@@ -291,7 +299,13 @@ impl Workspace {
 
     /// `openFile(path, focusLine?)`: open/activate the tab and force the
     /// editor view.
-    pub fn open_file(&mut self, path: String, line: Option<u32>, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_file(
+        &mut self,
+        path: String,
+        line: Option<u32>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.tabs.open(&path, line);
         self.set_view(MainViewKind::Editor, window, cx);
         self.sync_pane(window, cx);
@@ -344,27 +358,42 @@ impl Workspace {
         let current = self.pane.as_ref().map(|p| p.path.clone());
         if active != current {
             self.pane = active.as_ref().map(|path| {
-                let pcx = PaneContext { root: self.root.clone(), ..Default::default() };
-                let handle = open_pane(path, pcx, window, cx, |this: &mut Workspace, ev, window, cx| {
-                    this.on_pane_event(ev, window, cx)
-                });
+                let pcx = PaneContext {
+                    root: self.root.clone(),
+                    ..Default::default()
+                };
+                let handle = open_pane(
+                    path,
+                    pcx,
+                    window,
+                    cx,
+                    |this: &mut Workspace, ev, window, cx| this.on_pane_event(ev, window, cx),
+                );
                 if self.view == MainViewKind::Editor {
                     handle.focus(window, cx);
                 }
-                ActivePane { path: path.clone(), handle }
+                ActivePane {
+                    path: path.clone(),
+                    handle,
+                }
             });
             if self.pane.is_none() {
                 window.focus(&self.focus, cx);
             }
         }
-        self.explorer.update(cx, |e, cx| e.set_active_file(active.clone(), cx));
+        self.explorer
+            .update(cx, |e, cx| e.set_active_file(active.clone(), cx));
         if let Some(Dock::Backlinks(b)) = &self.dock {
-            b.update(cx, |b, cx| b.set_target(backlinks_target(active.as_deref()), cx));
+            b.update(cx, |b, cx| {
+                b.set_target(backlinks_target(active.as_deref()), cx)
+            });
         }
     }
 
     fn on_pane_event(&mut self, ev: &PaneEvent, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(path) = self.pane.as_ref().map(|p| p.path.clone()) else { return };
+        let Some(path) = self.pane.as_ref().map(|p| p.path.clone()) else {
+            return;
+        };
         match ev {
             PaneEvent::DirtyChanged(d) => {
                 if self.tabs.set_dirty(&path, *d) {
@@ -373,10 +402,19 @@ impl Workspace {
             }
             PaneEvent::OpenFile { path, line } => self.open_file(path.clone(), *line, window, cx),
             PaneEvent::OpenTag(tag) => self.open_tag(tag.clone(), window, cx),
-            PaneEvent::OpenMermaid { block_key, initial_text } => {
-                self.open_mermaid(block_key.clone(), crate::t!(AppDiagram), Some(initial_text.clone()), window, cx)
+            PaneEvent::OpenMermaid {
+                block_key,
+                initial_text,
+            } => self.open_mermaid(
+                block_key.clone(),
+                crate::t!(AppDiagram),
+                Some(initial_text.clone()),
+                window,
+                cx,
+            ),
+            PaneEvent::OpenCommandPalette(q) => {
+                palette::open(self, PaletteKind::Commands { query: q.clone() }, window, cx)
             }
-            PaneEvent::OpenCommandPalette(q) => palette::open(self, PaletteKind::Commands { query: q.clone() }, window, cx),
             PaneEvent::Close => self.close_tab(&path, window, cx),
             PaneEvent::QuickOpen => palette::open(self, PaletteKind::QuickOpen, window, cx),
             PaneEvent::CycleTab(delta) => {
@@ -396,7 +434,9 @@ impl Workspace {
     fn on_view_event(&mut self, ev: &ViewEvent, window: &mut Window, cx: &mut Context<Self>) {
         match ev {
             ViewEvent::OpenFile { path, line } => self.open_file(path.clone(), *line, window, cx),
-            ViewEvent::OpenInNewWindow(p) => crate::windows::open_editor_window(p.clone(), self.root.clone(), cx),
+            ViewEvent::OpenInNewWindow(p) => {
+                crate::windows::open_editor_window(p.clone(), self.root.clone(), cx)
+            }
             ViewEvent::OpenFolder => self.open_folder(window, cx),
             ViewEvent::PathRenamed { from, to } => {
                 self.tabs.rename(from, to);
@@ -470,7 +510,9 @@ impl Workspace {
             MainViewKind::Agenda => ensure(&mut self.agenda, root, window, cx, AgendaView::new),
             MainViewKind::Search => ensure(&mut self.search, root, window, cx, SearchView::new),
             MainViewKind::Tags => ensure(&mut self.tags, root, window, cx, TagsView::new),
-            MainViewKind::Settings => ensure(&mut self.settings, root, window, cx, SettingsView::new),
+            MainViewKind::Settings => {
+                ensure(&mut self.settings, root, window, cx, SettingsView::new)
+            }
         };
         self._subs.extend(sub);
         // The search panel autofocuses its query input on mount.
@@ -491,7 +533,12 @@ impl Workspace {
     }
 
     /// Palette `openSettings(section)`.
-    pub fn open_settings(&mut self, section: SettingsSection, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_settings(
+        &mut self,
+        section: SettingsSection,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         UiState::set_settings_section(cx, section);
         self.set_view(MainViewKind::Settings, window, cx);
         if let Some(s) = &self.settings {
@@ -572,14 +619,30 @@ impl Workspace {
 
     fn register_actions<E: InteractiveElement>(&self, el: E, cx: &mut Context<Self>) -> E {
         el.on_action(cx.listener(|this, _: &OpenFolder, w, cx| this.open_folder(w, cx)))
-            .on_action(cx.listener(|this, _: &ShowFiles, w, cx| this.set_view(MainViewKind::Editor, w, cx)))
-            .on_action(cx.listener(|this, _: &ShowAgenda, w, cx| this.set_view(MainViewKind::Agenda, w, cx)))
-            .on_action(cx.listener(|this, _: &ShowSearch, w, cx| this.set_view(MainViewKind::Search, w, cx)))
-            .on_action(cx.listener(|this, _: &ShowTags, w, cx| this.set_view(MainViewKind::Tags, w, cx)))
-            .on_action(cx.listener(|this, _: &ShowSettings, w, cx| this.set_view(MainViewKind::Settings, w, cx)))
             .on_action(
-                cx.listener(|this, _: &ShowShortcuts, w, cx| this.open_settings(SettingsSection::Shortcuts, w, cx)),
+                cx.listener(|this, _: &ShowFiles, w, cx| {
+                    this.set_view(MainViewKind::Editor, w, cx)
+                }),
             )
+            .on_action(
+                cx.listener(|this, _: &ShowAgenda, w, cx| {
+                    this.set_view(MainViewKind::Agenda, w, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &ShowSearch, w, cx| {
+                    this.set_view(MainViewKind::Search, w, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &ShowTags, w, cx| this.set_view(MainViewKind::Tags, w, cx)),
+            )
+            .on_action(cx.listener(|this, _: &ShowSettings, w, cx| {
+                this.set_view(MainViewKind::Settings, w, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ShowShortcuts, w, cx| {
+                this.open_settings(SettingsSection::Shortcuts, w, cx)
+            }))
             .on_action(cx.listener(|this, _: &CloseTab, w, cx| {
                 if let Some(p) = this.tabs.active.clone() {
                     this.close_tab(&p, w, cx)
@@ -608,9 +671,18 @@ impl Workspace {
                 }
             }))
             .on_action(cx.listener(|this, _: &CommandPalette, w, cx| {
-                palette::open(this, PaletteKind::Commands { query: String::new() }, w, cx)
+                palette::open(
+                    this,
+                    PaletteKind::Commands {
+                        query: String::new(),
+                    },
+                    w,
+                    cx,
+                )
             }))
-            .on_action(cx.listener(|this, _: &QuickOpen, w, cx| palette::open(this, PaletteKind::QuickOpen, w, cx)))
+            .on_action(cx.listener(|this, _: &QuickOpen, w, cx| {
+                palette::open(this, PaletteKind::QuickOpen, w, cx)
+            }))
     }
 
     // ----- rendering -------------------------------------------------------
@@ -646,7 +718,10 @@ impl Workspace {
                 .cursor_pointer()
                 .hover(|s| s.opacity(0.9))
                 .on_click(cx.listener(|this, _, w, cx| this.open_folder(w, cx)))
-                .child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::FolderOpen).size(u(14.)))
+                .child(
+                    gpui_kit::component::Icon::new(gpui_kit::component::IconName::FolderOpen)
+                        .size(u(14.)),
+                )
                 .child(crate::t!(CommonOpenFolder)),
         )
     }
@@ -670,11 +745,12 @@ impl Workspace {
                 let view = p.handle.view();
                 // Explorer rows dropped on the editor insert links.
                 let drop_bg = crate::theme::alpha(AppTheme::get(cx).colors.accent, 0.25);
-                let drop = cx.listener(|this, paths: &crate::explorer::DraggedPaths, window, cx| {
-                    if let Some(p) = &this.pane {
-                        p.handle.insert_dropped_paths(&paths.0, window, cx);
-                    }
-                });
+                let drop =
+                    cx.listener(|this, paths: &crate::explorer::DraggedPaths, window, cx| {
+                        if let Some(p) = &this.pane {
+                            p.handle.insert_dropped_paths(&paths.0, window, cx);
+                        }
+                    });
                 area.child(self.render_tab_bar(cx)).child(
                     div()
                         .id("editor-drop")
@@ -691,7 +767,11 @@ impl Workspace {
     fn render_dock(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
         let dock = self.dock.as_ref()?;
         let th = AppTheme::get(cx);
-        let (border, bg, hover) = (th.colors.border, th.panel_bg(), crate::theme::alpha(th.colors.accent, 0.3));
+        let (border, bg, hover) = (
+            th.colors.border,
+            th.panel_bg(),
+            crate::theme::alpha(th.colors.accent, 0.3),
+        );
         let handle = div()
             .id("dock-resizer")
             .debug_selector(|| "dock-resizer".into())
@@ -705,7 +785,10 @@ impl Workspace {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, ev: &MouseDownEvent, _, cx| {
-                    this.dock_drag = Some(DockDrag { start_x: f32::from(ev.position.x), start_width: this.dock_width });
+                    this.dock_drag = Some(DockDrag {
+                        start_x: f32::from(ev.position.x),
+                        start_width: this.dock_width,
+                    });
                     cx.stop_propagation();
                     cx.notify();
                 }),
@@ -737,7 +820,9 @@ fn ensure<V: MainView>(
         return None;
     }
     let view = cx.new(|cx| new(root, window, cx));
-    let sub = cx.subscribe_in(&view, window, |this, _, ev: &ViewEvent, window, cx| this.on_view_event(ev, window, cx));
+    let sub = cx.subscribe_in(&view, window, |this, _, ev: &ViewEvent, window, cx| {
+        this.on_view_event(ev, window, cx)
+    });
     *slot = Some(view);
     Some(sub)
 }
@@ -763,13 +848,15 @@ impl Render for Workspace {
         let root = self.register_actions(root, cx);
         let main = self.render_main(cx);
         root.when(self.dock_drag.is_some(), |d| {
-            d.cursor_col_resize().on_mouse_move(cx.listener(Self::on_dock_drag)).on_mouse_up(
-                MouseButton::Left,
-                cx.listener(|this, _, _, cx| {
-                    this.dock_drag = None;
-                    cx.notify();
-                }),
-            )
+            d.cursor_col_resize()
+                .on_mouse_move(cx.listener(Self::on_dock_drag))
+                .on_mouse_up(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _, cx| {
+                        this.dock_drag = None;
+                        cx.notify();
+                    }),
+                )
         })
         .child(self.render_activity_bar(cx))
         .child(self.render_sidebar(cx))
@@ -779,7 +866,14 @@ impl Render for Workspace {
                 .flex_1()
                 .min_w_0()
                 .h_full()
-                .child(div().flex_1().min_w_0().h_full().overflow_hidden().child(main))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .h_full()
+                        .overflow_hidden()
+                        .child(main),
+                )
                 .children(self.render_dock(cx)),
         )
         .children(palette::render_overlays(self))
@@ -825,7 +919,9 @@ mod tests {
 
     #[test]
     fn open_request_batch_uses_the_root_from_each_step() {
-        let paths: Vec<String> = ["/v/a.md", "/v/sub/b.md", "/elsewhere/c.md"].map(String::from).into();
+        let paths: Vec<String> = ["/v/a.md", "/v/sub/b.md", "/elsewhere/c.md"]
+            .map(String::from)
+            .into();
         assert_eq!(
             plan_open_requests(&paths, None),
             vec![
@@ -840,7 +936,10 @@ mod tests {
     #[test]
     fn inside_vault_is_a_prefix_with_slash() {
         let paths = vec!["/vault/a.md".to_string()];
-        assert_eq!(plan_open_requests(&paths, Some("/v")), vec![Step::Window("/vault/a.md".into())]);
+        assert_eq!(
+            plan_open_requests(&paths, Some("/v")),
+            vec![Step::Window("/vault/a.md".into())]
+        );
     }
 }
 

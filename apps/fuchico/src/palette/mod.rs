@@ -92,7 +92,12 @@ fn context(ws: &Workspace) -> CommandContext {
 
 /// Opens (or refocuses) an overlay. Both can be open at once, as in the
 /// original; the palette paints on top.
-pub fn open(ws: &mut Workspace, kind: PaletteKind, window: &mut Window, cx: &mut Context<Workspace>) {
+pub fn open(
+    ws: &mut Workspace,
+    kind: PaletteKind,
+    window: &mut Window,
+    cx: &mut Context<Workspace>,
+) {
     if !ws.palette.is_open() {
         ws.palette.restore = window.focused(cx);
     }
@@ -128,7 +133,12 @@ pub fn open(ws: &mut Workspace, kind: PaletteKind, window: &mut Window, cx: &mut
     cx.notify();
 }
 
-fn on_event(ws: &mut Workspace, ev: OverlayEvent, window: &mut Window, cx: &mut Context<Workspace>) {
+fn on_event(
+    ws: &mut Workspace,
+    ev: OverlayEvent,
+    window: &mut Window,
+    cx: &mut Context<Workspace>,
+) {
     cx.notify();
     // Hand focus back to the overlay still open, else to where it was.
     if let Some((p, _)) = &ws.palette.commands {
@@ -151,9 +161,12 @@ fn on_event(ws: &mut Workspace, ev: OverlayEvent, window: &mut Window, cx: &mut 
 /// Re-lists the vault's Markdown files off the UI thread and feeds the
 /// open palette (the template commands depend on them).
 fn refresh_md_files(ws: &mut Workspace, cx: &mut Context<Workspace>) {
-    let Some(root) = ws.root().map(str::to_string) else { return };
+    let Some(root) = ws.root().map(str::to_string) else {
+        return;
+    };
     let r = root.clone();
-    let task = cx.background_spawn(async move { fuchico_core::fs::tree::fs_list_markdown_files(r) });
+    let task =
+        cx.background_spawn(async move { fuchico_core::fs::tree::fs_list_markdown_files(r) });
     cx.spawn(async move |ws, cx| {
         let Ok(files) = task.await else { return };
         ws.update(cx, |ws, cx| {

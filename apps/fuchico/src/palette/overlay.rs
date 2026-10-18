@@ -5,8 +5,8 @@
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, App, BoxShadow, Div, Entity, HighlightStyle, MouseButton, MouseDownEvent, ScrollHandle, SharedString,
-    Stateful, StyledText, Window, div, hsla, point, px, relative,
+    AnyElement, App, BoxShadow, Div, Entity, HighlightStyle, MouseButton, MouseDownEvent,
+    ScrollHandle, SharedString, Stateful, StyledText, Window, div, hsla, point, px, relative,
 };
 
 use crate::theme::{AppTheme, alpha};
@@ -57,9 +57,19 @@ pub fn frame(
                 }])
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
-                    div().flex_none().border_b_1().border_color(th.colors.border).text_color(th.colors.foreground).child(
-                        Input::new(input).appearance(false).px(u(12.)).py(u(10.)).h(u(36.)).text_size(u(13.)),
-                    ),
+                    div()
+                        .flex_none()
+                        .border_b_1()
+                        .border_color(th.colors.border)
+                        .text_color(th.colors.foreground)
+                        .child(
+                            Input::new(input)
+                                .appearance(false)
+                                .px(u(12.))
+                                .py(u(10.))
+                                .h(u(36.))
+                                .text_size(u(13.)),
+                        ),
                 )
                 .child(
                     div()
@@ -100,7 +110,11 @@ pub fn item(
     cx: &App,
 ) -> Stateful<Div> {
     let th = AppTheme::get(cx);
-    let (bg, fg) = if active { (Some(th.colors.accent), th.colors.accent_foreground) } else { (None, th.colors.foreground) };
+    let (bg, fg) = if active {
+        (Some(th.colors.accent), th.colors.accent_foreground)
+    } else {
+        (None, th.colors.foreground)
+    };
     div()
         .id(id.into())
         .flex()
@@ -121,11 +135,19 @@ pub fn item(
                 .text_color(th.colors.muted_foreground)
                 .child(gpui_kit::component::Icon::new(icon).size(u(13.))),
         )
-        .child(div().flex_1().min_w_0().overflow_hidden().whitespace_nowrap().text_ellipsis().child(highlighted(
-            text,
-            indices,
-            alpha(th.colors.syntax_number, 0.35),
-        )))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .text_ellipsis()
+                .child(highlighted(
+                    text,
+                    indices,
+                    alpha(th.colors.syntax_number, 0.35),
+                )),
+        )
 }
 
 /// `.palette-overlay-alias`.
@@ -145,7 +167,10 @@ pub fn alias_chip(alias: &'static str, cx: &App) -> Div {
 pub fn keys_chip(text: String, active: bool, after_alias: bool, cx: &App) -> Div {
     let th = AppTheme::get(cx);
     let (fg, border) = if active {
-        (th.colors.accent_foreground, alpha(th.colors.accent_foreground, 0.3))
+        (
+            th.colors.accent_foreground,
+            alpha(th.colors.accent_foreground, 0.3),
+        )
     } else {
         (th.colors.muted_foreground, th.colors.border)
     };
@@ -185,7 +210,10 @@ pub fn char_ranges(text: &str, indices: &[usize]) -> Vec<std::ops::Range<usize>>
 
 /// `HighlightedText`: matched chars get the `syntax-number` 35% background.
 pub fn highlighted(text: &str, indices: &[usize], bg: gpui_kit::Hsla) -> StyledText {
-    let style = HighlightStyle { background_color: Some(bg), ..Default::default() };
+    let style = HighlightStyle {
+        background_color: Some(bg),
+        ..Default::default()
+    };
     StyledText::new(SharedString::from(text.to_string()))
         .with_highlights(char_ranges(text, indices).into_iter().map(|r| (r, style)))
 }
@@ -198,7 +226,10 @@ mod tests {
     fn ranges_are_bytes_and_merged() {
         assert_eq!(char_ranges("Save File", &[0, 1, 2, 3]), vec![0..4]);
         assert_eq!(char_ranges("abc", &[0, 2]), vec![0..1, 2..3]);
-        assert_eq!(char_ranges("calendário x", &[7, 8, 11]), vec![8..10, 12..13]);
+        assert_eq!(
+            char_ranges("calendário x", &[7, 8, 11]),
+            vec![8..10, 12..13]
+        );
         assert!(char_ranges("ab", &[5]).is_empty());
     }
 }

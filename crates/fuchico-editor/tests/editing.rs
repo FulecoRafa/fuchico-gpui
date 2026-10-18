@@ -335,7 +335,10 @@ async fn alt_o_i_n_p_walk_the_markdown_tree(cx: &mut TestAppContext) {
 
     // Non-Markdown files have no Markdown tree: Alt-o is a no-op, Alt-n
     // selects the whole document (cm-helix fallback).
-    let options = EditorOptions { path: Some("a.py".into()), ..EditorOptions::default() };
+    let options = EditorOptions {
+        path: Some("a.py".into()),
+        ..EditorOptions::default()
+    };
     let mut ui = open(cx, "x = 1\ny = 2\n", options);
     ui.press("l");
     ui.press("alt-o");

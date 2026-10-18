@@ -226,6 +226,16 @@ impl EditorStyle {
         self.foreground
     }
     /// `.cm-searchMatch` (30%) and the selected match (55%).
+    /// `.cm-selectionMatch` (CodeMirror base theme: `#99ff7780`).
+    pub fn selection_match(&self) -> Hsla {
+        gpui_kit::Rgba {
+            r: 0x99 as f32 / 255.,
+            g: 1.,
+            b: 0x77 as f32 / 255.,
+            a: 0x80 as f32 / 255.,
+        }
+        .into()
+    }
     pub fn search_match(&self, selected: bool) -> Hsla {
         mix(self.syntax_number, if selected { 0.55 } else { 0.30 })
     }

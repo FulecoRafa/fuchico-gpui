@@ -343,7 +343,8 @@ async fn host_edits_are_undoable(cx: &mut TestAppContext) {
     assert_eq!(ui.text(), "title\n- [ ] task one\nplain\n");
     // Normal-mode clipboard paste is one undo step.
     ui.update(|v, _, cx| v.set_selection(0, 0, cx));
-    ui.cx.write_to_clipboard(ClipboardItem::new_string("XY".into()));
+    ui.cx
+        .write_to_clipboard(ClipboardItem::new_string("XY".into()));
     ui.press("cmd-v");
     assert!(ui.text().contains("XY"), "{:?}", ui.text());
     ui.press("u");

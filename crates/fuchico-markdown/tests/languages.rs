@@ -8,15 +8,19 @@ use fuchico_markdown::highlight::{find_grammar, highlight_snippet};
 use fuchico_markdown::languages::LANGUAGES;
 
 fn slug(name: &str) -> String {
-    name.to_lowercase().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect()
+    name.to_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
 }
 
 #[test]
 fn every_language_highlights_a_sample() {
     assert_eq!(LANGUAGES.len(), 143);
     // Comma-separated exact slugs.
-    let filter: Option<Vec<String>> =
-        std::env::var("LANG_FILTER").ok().map(|f| f.split(',').map(|s| s.trim().to_string()).collect());
+    let filter: Option<Vec<String>> = std::env::var("LANG_FILTER")
+        .ok()
+        .map(|f| f.split(',').map(|s| s.trim().to_string()).collect());
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/lang_samples");
     let mut seen = HashSet::new();
     let mut failures = Vec::new();
@@ -32,14 +36,20 @@ fn every_language_highlights_a_sample() {
             continue;
         };
         let Some(syntax) = find_grammar(grammar) else {
-            failures.push(format!("{} ({s}): grammar {grammar:?} not in syntax set", lang.name));
+            failures.push(format!(
+                "{} ({s}): grammar {grammar:?} not in syntax set",
+                lang.name
+            ));
             continue;
         };
         let Ok(sample) = std::fs::read_to_string(format!("{dir}/{s}.txt")) else {
             failures.push(format!("{} ({s}): missing sample {s}.txt", lang.name));
             continue;
         };
-        let styles: BTreeSet<_> = highlight_snippet(&sample, syntax).into_iter().map(|(_, id)| id.name()).collect();
+        let styles: BTreeSet<_> = highlight_snippet(&sample, syntax)
+            .into_iter()
+            .map(|(_, id)| id.name())
+            .collect();
         if styles.len() < 2 {
             failures.push(format!("{} ({s}): only {styles:?}", lang.name));
         } else {
@@ -47,12 +57,19 @@ fn every_language_highlights_a_sample() {
         }
     }
     println!("{ok} languages highlight with >= 2 styles");
-    assert!(failures.is_empty(), "{} failing:\n{}", failures.len(), failures.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} failing:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 #[test]
 fn non_markdown_files_get_file_highlighting_without_live_preview() {
-    use fuchico_markdown::{DecorationContext, FoldState, LineClass, MarkdownModel, Settings, StyleId};
+    use fuchico_markdown::{
+        DecorationContext, FoldState, LineClass, MarkdownModel, Settings, StyleId,
+    };
     let src = "# heading?\nx = \"**s**\"\n";
     let folds = FoldState::default();
     let ctx = DecorationContext::new(None, &folds);
@@ -60,23 +77,53 @@ fn non_markdown_files_get_file_highlighting_without_live_preview() {
     let mut py = MarkdownModel::with_path(src, Settings::default(), Some("notes/a.py"));
     assert!(!py.is_markdown());
     let d = py.decorations(0..2, &ctx);
-    assert!(d.lines[0].styles.iter().any(|r| r.styles.contains(StyleId::Comment)));
-    assert!(!d.lines[0].classes.iter().any(|c| matches!(c, LineClass::Heading(_))));
-    assert!(d.lines[1].styles.iter().any(|r| r.styles.contains(StyleId::String)));
+    assert!(
+        d.lines[0]
+            .styles
+            .iter()
+            .any(|r| r.styles.contains(StyleId::Comment))
+    );
+    assert!(
+        !d.lines[0]
+            .classes
+            .iter()
+            .any(|c| matches!(c, LineClass::Heading(_)))
+    );
+    assert!(
+        d.lines[1]
+            .styles
+            .iter()
+            .any(|r| r.styles.contains(StyleId::String))
+    );
     assert!(d.lines[1].replacements.is_empty());
     assert!(py.foldable(0).is_none());
     // Edits keep the highlighter in sync.
     py.update("x = 1  # c\n", &[]);
     let d = py.decorations(0..1, &ctx);
-    assert!(d.lines[0].styles.iter().any(|r| r.styles.contains(StyleId::Comment)));
+    assert!(
+        d.lines[0]
+            .styles
+            .iter()
+            .any(|r| r.styles.contains(StyleId::Comment))
+    );
 
     // Unknown extensions are plain text; Markdown keeps the live preview.
     let txt = MarkdownModel::with_path(src, Settings::default(), Some("a.txt"));
     assert!(!txt.is_markdown());
-    assert!(txt.decorations(0..2, &ctx).lines.iter().all(|l| l.styles.iter().all(|r| r.styles.is_empty())));
+    assert!(
+        txt.decorations(0..2, &ctx)
+            .lines
+            .iter()
+            .all(|l| l.styles.iter().all(|r| r.styles.is_empty()))
+    );
     let mut md = MarkdownModel::with_path(src, Settings::default(), Some("a.md"));
     assert!(md.is_markdown());
-    assert!(md.decorations(0..1, &ctx).lines[0].classes.iter().any(|c| matches!(c, LineClass::Heading(_))));
+    assert!(
+        md.decorations(0..1, &ctx).lines[0]
+            .classes
+            .iter()
+            .any(|c| matches!(c, LineClass::Heading(_)))
+    );
     md.set_path(Some("a.rs"));
     assert!(!md.is_markdown());
 }

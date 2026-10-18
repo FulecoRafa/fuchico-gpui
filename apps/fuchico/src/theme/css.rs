@@ -119,7 +119,10 @@ pub fn first_font_family(value: &str) -> Option<String> {
         "inherit",
         "initial",
     ];
-    if name.is_empty() || name.starts_with("var(") || GENERIC.contains(&name.to_ascii_lowercase().as_str()) {
+    if name.is_empty()
+        || name.starts_with("var(")
+        || GENERIC.contains(&name.to_ascii_lowercase().as_str())
+    {
         None
     } else {
         Some(name.to_string())
@@ -140,7 +143,10 @@ mod tests {
             vec![
                 ("--background".into(), "#000".into()),
                 ("--primary".into(), "oklch(0.5 0.1 30 / 50%)".into()),
-                ("--x".into(), "color-mix(in oklch, red 10%, transparent)".into()),
+                (
+                    "--x".into(),
+                    "color-mix(in oklch, red 10%, transparent)".into()
+                ),
             ]
         );
         assert!(p.ignored.is_empty());
@@ -152,7 +158,10 @@ mod tests {
         assert_eq!(p.decls.len(), 2);
         assert_eq!(p.decls[0].0, "--a");
         assert_eq!(p.decls[1].0, "--c");
-        assert_eq!(p.ignored, vec!["color: red".to_string(), ".x { --b: 2px; }".to_string()]);
+        assert_eq!(
+            p.ignored,
+            vec!["color: red".to_string(), ".x { --b: 2px; }".to_string()]
+        );
     }
 
     #[test]
@@ -167,7 +176,10 @@ mod tests {
         assert_eq!(parse_length_px("4px"), Some(4.));
         assert_eq!(parse_length_px("0"), Some(0.));
         assert_eq!(parse_length_px("big"), None);
-        assert_eq!(first_font_family("\"Fira Code\", monospace").as_deref(), Some("Fira Code"));
+        assert_eq!(
+            first_font_family("\"Fira Code\", monospace").as_deref(),
+            Some("Fira Code")
+        );
         assert_eq!(first_font_family("monospace"), None);
         assert_eq!(first_font_family("var(--x)"), None);
     }

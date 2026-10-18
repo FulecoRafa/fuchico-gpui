@@ -40,7 +40,8 @@ pub enum PaletteId {
 }
 
 impl PaletteId {
-    pub const BUILT_IN: [PaletteId; 3] = [PaletteId::Ayu, PaletteId::Dracula, PaletteId::Catppuccin];
+    pub const BUILT_IN: [PaletteId; 3] =
+        [PaletteId::Ayu, PaletteId::Dracula, PaletteId::Catppuccin];
 
     /// Proper-noun display name (not translated).
     pub fn display_name(self) -> &'static str {
@@ -128,7 +129,10 @@ impl Default for Settings {
             custom_themes: Vec::new(),
             custom_theme_id: None,
             keybinding_mode: KeybindingMode::Helix,
-            shortcuts: DEFAULT_SHORTCUTS.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect(),
+            shortcuts: DEFAULT_SHORTCUTS
+                .iter()
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+                .collect(),
             fold_start_marker: ":::fold".into(),
             fold_end_marker: ":::endfold".into(),
             ui_font: String::new(),
@@ -149,17 +153,21 @@ impl Default for Settings {
 impl Settings {
     /// Load rules of spec 5 §1.1. `None`/unparsable → defaults.
     pub fn from_json(raw: Option<&str>) -> Settings {
-        let Some(Value::Object(parsed)) = raw.and_then(|r| serde_json::from_str::<Value>(r).ok()) else {
+        let Some(Value::Object(parsed)) = raw.and_then(|r| serde_json::from_str::<Value>(r).ok())
+        else {
             return Settings::default();
         };
-        let Value::Object(defaults) = serde_json::to_value(Settings::default()).expect("defaults serialize") else {
+        let Value::Object(defaults) =
+            serde_json::to_value(Settings::default()).expect("defaults serialize")
+        else {
             unreachable!("settings serialize to an object")
         };
 
         let mut merged = defaults.clone();
         for (k, v) in &parsed {
             if k == "shortcuts"
-                && let (Some(Value::Object(dst)), Value::Object(src)) = (merged.get_mut("shortcuts"), v)
+                && let (Some(Value::Object(dst)), Value::Object(src)) =
+                    (merged.get_mut("shortcuts"), v)
             {
                 for (a, b) in src {
                     dst.insert(a.clone(), b.clone());
@@ -201,7 +209,11 @@ impl Settings {
             && !css.trim().is_empty()
             && self.custom_themes.is_empty()
         {
-            let theme = CustomTheme { id: new_custom_theme_id(), name: "Custom".into(), css };
+            let theme = CustomTheme {
+                id: new_custom_theme_id(),
+                name: "Custom".into(),
+                css,
+            };
             self.custom_theme_id = Some(theme.id.clone());
             self.custom_themes.push(theme);
         }
@@ -227,7 +239,12 @@ impl Settings {
         self.shortcuts
             .get(action)
             .map(String::as_str)
-            .or_else(|| DEFAULT_SHORTCUTS.iter().find(|(a, _)| *a == action).map(|(_, b)| *b))
+            .or_else(|| {
+                DEFAULT_SHORTCUTS
+                    .iter()
+                    .find(|(a, _)| *a == action)
+                    .map(|(_, b)| *b)
+            })
             .unwrap_or("")
     }
 }
@@ -240,7 +257,9 @@ pub fn new_custom_theme_id() -> String {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
     let mut rng = rand::rng();
-    let suffix: String = (0..5).map(|_| base36_digit(rng.random_range(0..36))).collect();
+    let suffix: String = (0..5)
+        .map(|_| base36_digit(rng.random_range(0..36)))
+        .collect();
     format!("theme-{}-{}", base36(ms), suffix)
 }
 
@@ -276,7 +295,11 @@ pub fn parse_rulers(input: &str) -> Vec<u32> {
 
 /// Canonical `a, b` rendering of rulers.
 pub fn format_rulers(rulers: &[u32]) -> String {
-    rulers.iter().map(u32::to_string).collect::<Vec<_>>().join(", ")
+    rulers
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// `clampEditorFontSize`: non-finite → 13; clamp `[8, 32]` (no rounding).
@@ -317,7 +340,10 @@ mod tests {
             actual[k] = expected[k].clone();
         }
         assert_eq!(actual, expected);
-        assert_eq!(Settings::from_json(Some(DEFAULTS_JSON)), Settings::default());
+        assert_eq!(
+            Settings::from_json(Some(DEFAULTS_JSON)),
+            Settings::default()
+        );
     }
 
     #[test]
@@ -342,7 +368,9 @@ mod tests {
 
     #[test]
     fn wrong_typed_field_falls_back_individually() {
-        let s = Settings::from_json(Some(r#"{"tabSize":"four","palette":"catppuccin","mode":"sepia","shortcuts":{"insertDate":5}}"#));
+        let s = Settings::from_json(Some(
+            r#"{"tabSize":"four","palette":"catppuccin","mode":"sepia","shortcuts":{"insertDate":5}}"#,
+        ));
         assert_eq!(s.tab_size, 2);
         assert_eq!(s.mode, ModePref::System);
         assert_eq!(s.palette, PaletteId::Catppuccin);
@@ -351,7 +379,9 @@ mod tests {
 
     #[test]
     fn migrates_custom_theme_css() {
-        let s = Settings::from_json(Some(r#"{"customThemeCss":"--background: #000;","palette":"custom"}"#));
+        let s = Settings::from_json(Some(
+            r#"{"customThemeCss":"--background: #000;","palette":"custom"}"#,
+        ));
         assert_eq!(s.custom_themes.len(), 1);
         let t = &s.custom_themes[0];
         assert_eq!(t.name, "Custom");
@@ -388,7 +418,10 @@ mod tests {
 
     #[test]
     fn rulers() {
-        assert_eq!(parse_rulers("120, 80;80  0 1001 7.5 abc 1000"), vec![80, 120, 1000]);
+        assert_eq!(
+            parse_rulers("120, 80;80  0 1001 7.5 abc 1000"),
+            vec![80, 120, 1000]
+        );
         assert_eq!(parse_rulers(""), Vec::<u32>::new());
         assert_eq!(format_rulers(&[80, 120]), "80, 120");
     }

@@ -23,18 +23,20 @@ use std::ops::Range;
 
 pub use completion::{CompletionContext, CompletionOption, CompletionSource, CompletionType};
 pub use decorate::{
-    checkbox_toggle, BlockWidget, DecorationContext, FenceToolbar, Hidden, LineDecoration, LineDecorations,
-    LineEndWidget, Replacement, Widget,
+    BlockWidget, DecorationContext, FenceToolbar, Hidden, LineDecoration, LineDecorations,
+    LineEndWidget, Replacement, Widget, checkbox_toggle,
 };
-pub use fold::{code_foldable, CodeFoldStyle, FoldPlaceholder, FoldState};
+pub use fold::{CodeFoldStyle, FoldPlaceholder, FoldState, code_foldable};
 pub use highlight::FileHighlighter;
-pub use style::{CalloutKind, ColorToken, LineClass, LineHeight, ResolvedStyle, StyleId, StyleRun, StyleSet};
+pub use style::{
+    CalloutKind, ColorToken, LineClass, LineHeight, ResolvedStyle, StyleId, StyleRun, StyleSet,
+};
 pub use syntax::{BlockKind, Parsed};
 pub use table::{Align, TableData, TableEditState, TableKey, TableModel, TableOutcome};
-pub use text::{apply_edits, LineIndex, TextEdit};
+pub use text::{LineIndex, TextEdit, apply_edits};
 pub use tree::{SyntaxTree, TreeNode};
 
-use fuchico_core::outline::{extract_outline, OutlineHeader};
+use fuchico_core::outline::{OutlineHeader, extract_outline};
 use highlight::SnippetCache;
 
 /// Editor settings that affect the model.
@@ -118,7 +120,8 @@ impl MarkdownModel {
         self.code = if self.markdown {
             None
         } else {
-            path.and_then(|p| FileHighlighter::for_path(p, &self.text)).map(std::sync::Mutex::new)
+            path.and_then(|p| FileHighlighter::for_path(p, &self.text))
+                .map(std::sync::Mutex::new)
         };
         self.reparse();
     }
@@ -130,7 +133,11 @@ impl MarkdownModel {
 
     /// Syntax style runs of `line` for a non-Markdown file.
     pub(crate) fn code_styles(&self, line: usize) -> Option<Vec<StyleRun>> {
-        let mut h = self.code.as_ref()?.lock().unwrap_or_else(|e| e.into_inner());
+        let mut h = self
+            .code
+            .as_ref()?
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         h.highlight(line..line + 1).pop()
     }
 
@@ -142,7 +149,9 @@ impl MarkdownModel {
         self.text.clear();
         self.text.push_str(text);
         if let Some(h) = &mut self.code {
-            h.get_mut().unwrap_or_else(|e| e.into_inner()).update(text, edits);
+            h.get_mut()
+                .unwrap_or_else(|e| e.into_inner())
+                .update(text, edits);
         }
         self.reparse();
     }
@@ -219,7 +228,11 @@ impl MarkdownModel {
 
     /// Table containing `pos`, with its index.
     pub fn table_at(&self, pos: usize) -> Option<(usize, TableModel)> {
-        let i = self.parsed.tables.iter().position(|t| t.range.start <= pos && pos <= t.range.end)?;
+        let i = self
+            .parsed
+            .tables
+            .iter()
+            .position(|t| t.range.start <= pos && pos <= t.range.end)?;
         Some((i, self.table(i)?))
     }
 

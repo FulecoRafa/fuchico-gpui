@@ -24,7 +24,10 @@ fn main() {
     for path in files {
         println!("cargo:rerun-if-changed={}", path.display());
         let src = std::fs::read_to_string(&path).expect("read grammar");
-        let fallback = path.file_stem().and_then(|s| s.to_str()).map(str::to_string);
+        let fallback = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(str::to_string);
         match SyntaxDefinition::load_from_str(&src, true, fallback.as_deref()) {
             Ok(def) => builder.add(def),
             Err(e) => println!("cargo:warning=skipping {}: {e}", path.display()),

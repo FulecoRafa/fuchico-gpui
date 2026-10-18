@@ -8,7 +8,7 @@ use chrono::{Datelike, NaiveDateTime, Timelike};
 use regex::{Captures, Regex};
 
 use crate::events::{CoreEvent, EventSink};
-use crate::fs::file::{fs_read_file, fs_write_file, ReadResult};
+use crate::fs::file::{ReadResult, fs_read_file, fs_write_file};
 use crate::fs::mutate::fs_create_dir;
 
 /// Template file reserved for seeding daily notes.
@@ -28,7 +28,8 @@ pub fn format_date_default(d: &NaiveDateTime) -> String {
     format_date(d, "YYYY-MM-DD")
 }
 
-static DATE_FMT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{\s*date:([^}]+?)\s*\}\}").unwrap());
+static DATE_FMT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{\{\s*date:([^}]+?)\s*\}\}").unwrap());
 static DATE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{\s*date\s*\}\}").unwrap());
 static TIME_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{\s*time\s*\}\}").unwrap());
 static TITLE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{\s*title\s*\}\}").unwrap());
@@ -37,7 +38,9 @@ pub fn expand_template(text: &str, title: &str, now: &NaiveDateTime) -> String {
     let s = DATE_FMT_RE.replace_all(text, |c: &Captures| format_date(now, c[1].trim()));
     let s = DATE_RE.replace_all(&s, |_: &Captures| format_date_default(now));
     let s = TIME_RE.replace_all(&s, |_: &Captures| format_date(now, "HH:mm"));
-    TITLE_RE.replace_all(&s, |_: &Captures| title.to_string()).into_owned()
+    TITLE_RE
+        .replace_all(&s, |_: &Captures| title.to_string())
+        .into_owned()
 }
 
 pub fn basename(path: &str) -> &str {
@@ -59,7 +62,11 @@ fn trim_slashes(s: &str) -> &str {
 }
 
 /// Absolute paths of template files among `vault_files`, sorted.
-pub fn list_templates<S: AsRef<str>>(root: &str, templates_folder: &str, vault_files: &[S]) -> Vec<String> {
+pub fn list_templates<S: AsRef<str>>(
+    root: &str,
+    templates_folder: &str,
+    vault_files: &[S],
+) -> Vec<String> {
     let prefix = format!("{root}/{}/", trim_slashes(templates_folder));
     let mut out: Vec<String> = vault_files
         .iter()
@@ -92,9 +99,17 @@ fn ensure_dir(path: &str) -> Result<(), String> {
 fn create_note(path: &str, content: String, sink: &dyn EventSink) -> Result<(), String> {
     let dir = &path[..path.rfind('/').unwrap_or(0)];
     ensure_dir(dir)?;
-    fs_write_file(path.to_string(), content, Some("template".to_string()), sink)?;
+    fs_write_file(
+        path.to_string(),
+        content,
+        Some("template".to_string()),
+        sink,
+    )?;
     // `notifyFsChanged(dir)`
-    sink.emit(CoreEvent::FsChanged { dir: dir.to_string(), from: None });
+    sink.emit(CoreEvent::FsChanged {
+        dir: dir.to_string(),
+        from: None,
+    });
     Ok(())
 }
 
@@ -113,17 +128,33 @@ pub fn open_daily_note(
     if exists(&path) {
         return Ok(path);
     }
-    let template = read_text(&format!("{root}/{}/{DAILY_TEMPLATE}", trim_slashes(templates_folder)));
-    let content = expand_template(template.as_deref().unwrap_or("# {{title}}\n\n"), &title, now);
+    let template = read_text(&format!(
+        "{root}/{}/{DAILY_TEMPLATE}",
+        trim_slashes(templates_folder)
+    ));
+    let content = expand_template(
+        template.as_deref().unwrap_or("# {{title}}\n\n"),
+        &title,
+        now,
+    );
     create_note(&path, content, sink)?;
     Ok(path)
 }
 
 /// Creates a new note in the vault root from `template_path`, named after
 /// the template plus a timestamp.
-pub fn create_from_template(root: &str, template_path: &str, now: &NaiveDateTime, sink: &dyn EventSink) -> Result<String, String> {
+pub fn create_from_template(
+    root: &str,
+    template_path: &str,
+    now: &NaiveDateTime,
+    sink: &dyn EventSink,
+) -> Result<String, String> {
     let template = read_text(template_path).unwrap_or_default();
-    let title = format!("{} {}", stem(template_path), format_date(now, "YYYY-MM-DD HHmm"));
+    let title = format!(
+        "{} {}",
+        stem(template_path),
+        format_date(now, "YYYY-MM-DD HHmm")
+    );
     let mut path = format!("{root}/{title}.md");
     let mut n = 2;
     while exists(&path) {
@@ -141,7 +172,10 @@ mod tests {
     use chrono::NaiveDate;
 
     fn now() -> NaiveDateTime {
-        NaiveDate::from_ymd_opt(2026, 8, 27).unwrap().and_hms_opt(9, 5, 7).unwrap()
+        NaiveDate::from_ymd_opt(2026, 8, 27)
+            .unwrap()
+            .and_hms_opt(9, 5, 7)
+            .unwrap()
     }
 
     #[test]
@@ -152,7 +186,11 @@ mod tests {
 
     #[test]
     fn expands_template_variables() {
-        let out = expand_template("# {{title}}\n{{date}} {{ time }} {{date:YYYY}} {{unknown}}", "T", &now());
+        let out = expand_template(
+            "# {{title}}\n{{date}} {{ time }} {{date:YYYY}} {{unknown}}",
+            "T",
+            &now(),
+        );
         assert_eq!(out, "# T\n2026-08-27 09:05 2026 {{unknown}}");
     }
 
@@ -165,7 +203,10 @@ mod tests {
             "/v/notes.md",
             "/v/templatesX/a.md",
         ];
-        assert_eq!(list_templates("/v", "/templates/", &files), vec!["/v/templates/meeting.md"]);
+        assert_eq!(
+            list_templates("/v", "/templates/", &files),
+            vec!["/v/templates/meeting.md"]
+        );
         assert_eq!(stem("/v/templates/meeting.md"), "meeting");
     }
 
@@ -179,7 +220,10 @@ mod tests {
         let p = open_daily_note(&root, "daily", "templates", &now(), &tx).unwrap();
         assert!(p.ends_with("daily/2026-08-27.md"));
         assert_eq!(std::fs::read_to_string(&p).unwrap(), "Day 2026-08-27\n");
-        assert!(rx.try_iter().any(|e| matches!(e, CoreEvent::FsChanged { .. })));
+        assert!(
+            rx.try_iter()
+                .any(|e| matches!(e, CoreEvent::FsChanged { .. }))
+        );
         // Second call does not rewrite.
         std::fs::write(&p, "edited").unwrap();
         open_daily_note(&root, "daily", "templates", &now(), &NullSink).unwrap();
@@ -197,6 +241,9 @@ mod tests {
         let b = create_from_template(&root, &tpl, &now(), &NullSink).unwrap();
         assert!(a.ends_with("meeting 2026-08-27 0905.md"));
         assert!(b.ends_with("meeting 2026-08-27 0905 2.md"));
-        assert_eq!(std::fs::read_to_string(&a).unwrap(), "# meeting 2026-08-27 0905");
+        assert_eq!(
+            std::fs::read_to_string(&a).unwrap(),
+            "# meeting 2026-08-27 0905"
+        );
     }
 }

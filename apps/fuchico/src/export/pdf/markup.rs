@@ -60,7 +60,11 @@ impl ImageLoader for DiskImages {
         }
         let decoded = percent_decode(href);
         let p = Path::new(&decoded);
-        let full = if p.is_absolute() { p.to_path_buf() } else { self.note_dir.join(p) };
+        let full = if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            self.note_dir.join(p)
+        };
         std::fs::read(full).ok()
     }
 }
@@ -93,7 +97,8 @@ fn percent_decode(s: &str) -> String {
     while i < b.len() {
         if b[i] == b'%'
             && i + 2 < b.len()
-            && let Ok(v) = u8::from_str_radix(std::str::from_utf8(&b[i + 1..i + 3]).unwrap_or("zz"), 16)
+            && let Ok(v) =
+                u8::from_str_radix(std::str::from_utf8(&b[i + 1..i + 3]).unwrap_or("zz"), 16)
         {
             out.push(v);
             i += 3;
@@ -109,7 +114,9 @@ fn decode_data_url(rest: &str) -> Option<Vec<u8>> {
     use base64::Engine as _;
     let (meta, data) = rest.split_once(',')?;
     if meta.ends_with(";base64") {
-        base64::engine::general_purpose::STANDARD.decode(data.trim()).ok()
+        base64::engine::general_purpose::STANDARD
+            .decode(data.trim())
+            .ok()
     } else {
         Some(percent_decode(data).into_bytes())
     }
@@ -133,7 +140,11 @@ pub fn esc(s: &str) -> String {
 
 /// `#"text";` — literal text in markup.
 fn text_lit(s: &str) -> String {
-    if s.is_empty() { String::new() } else { format!("#\"{}\";", esc(s)) }
+    if s.is_empty() {
+        String::new()
+    } else {
+        format!("#\"{}\";", esc(s))
+    }
 }
 
 /// The document preamble: page, fonts and the `READING_CSS` look.
@@ -200,7 +211,11 @@ pub fn preamble(style: &PdfStyle) -> String {
 /// `("User Font", "Fallback", ...)` as a Typst array.
 fn font_list(first: &str, fallbacks: &[&str]) -> String {
     let mut names: Vec<String> = Vec::new();
-    for f in first.split(',').map(|s| s.trim().trim_matches(['"', '\''])).filter(|s| !s.is_empty()) {
+    for f in first
+        .split(',')
+        .map(|s| s.trim().trim_matches(['"', '\'']))
+        .filter(|s| !s.is_empty())
+    {
         names.push(f.to_string());
     }
     for f in fallbacks {
@@ -216,14 +231,34 @@ enum Frame {
     Buf(String),
     Heading(u8, String),
     Quote(String),
-    Code { info: Option<String>, text: String },
-    List { start: Option<u64>, items: Vec<ListItem>, loose: bool },
+    Code {
+        info: Option<String>,
+        text: String,
+    },
+    List {
+        start: Option<u64>,
+        items: Vec<ListItem>,
+        loose: bool,
+    },
     Item(ListItem),
-    Table { aligns: Vec<Alignment>, rows: Vec<Vec<Cell>>, row: Vec<Cell> },
+    Table {
+        aligns: Vec<Alignment>,
+        rows: Vec<Vec<Cell>>,
+        row: Vec<Cell>,
+    },
     Cell(Cell),
-    Wrap { open: &'static str, buf: String },
-    Link { dest: String, buf: String },
-    Image { dest: String, alt: String },
+    Wrap {
+        open: &'static str,
+        buf: String,
+    },
+    Link {
+        dest: String,
+        buf: String,
+    },
+    Image {
+        dest: String,
+        alt: String,
+    },
 }
 
 #[derive(Default)]
@@ -257,7 +292,9 @@ impl<'a> Emitter<'a> {
                 Frame::Item(i) => return &mut i.buf,
                 Frame::Cell(c) => return &mut c.buf,
                 // Text inside these is captured separately.
-                Frame::Code { .. } | Frame::Image { .. } => unreachable!("code/image text is captured"),
+                Frame::Code { .. } | Frame::Image { .. } => {
+                    unreachable!("code/image text is captured")
+                }
                 Frame::List { .. } | Frame::Table { .. } => continue,
             }
         }
@@ -282,7 +319,12 @@ impl<'a> Emitter<'a> {
             }
             _ => {}
         }
-        if let Some(Frame::Cell(c)) = self.stack.iter_mut().rev().find(|f| matches!(f, Frame::Cell(_))) {
+        if let Some(Frame::Cell(c)) = self
+            .stack
+            .iter_mut()
+            .rev()
+            .find(|f| matches!(f, Frame::Cell(_)))
+        {
             c.chars += t.chars().count();
         }
         let lit = text_lit(t);
@@ -321,21 +363,53 @@ impl<'a> Emitter<'a> {
                     CodeBlockKind::Fenced(i) => Some(i.to_string()),
                     CodeBlockKind::Indented => None,
                 };
-                self.stack.push(Frame::Code { info, text: String::new() });
+                self.stack.push(Frame::Code {
+                    info,
+                    text: String::new(),
+                });
             }
             Tag::HtmlBlock => self.stack.push(Frame::Buf(String::new())),
-            Tag::List(start) => self.stack.push(Frame::List { start, items: Vec::new(), loose: false }),
+            Tag::List(start) => self.stack.push(Frame::List {
+                start,
+                items: Vec::new(),
+                loose: false,
+            }),
             Tag::Item => self.stack.push(Frame::Item(ListItem::default())),
-            Tag::Table(aligns) => self.stack.push(Frame::Table { aligns, rows: Vec::new(), row: Vec::new() }),
+            Tag::Table(aligns) => self.stack.push(Frame::Table {
+                aligns,
+                rows: Vec::new(),
+                row: Vec::new(),
+            }),
             Tag::TableHead | Tag::TableRow => {}
             Tag::TableCell => self.stack.push(Frame::Cell(Cell::default())),
-            Tag::Emphasis => self.stack.push(Frame::Wrap { open: "#emph[", buf: String::new() }),
-            Tag::Strong => self.stack.push(Frame::Wrap { open: "#strong[", buf: String::new() }),
-            Tag::Strikethrough => self.stack.push(Frame::Wrap { open: "#strike[", buf: String::new() }),
-            Tag::Superscript => self.stack.push(Frame::Wrap { open: "#super[", buf: String::new() }),
-            Tag::Subscript => self.stack.push(Frame::Wrap { open: "#sub[", buf: String::new() }),
-            Tag::Link { dest_url, .. } => self.stack.push(Frame::Link { dest: dest_url.to_string(), buf: String::new() }),
-            Tag::Image { dest_url, .. } => self.stack.push(Frame::Image { dest: dest_url.to_string(), alt: String::new() }),
+            Tag::Emphasis => self.stack.push(Frame::Wrap {
+                open: "#emph[",
+                buf: String::new(),
+            }),
+            Tag::Strong => self.stack.push(Frame::Wrap {
+                open: "#strong[",
+                buf: String::new(),
+            }),
+            Tag::Strikethrough => self.stack.push(Frame::Wrap {
+                open: "#strike[",
+                buf: String::new(),
+            }),
+            Tag::Superscript => self.stack.push(Frame::Wrap {
+                open: "#super[",
+                buf: String::new(),
+            }),
+            Tag::Subscript => self.stack.push(Frame::Wrap {
+                open: "#sub[",
+                buf: String::new(),
+            }),
+            Tag::Link { dest_url, .. } => self.stack.push(Frame::Link {
+                dest: dest_url.to_string(),
+                buf: String::new(),
+            }),
+            Tag::Image { dest_url, .. } => self.stack.push(Frame::Image {
+                dest: dest_url.to_string(),
+                alt: String::new(),
+            }),
             Tag::FootnoteDefinition(_)
             | Tag::DefinitionList
             | Tag::DefinitionListTitle
@@ -364,7 +438,12 @@ impl<'a> Emitter<'a> {
                 }
             }
             TagEnd::List(_) => {
-                if let Some(Frame::List { start, items, loose }) = self.stack.pop() {
+                if let Some(Frame::List {
+                    start,
+                    items,
+                    loose,
+                }) = self.stack.pop()
+                {
                     let s = list_markup(start, &items, loose);
                     self.block(&s);
                 }
@@ -396,7 +475,11 @@ impl<'a> Emitter<'a> {
                     self.block(&s);
                 }
             }
-            TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Superscript | TagEnd::Subscript => {
+            TagEnd::Emphasis
+            | TagEnd::Strong
+            | TagEnd::Strikethrough
+            | TagEnd::Superscript
+            | TagEnd::Subscript => {
                 if let Some(Frame::Wrap { open, buf }) = self.stack.pop() {
                     self.push(&format!("{open}{buf}];"));
                 }
@@ -433,7 +516,11 @@ impl<'a> Emitter<'a> {
     fn html(&mut self, html: &str) {
         for (is_tag, piece) in split_html(html) {
             if is_tag {
-                let name = piece.trim_start_matches(['<', '/']).split([' ', '>', '/']).next().unwrap_or("");
+                let name = piece
+                    .trim_start_matches(['<', '/'])
+                    .split([' ', '>', '/'])
+                    .next()
+                    .unwrap_or("");
                 if name.eq_ignore_ascii_case("br") {
                     self.push("#linebreak();");
                 }
@@ -447,9 +534,18 @@ impl<'a> Emitter<'a> {
     }
 
     fn image(&mut self, dest: &str, alt: &str) -> String {
-        let fallback = || format!("#emph[{}];", text_lit(if alt.is_empty() { dest } else { alt }));
-        let Some(bytes) = self.images.load(dest) else { return fallback() };
-        let Some(ext) = sniff_image(&bytes) else { return fallback() };
+        let fallback = || {
+            format!(
+                "#emph[{}];",
+                text_lit(if alt.is_empty() { dest } else { alt })
+            )
+        };
+        let Some(bytes) = self.images.load(dest) else {
+            return fallback();
+        };
+        let Some(ext) = sniff_image(&bytes) else {
+            return fallback();
+        };
         let name = format!("/img-{}.{ext}", self.n_images);
         self.n_images += 1;
         self.files.insert(name.clone(), bytes);
@@ -470,7 +566,9 @@ impl<'a> Emitter<'a> {
                 Err(e) => log::info!("pdf export: mermaid block not rendered: {e}"),
             }
         }
-        let grammar = language_for_info(info).and_then(|d| d.grammar).and_then(find_grammar);
+        let grammar = language_for_info(info)
+            .and_then(|d| d.grammar)
+            .and_then(find_grammar);
         let mut body = String::new();
         let mut runs: Vec<(std::ops::Range<usize>, Option<ColorToken>)> = Vec::new();
         if let Some(g) = grammar {
@@ -503,9 +601,11 @@ impl<'a> Emitter<'a> {
                 // non-breaking space keeps indentation intact at line starts.
                 let line = keep_indent(line);
                 match color {
-                    Some(c) => {
-                        body.push_str(&format!("#text(fill: {}, \"{}\");", self.style.token_color(c), esc(&line)))
-                    }
+                    Some(c) => body.push_str(&format!(
+                        "#text(fill: {}, \"{}\");",
+                        self.style.token_color(c),
+                        esc(&line)
+                    )),
                     None => body.push_str(&text_lit(&line)),
                 }
             }
@@ -540,13 +640,19 @@ fn list_markup(start: Option<u64>, items: &[ListItem], loose: bool) -> String {
     let tight = if loose { "false" } else { "true" };
     match start {
         Some(n) => format!("#enum(start: {n}, tight: {tight}, {});", body.join(", ")),
-        None if all_tasks => format!("#list(marker: none, indent: 0pt, body-indent: 0pt, tight: {tight}, {});", body.join(", ")),
+        None if all_tasks => format!(
+            "#list(marker: none, indent: 0pt, body-indent: 0pt, tight: {tight}, {});",
+            body.join(", ")
+        ),
         None => format!("#list(tight: {tight}, {});", body.join(", ")),
     }
 }
 
 fn table_markup(aligns: &[Alignment], rows: &[Vec<Cell>]) -> String {
-    let ncols = aligns.len().max(rows.iter().map(|r| r.len()).max().unwrap_or(0)).max(1);
+    let ncols = aligns
+        .len()
+        .max(rows.iter().map(|r| r.len()).max().unwrap_or(0))
+        .max(1);
     // Width weights from the longest cell text of each column (CSS auto
     // table layout distributes width by content too).
     let mut weights = vec![1usize; ncols];
@@ -564,7 +670,12 @@ fn table_markup(aligns: &[Alignment], rows: &[Vec<Cell>]) -> String {
         })
         .collect();
     let cell = |c: Option<&Cell>| format!("[{}]", c.map(|c| c.buf.trim()).unwrap_or(""));
-    let row_cells = |r: &Vec<Cell>| (0..ncols).map(|i| cell(r.get(i))).collect::<Vec<_>>().join(", ");
+    let row_cells = |r: &Vec<Cell>| {
+        (0..ncols)
+            .map(|i| cell(r.get(i)))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
     let mut parts = Vec::new();
     if let Some(head) = rows.first() {
         parts.push(format!("table.header({})", row_cells(head)));
@@ -572,7 +683,12 @@ fn table_markup(aligns: &[Alignment], rows: &[Vec<Cell>]) -> String {
     for r in rows.iter().skip(1) {
         parts.push(row_cells(r));
     }
-    format!("#table(columns: ({},), align: ({},), {});", cols.join(", "), al.join(", "), parts.join(", "))
+    format!(
+        "#table(columns: ({},), align: ({},), {});",
+        cols.join(", "),
+        al.join(", "),
+        parts.join(", ")
+    )
 }
 
 /// Splits HTML into `(is_tag, text)` pieces.
@@ -621,7 +737,8 @@ pub fn sniff_image(b: &[u8]) -> Option<&'static str> {
         Some("webp")
     } else {
         let head = String::from_utf8_lossy(&b[..b.len().min(512)]).to_lowercase();
-        (head.contains("<svg") || (head.trim_start().starts_with("<?xml") && head.contains("svg"))).then_some("svg")
+        (head.contains("<svg") || (head.trim_start().starts_with("<?xml") && head.contains("svg")))
+            .then_some("svg")
     }
 }
 
@@ -648,7 +765,12 @@ pub fn to_typst(markdown: &str, style: &PdfStyle, images: &dyn ImageLoader) -> T
             Event::End(tag) => em.end(tag),
             Event::Text(t) => em.text(&t),
             Event::Code(t) => {
-                if let Some(Frame::Cell(c)) = em.stack.iter_mut().rev().find(|f| matches!(f, Frame::Cell(_))) {
+                if let Some(Frame::Cell(c)) = em
+                    .stack
+                    .iter_mut()
+                    .rev()
+                    .find(|f| matches!(f, Frame::Cell(_)))
+                {
                     c.chars += t.chars().count();
                 }
                 if let Some(Frame::Image { alt, .. }) = em.stack.last_mut() {
@@ -659,13 +781,18 @@ pub fn to_typst(markdown: &str, style: &PdfStyle, images: &dyn ImageLoader) -> T
             }
             Event::InlineMath(t) | Event::DisplayMath(t) => em.text(&t),
             Event::Html(h) | Event::InlineHtml(h) => {
-                if matches!(em.stack.last(), Some(Frame::Code { .. }) | Some(Frame::Image { .. })) {
+                if matches!(
+                    em.stack.last(),
+                    Some(Frame::Code { .. }) | Some(Frame::Image { .. })
+                ) {
                     em.text(&h);
                 } else {
                     em.html(&h);
                 }
             }
-            Event::FootnoteReference(r) => em.push(&format!("#super[{}];", text_lit(&format!("[{r}]")))),
+            Event::FootnoteReference(r) => {
+                em.push(&format!("#super[{}];", text_lit(&format!("[{r}]"))))
+            }
             Event::SoftBreak => em.text(" "),
             Event::HardBreak => em.push("#linebreak();"),
             Event::Rule => em.block("#mdhr();"),
@@ -682,7 +809,10 @@ pub fn to_typst(markdown: &str, style: &PdfStyle, images: &dyn ImageLoader) -> T
             em.out.push_str(&b);
         }
     }
-    TypstDoc { source: format!("{}\n{}", preamble(style), em.out), files: em.files }
+    TypstDoc {
+        source: format!("{}\n{}", preamble(style), em.out),
+        files: em.files,
+    }
 }
 
 #[cfg(test)]
@@ -730,7 +860,10 @@ mod tests {
         assert!(b.contains("#heading(level: 1)[#\"T\";];"));
         assert!(b.contains("#enum(start: 1, tight: true, [#\"one\";], [#\"two\";]);"));
         assert!(b.contains("align: (center, right,)"), "{b}");
-        assert!(b.contains("table.header([#\"a\";], [#\"b\";]), [#\"1\";], [#\"2\";]"), "{b}");
+        assert!(
+            b.contains("table.header([#\"a\";], [#\"b\";]), [#\"1\";], [#\"2\";]"),
+            "{b}"
+        );
         assert!(b.contains("#mdhr();"));
     }
 
@@ -743,7 +876,11 @@ mod tests {
 
     #[test]
     fn mermaid_becomes_a_vector_image() {
-        let d = to_typst("```mermaid\ngraph TD; A-->B\n```\n", &PdfStyle::test(), &NoImages);
+        let d = to_typst(
+            "```mermaid\ngraph TD; A-->B\n```\n",
+            &PdfStyle::test(),
+            &NoImages,
+        );
         assert!(d.source.contains("mdimg(\"/mermaid-0.svg\""));
         assert!(String::from_utf8_lossy(&d.files["/mermaid-0.svg"]).contains("<svg"));
     }
@@ -755,7 +892,10 @@ mod tests {
 
     #[test]
     fn html_is_reduced_to_text() {
-        assert_eq!(body("a<br>b <b>c</b>"), "#\"a\";#linebreak();#\"b \";#\"c\";");
+        assert_eq!(
+            body("a<br>b <b>c</b>"),
+            "#\"a\";#linebreak();#\"b \";#\"c\";"
+        );
     }
 
     #[test]

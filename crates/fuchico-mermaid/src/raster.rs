@@ -53,21 +53,34 @@ pub fn quantize_scale(wanted: f32) -> f32 {
 /// Rasterize `svg` at `scale` (device pixels per logical px). Transparent
 /// background, premultiplied BGRA as GPUI expects.
 pub fn rasterize(svg: &str, scale: f32) -> Result<Raster, MermaidError> {
-    let tree = usvg::Tree::from_str(svg, &options())
-        .map_err(|e| MermaidError { message: format!("Invalid SVG: {e}"), line: None })?;
+    let tree = usvg::Tree::from_str(svg, &options()).map_err(|e| MermaidError {
+        message: format!("Invalid SVG: {e}"),
+        line: None,
+    })?;
     let size = tree.size();
     let (w, h) = (size.width().max(1.0), size.height().max(1.0));
     let scale = scale.min(MAX_RASTER_SIDE / w.max(h)).max(0.01);
     let (pw, ph) = ((w * scale).ceil() as u32, (h * scale).ceil() as u32);
-    let mut pixmap = tiny_skia::Pixmap::new(pw.max(1), ph.max(1))
-        .ok_or_else(|| MermaidError { message: "Diagram too large to rasterize".into(), line: None })?;
-    resvg::render(&tree, tiny_skia::Transform::from_scale(scale, scale), &mut pixmap.as_mut());
+    let mut pixmap = tiny_skia::Pixmap::new(pw.max(1), ph.max(1)).ok_or_else(|| MermaidError {
+        message: "Diagram too large to rasterize".into(),
+        line: None,
+    })?;
+    resvg::render(
+        &tree,
+        tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
     let mut data = pixmap.take();
     for px in data.as_chunks_mut::<4>().0 {
         px.swap(0, 2);
     }
     let buf = RgbaImage::from_raw(pw.max(1), ph.max(1), data).expect("pixmap size matches");
-    Ok(Raster { image: Arc::new(RenderImage::new(vec![Frame::new(buf)])), width: w, height: h, scale })
+    Ok(Raster {
+        image: Arc::new(RenderImage::new(vec![Frame::new(buf)])),
+        width: w,
+        height: h,
+        scale,
+    })
 }
 
 fn hash_of<T: Hash + ?Sized>(v: &T) -> u64 {
@@ -86,7 +99,11 @@ pub struct RasterKey {
 
 impl RasterKey {
     pub fn new(source: &str, theme: &MermaidTheme, scale: f32) -> Self {
-        Self { source: hash_of(source), theme: hash_of(theme), scale: (scale * 100.0).round() as u32 }
+        Self {
+            source: hash_of(source),
+            theme: hash_of(theme),
+            scale: (scale * 100.0).round() as u32,
+        }
     }
 }
 
@@ -146,6 +163,9 @@ pub fn cache_len() -> usize {
 
 /// Tint a monochrome lucide icon (`currentColor`) and rasterize it.
 pub fn rasterize_icon(svg: &str, color_hex: &str, px: f32, scale: f32) -> Option<Arc<RenderImage>> {
-    let tinted = svg.replace("currentColor", color_hex).replace("width=\"24\"", &format!("width=\"{px}\"")).replace("height=\"24\"", &format!("height=\"{px}\""));
+    let tinted = svg
+        .replace("currentColor", color_hex)
+        .replace("width=\"24\"", &format!("width=\"{px}\""))
+        .replace("height=\"24\"", &format!("height=\"{px}\""));
     rasterize(&tinted, scale).ok().map(|r| r.image)
 }

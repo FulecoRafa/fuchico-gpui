@@ -10,7 +10,10 @@ fn folded_text(doc: &str, r: Option<std::ops::Range<usize>>) -> Option<String> {
 fn heading_sections() {
     let doc = "# A\npara\n## B\nb text\n# C\nc";
     let m = model(doc);
-    assert_eq!(folded_text(doc, m.foldable(0)).as_deref(), Some("\npara\n## B\nb text"));
+    assert_eq!(
+        folded_text(doc, m.foldable(0)).as_deref(),
+        Some("\npara\n## B\nb text")
+    );
     assert_eq!(folded_text(doc, m.foldable(2)).as_deref(), Some("\nb text"));
     assert_eq!(folded_text(doc, m.foldable(4)).as_deref(), Some("\nc"));
     assert_eq!(m.foldable(1), None);
@@ -22,30 +25,51 @@ fn heading_sections() {
 fn syntax_folds() {
     let doc = "```js\na\nb\n```\n\n> q\n> r\n\n- item\n  more\n- two";
     let m = model(doc);
-    assert_eq!(folded_text(doc, m.foldable(0)).as_deref(), Some("\na\nb\n```"));
+    assert_eq!(
+        folded_text(doc, m.foldable(0)).as_deref(),
+        Some("\na\nb\n```")
+    );
     assert_eq!(folded_text(doc, m.foldable(5)).as_deref(), Some("\n> r"));
     // ListItem folds; the List itself does not.
     assert_eq!(folded_text(doc, m.foldable(8)).as_deref(), Some("\n  more"));
     assert_eq!(m.foldable(10), None);
     // Frontmatter folds (our addition).
     let fm = "---\na: 1\nb: 2\n---\nx";
-    assert_eq!(folded_text(fm, model(fm).foldable(0)).as_deref(), Some("\na: 1\nb: 2\n---"));
+    assert_eq!(
+        folded_text(fm, model(fm).foldable(0)).as_deref(),
+        Some("\na: 1\nb: 2\n---")
+    );
 }
 
 #[test]
 fn regions_take_precedence_and_nest() {
     let doc = "# H\n:::fold Outer\n:::fold Inner\nx\n:::endfold\ny\n:::endfold\nz";
     let m = model(doc);
-    assert_eq!(folded_text(doc, m.foldable(1)).as_deref(), Some("\n:::fold Inner\nx\n:::endfold\ny\n:::endfold"));
-    assert_eq!(folded_text(doc, m.foldable(2)).as_deref(), Some("\nx\n:::endfold"));
+    assert_eq!(
+        folded_text(doc, m.foldable(1)).as_deref(),
+        Some("\n:::fold Inner\nx\n:::endfold\ny\n:::endfold")
+    );
+    assert_eq!(
+        folded_text(doc, m.foldable(2)).as_deref(),
+        Some("\nx\n:::endfold")
+    );
     // Unterminated region: falls through to the other services (here the
     // two-line paragraph's syntax fold).
     assert_eq!(model(":::fold\nx").foldable(0), Some(7..9));
     // Blank marker disables region folding.
-    let s = Settings { fold_start_marker: " ".into(), ..Default::default() };
+    let s = Settings {
+        fold_start_marker: " ".into(),
+        ..Default::default()
+    };
     let d2 = ":::fold\na\n\n:::endfold";
-    assert_eq!(folded_text(d2, model(d2).foldable(0)).as_deref(), Some("\na\n\n:::endfold"));
-    assert_eq!(folded_text(d2, MarkdownModel::new(d2, s).foldable(0)).as_deref(), Some("\na"));
+    assert_eq!(
+        folded_text(d2, model(d2).foldable(0)).as_deref(),
+        Some("\na\n\n:::endfold")
+    );
+    assert_eq!(
+        folded_text(d2, MarkdownModel::new(d2, s).foldable(0)).as_deref(),
+        Some("\na")
+    );
     // Indented marker.
     assert!(model("  :::fold\nx\n:::endfold").foldable(0).is_some());
 }
@@ -55,14 +79,29 @@ fn placeholders() {
     let doc = ":::fold Box\na\nb\n:::endfold\n# H\nx";
     let m = model(doc);
     let r = m.foldable(0).unwrap();
-    assert_eq!(m.fold_placeholder(&r), FoldPlaceholder::Region { name: "Box".into(), line_count: 2 });
-    assert_eq!(m.fold_placeholder(&r).count_label().as_deref(), Some("2 lines"));
+    assert_eq!(
+        m.fold_placeholder(&r),
+        FoldPlaceholder::Region {
+            name: "Box".into(),
+            line_count: 2
+        }
+    );
+    assert_eq!(
+        m.fold_placeholder(&r).count_label().as_deref(),
+        Some("2 lines")
+    );
     let h = m.foldable(4).unwrap();
     assert_eq!(m.fold_placeholder(&h), FoldPlaceholder::Ellipsis);
     let unnamed = ":::fold\na\n:::endfold";
     let m2 = model(unnamed);
     let r2 = m2.foldable(0).unwrap();
-    assert_eq!(m2.fold_placeholder(&r2), FoldPlaceholder::Region { name: "Region".into(), line_count: 1 });
+    assert_eq!(
+        m2.fold_placeholder(&r2),
+        FoldPlaceholder::Region {
+            name: "Region".into(),
+            line_count: 1
+        }
+    );
 }
 
 #[test]
@@ -89,7 +128,18 @@ fn folded_decorations() {
     let mut fs = FoldState::new();
     assert!(m.toggle_fold(&mut fs, 1));
     let r = render_model(&m, Some(0), &fs);
-    assert_eq!(r, ["x", "[region-hidden][fold:Box:2]", "<hidden:Folded>", "<hidden:Folded>", "<hidden:Folded>", "H", "under"]);
+    assert_eq!(
+        r,
+        [
+            "x",
+            "[region-hidden][fold:Box:2]",
+            "<hidden:Folded>",
+            "<hidden:Folded>",
+            "<hidden:Folded>",
+            "H",
+            "under"
+        ]
+    );
     // Cursor on the marker line: the raw marker shows, plus the pill.
     let r = render_model(&m, Some(1), &fs);
     assert_eq!(r[1], ":::fold Box[fold:Box:2]");

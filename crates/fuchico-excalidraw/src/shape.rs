@@ -152,11 +152,10 @@ fn rough_options(el: &Element, continuous_path: bool) -> Options {
                 o.curve_fitting = Some(1.0);
             }
         }
-        "line" | "freedraw"
-            if is_path_a_loop(&el.points()) && filled => {
-                o.fill_style = Some(fill_style(el.fill_style()));
-                o.fill = Some(PLACEHOLDER);
-            }
+        "line" | "freedraw" if is_path_a_loop(&el.points()) && filled => {
+            o.fill_style = Some(fill_style(el.fill_style()));
+            o.fill = Some(PLACEHOLDER);
+        }
         _ => {}
     }
     o
@@ -173,7 +172,9 @@ pub fn is_path_a_loop(points: &[[f64; 2]]) -> bool {
 
 /// Excalidraw's `getCornerRadius`.
 pub fn corner_radius(x: f64, el: &Element) -> f64 {
-    let Some(r) = el.f.roundness.get() else { return 0.0 };
+    let Some(r) = el.f.roundness.get() else {
+        return 0.0;
+    };
     let kind = r.kind.0 as i64;
     if kind == 3 {
         let fixed = r.value.get().map(|v| v.0).unwrap_or(32.0);
@@ -194,7 +195,13 @@ pub fn diamond_points(el: &Element) -> [[f64; 2]; 4] {
     [[top_x, 0.0], [w, right_y], [top_x, h], [0.0, right_y]]
 }
 
-fn sets_to_layers(d: Drawable<f32>, el: &Element, stroke_ink: Ink, fill_ink: Ink, out: &mut Vec<Layer>) {
+fn sets_to_layers(
+    d: Drawable<f32>,
+    el: &Element,
+    stroke_ink: Ink,
+    fill_ink: Ink,
+    out: &mut Vec<Layer>,
+) {
     let sw = d.options.stroke_width.unwrap_or(1.0);
     let fw = {
         let f = d.options.fill_weight.unwrap_or(-1.0);
@@ -207,14 +214,24 @@ fn sets_to_layers(d: Drawable<f32>, el: &Element, stroke_ink: Ink, fill_ink: Ink
             match op.op {
                 OpType::Move => ops.push(Op::Move([v[0], v[1]])),
                 OpType::LineTo => ops.push(Op::Line([v[0], v[1]])),
-                OpType::BCurveTo => {
-                    ops.push(Op::Cubic([v[0], v[1]], [v[2], v[3]], [v[4], v[5]]))
-                }
+                OpType::BCurveTo => ops.push(Op::Cubic([v[0], v[1]], [v[2], v[3]], [v[4], v[5]])),
             }
         }
         let (paint, ink) = match set.op_set_type {
-            OpSetType::Path => (Paint::Stroke { width: sw, dash: dash(el) }, stroke_ink),
-            OpSetType::FillSketch => (Paint::Stroke { width: fw, dash: None }, fill_ink),
+            OpSetType::Path => (
+                Paint::Stroke {
+                    width: sw,
+                    dash: dash(el),
+                },
+                stroke_ink,
+            ),
+            OpSetType::FillSketch => (
+                Paint::Stroke {
+                    width: fw,
+                    dash: None,
+                },
+                fill_ink,
+            ),
             OpSetType::FillPath => {
                 ops.push(Op::Close);
                 (Paint::Fill, fill_ink)
@@ -243,13 +260,34 @@ pub fn generate(el: &Element) -> Shape {
                 let r = corner_radius(w.abs().min(h.abs()), el);
                 let d = format!(
                     "M {} 0 L {} 0 Q {} 0, {} {} L {} {} Q {} {}, {} {} L {} {} Q 0 {}, 0 {} L 0 {} Q 0 0, {} 0",
-                    fmt(r), fmt(w - r), fmt(w), fmt(w), fmt(r), fmt(w), fmt(h - r), fmt(w), fmt(h),
-                    fmt(w - r), fmt(h), fmt(r), fmt(h), fmt(h), fmt(h - r), fmt(r), fmt(r)
+                    fmt(r),
+                    fmt(w - r),
+                    fmt(w),
+                    fmt(w),
+                    fmt(r),
+                    fmt(w),
+                    fmt(h - r),
+                    fmt(w),
+                    fmt(h),
+                    fmt(w - r),
+                    fmt(h),
+                    fmt(r),
+                    fmt(h),
+                    fmt(h),
+                    fmt(h - r),
+                    fmt(r),
+                    fmt(r)
                 );
                 let d = g.path::<f32>(d, &Some(rough_options(el, true)));
                 sets_to_layers(d, el, Ink::Stroke, Ink::Background, &mut layers);
             } else {
-                let d = g.rectangle::<f32>(0.0, 0.0, w as f32, h as f32, &Some(rough_options(el, false)));
+                let d = g.rectangle::<f32>(
+                    0.0,
+                    0.0,
+                    w as f32,
+                    h as f32,
+                    &Some(rough_options(el, false)),
+                );
                 sets_to_layers(d, el, Ink::Stroke, Ink::Background, &mut layers);
             }
         }
@@ -260,19 +298,48 @@ pub fn generate(el: &Element) -> Shape {
                 let hr = corner_radius((r[1] - t[1]).abs(), el);
                 let d = format!(
                     "M {} {} L {} {} C {} {}, {} {}, {} {} L {} {} C {} {}, {} {}, {} {} L {} {} C {} {}, {} {}, {} {} L {} {} C {} {}, {} {}, {} {}",
-                    fmt(t[0] + vr), fmt(t[1] + hr), fmt(r[0] - vr), fmt(r[1] - hr),
-                    fmt(r[0]), fmt(r[1]), fmt(r[0]), fmt(r[1]), fmt(r[0] - vr), fmt(r[1] + hr),
-                    fmt(b[0] + vr), fmt(b[1] - hr),
-                    fmt(b[0]), fmt(b[1]), fmt(b[0]), fmt(b[1]), fmt(b[0] - vr), fmt(b[1] - hr),
-                    fmt(l[0] + vr), fmt(l[1] + hr),
-                    fmt(l[0]), fmt(l[1]), fmt(l[0]), fmt(l[1]), fmt(l[0] + vr), fmt(l[1] - hr),
-                    fmt(t[0] - vr), fmt(t[1] + hr),
-                    fmt(t[0]), fmt(t[1]), fmt(t[0]), fmt(t[1]), fmt(t[0] + vr), fmt(t[1] + hr),
+                    fmt(t[0] + vr),
+                    fmt(t[1] + hr),
+                    fmt(r[0] - vr),
+                    fmt(r[1] - hr),
+                    fmt(r[0]),
+                    fmt(r[1]),
+                    fmt(r[0]),
+                    fmt(r[1]),
+                    fmt(r[0] - vr),
+                    fmt(r[1] + hr),
+                    fmt(b[0] + vr),
+                    fmt(b[1] - hr),
+                    fmt(b[0]),
+                    fmt(b[1]),
+                    fmt(b[0]),
+                    fmt(b[1]),
+                    fmt(b[0] - vr),
+                    fmt(b[1] - hr),
+                    fmt(l[0] + vr),
+                    fmt(l[1] + hr),
+                    fmt(l[0]),
+                    fmt(l[1]),
+                    fmt(l[0]),
+                    fmt(l[1]),
+                    fmt(l[0] + vr),
+                    fmt(l[1] - hr),
+                    fmt(t[0] - vr),
+                    fmt(t[1] + hr),
+                    fmt(t[0]),
+                    fmt(t[1]),
+                    fmt(t[0]),
+                    fmt(t[1]),
+                    fmt(t[0] + vr),
+                    fmt(t[1] + hr),
                 );
                 let d = g.path::<f32>(d, &Some(rough_options(el, true)));
                 sets_to_layers(d, el, Ink::Stroke, Ink::Background, &mut layers);
             } else {
-                let d = g.polygon::<f32>(&[pt(t), pt(r), pt(b), pt(l)], &Some(rough_options(el, false)));
+                let d = g.polygon::<f32>(
+                    &[pt(t), pt(r), pt(b), pt(l)],
+                    &Some(rough_options(el, false)),
+                );
                 sets_to_layers(d, el, Ink::Stroke, Ink::Background, &mut layers);
             }
         }
@@ -297,7 +364,11 @@ pub fn generate(el: &Element) -> Shape {
                 el.text_align(),
                 w,
             );
-            layers.push(Layer { paint: Paint::Fill, ink: Ink::Stroke, ops });
+            layers.push(Layer {
+                paint: Paint::Fill,
+                ink: Ink::Stroke,
+                ops,
+            });
         }
         _ => {}
     }
@@ -325,16 +396,26 @@ fn linear(el: &Element, g: &Generator, layers: &mut Vec<Layer>) {
         .sets
         .iter()
         .find(|s| s.op_set_type == OpSetType::Path)
-        .map(|s| s.ops.iter().map(|o| (o.op.clone(), o.data.clone())).collect())
+        .map(|s| {
+            s.ops
+                .iter()
+                .map(|o| (o.op.clone(), o.data.clone()))
+                .collect()
+        })
         .unwrap_or_default();
     sets_to_layers(d, el, Ink::Stroke, Ink::Background, layers);
 
     if el.kind != "arrow" {
         return;
     }
-    for (pos, head) in [("start", el.f.start_arrowhead.get()), ("end", el.f.end_arrowhead.get())] {
+    for (pos, head) in [
+        ("start", el.f.start_arrowhead.get()),
+        ("end", el.f.end_arrowhead.get()),
+    ] {
         let Some(head) = head else { continue };
-        let Some(hp) = arrowhead_points(el, &points, &stroke_ops, pos, head) else { continue };
+        let Some(hp) = arrowhead_points(el, &points, &stroke_ops, pos, head) else {
+            continue;
+        };
         let mut o = opts.clone();
         o.stroke_line_dash = None;
         o.fill = None;
@@ -355,7 +436,11 @@ fn linear(el: &Element, g: &Generator, layers: &mut Vec<Layer>) {
                 o2.fill = Some(PLACEHOLDER);
                 o2.fill_style = Some(FillStyle::Solid);
                 o2.roughness = Some(o.roughness.unwrap_or(0.0).min(0.5));
-                let fill_ink = if head == "circle_outline" { Ink::Canvas } else { Ink::Stroke };
+                let fill_ink = if head == "circle_outline" {
+                    Ink::Canvas
+                } else {
+                    Ink::Stroke
+                };
                 push(g.circle::<f32>(hp[0], hp[1], hp[2], &Some(o2)), fill_ink);
             }
             "triangle" | "triangle_outline" => {
@@ -363,7 +448,11 @@ fn linear(el: &Element, g: &Generator, layers: &mut Vec<Layer>) {
                 o2.fill = Some(PLACEHOLDER);
                 o2.fill_style = Some(FillStyle::Solid);
                 o2.roughness = Some(o.roughness.unwrap_or(0.0).min(1.0));
-                let fill_ink = if head == "triangle_outline" { Ink::Canvas } else { Ink::Stroke };
+                let fill_ink = if head == "triangle_outline" {
+                    Ink::Canvas
+                } else {
+                    Ink::Stroke
+                };
                 let poly = [
                     Point2D::new(hp[0], hp[1]),
                     Point2D::new(hp[2], hp[3]),
@@ -377,7 +466,11 @@ fn linear(el: &Element, g: &Generator, layers: &mut Vec<Layer>) {
                 o2.fill = Some(PLACEHOLDER);
                 o2.fill_style = Some(FillStyle::Solid);
                 o2.roughness = Some(o.roughness.unwrap_or(0.0).min(1.0));
-                let fill_ink = if head == "diamond_outline" { Ink::Canvas } else { Ink::Stroke };
+                let fill_ink = if head == "diamond_outline" {
+                    Ink::Canvas
+                } else {
+                    Ink::Stroke
+                };
                 let poly = [
                     Point2D::new(hp[0], hp[1]),
                     Point2D::new(hp[2], hp[3]),
@@ -389,8 +482,14 @@ fn linear(el: &Element, g: &Generator, layers: &mut Vec<Layer>) {
             }
             _ => {
                 // arrow, bar and crowfoot variants: two strokes into the tip.
-                push(g.line::<f32>(hp[2], hp[3], hp[0], hp[1], &Some(o.clone())), Ink::Stroke);
-                push(g.line::<f32>(hp[4], hp[5], hp[0], hp[1], &Some(o.clone())), Ink::Stroke);
+                push(
+                    g.line::<f32>(hp[2], hp[3], hp[0], hp[1], &Some(o.clone())),
+                    Ink::Stroke,
+                );
+                push(
+                    g.line::<f32>(hp[4], hp[5], hp[0], hp[1], &Some(o.clone())),
+                    Ink::Stroke,
+                );
             }
         }
     }
@@ -422,7 +521,11 @@ fn arrowhead_points(
     if ops.len() < 2 {
         return None;
     }
-    let index = if position == "start" { 1 } else { ops.len() - 1 };
+    let index = if position == "start" {
+        1
+    } else {
+        ops.len() - 1
+    };
     let (op, data) = &ops[index];
     if *op != OpType::BCurveTo || data.len() < 6 {
         return None;
@@ -456,11 +559,16 @@ fn arrowhead_points(
         (points[0], points[1])
     };
     let length = (((c[0] - p[0]).powi(2) + (c[1] - p[1]).powi(2)).sqrt()) as f32;
-    let mult = if head.starts_with("diamond") { 0.25 } else { 0.5 };
+    let mult = if head.starts_with("diamond") {
+        0.25
+    } else {
+        0.5
+    };
     let min_size = size.min(length * mult);
     let (xs, ys) = (x2 - nx * min_size, y2 - ny * min_size);
     if matches!(head, "dot" | "circle" | "circle_outline") {
-        let diameter = ((ys - y2).powi(2) + (xs - x2).powi(2)).sqrt() + el.stroke_width() as f32 - 2.0;
+        let diameter =
+            ((ys - y2).powi(2) + (xs - x2).powi(2)).sqrt() + el.stroke_width() as f32 - 2.0;
         return Some(vec![x2, y2, diameter.max(1.0)]);
     }
     let angle: f32 = match head {
@@ -499,12 +607,11 @@ fn arrowhead_points(
 pub fn freedraw_outline(el: &Element) -> Vec<[f32; 2]> {
     let pts = el.points();
     let simulate = el.f.simulate_pressure.get().copied().unwrap_or(true);
-    let pressures: Vec<f64> = el
-        .f
-        .pressures
-        .get()
-        .map(|v| v.iter().map(|n| n.0).collect())
-        .unwrap_or_default();
+    let pressures: Vec<f64> =
+        el.f.pressures
+            .get()
+            .map(|v| v.iter().map(|n| n.0).collect())
+            .unwrap_or_default();
     let size = el.stroke_width() * 4.25;
     let thinning = 0.6;
     let streamline = 0.5;
@@ -518,7 +625,11 @@ pub fn freedraw_outline(el: &Element) -> Vec<[f32; 2]> {
     let t = 0.15 + (1.0 - streamline) * 0.85;
     let mut sp: Vec<([f64; 2], f64, f64)> = Vec::new(); // (point, pressure, distance)
     let pr = |i: usize| -> f64 {
-        if simulate { 0.5 } else { pressures.get(i).copied().unwrap_or(0.5) }
+        if simulate {
+            0.5
+        } else {
+            pressures.get(i).copied().unwrap_or(0.5)
+        }
     };
     sp.push((pts[0], pr(0), 0.0));
     for (i, p) in pts.iter().enumerate().skip(1) {
@@ -526,7 +637,10 @@ pub fn freedraw_outline(el: &Element) -> Vec<[f32; 2]> {
         let q = if i == pts.len() - 1 {
             *p
         } else {
-            [prev[0] + (p[0] - prev[0]) * t, prev[1] + (p[1] - prev[1]) * t]
+            [
+                prev[0] + (p[0] - prev[0]) * t,
+                prev[1] + (p[1] - prev[1]) * t,
+            ]
         };
         let d = ((q[0] - prev[0]).powi(2) + (q[1] - prev[1]).powi(2)).sqrt();
         if d < 0.5 && i != pts.len() - 1 {
@@ -599,7 +713,9 @@ pub fn freedraw_outline(el: &Element) -> Vec<[f32; 2]> {
     cap(sp[n - 1].0, left[n - 1], radii[n - 1], &mut poly);
     poly.extend(right.iter().rev());
     cap(sp[0].0, right[0], radii[0], &mut poly);
-    poly.into_iter().map(|p| [p[0] as f32, p[1] as f32]).collect()
+    poly.into_iter()
+        .map(|p| [p[0] as f32, p[1] as f32])
+        .collect()
 }
 
 fn freedraw(el: &Element, g: &Generator, layers: &mut Vec<Layer>) {
@@ -624,7 +740,11 @@ fn freedraw(el: &Element, g: &Generator, layers: &mut Vec<Layer>) {
         ops.push(Op::Quad(a, [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]));
     }
     ops.push(Op::Close);
-    layers.push(Layer { paint: Paint::Fill, ink: Ink::Stroke, ops });
+    layers.push(Layer {
+        paint: Paint::Fill,
+        ink: Ink::Stroke,
+        ops,
+    });
 }
 
 #[cfg(test)]
@@ -639,14 +759,35 @@ mod tests {
     fn generates_every_kind() {
         for (kind, extra) in [
             ("rectangle", r##""roundness":{"type":3}"##),
-            ("rectangle", r##""roundness":null,"backgroundColor":"#ffc9c9","fillStyle":"hachure""##),
+            (
+                "rectangle",
+                r##""roundness":null,"backgroundColor":"#ffc9c9","fillStyle":"hachure""##,
+            ),
             ("diamond", r##""roundness":{"type":2}"##),
-            ("diamond", r##""roundness":null,"backgroundColor":"#a5d8ff","fillStyle":"cross-hatch""##),
-            ("ellipse", r##""backgroundColor":"#b2f2bb","fillStyle":"solid""##),
-            ("line", r##""points":[[0,0],[100,50],[30,80]],"roundness":{"type":2}"##),
-            ("arrow", r##""points":[[0,0],[100,50]],"endArrowhead":"arrow","startArrowhead":"dot""##),
-            ("arrow", r##""points":[[0,0],[100,50]],"endArrowhead":"triangle","startArrowhead":"diamond""##),
-            ("freedraw", r##""points":[[0,0],[10,5],[20,15],[40,20]],"pressures":[],"simulatePressure":true"##),
+            (
+                "diamond",
+                r##""roundness":null,"backgroundColor":"#a5d8ff","fillStyle":"cross-hatch""##,
+            ),
+            (
+                "ellipse",
+                r##""backgroundColor":"#b2f2bb","fillStyle":"solid""##,
+            ),
+            (
+                "line",
+                r##""points":[[0,0],[100,50],[30,80]],"roundness":{"type":2}"##,
+            ),
+            (
+                "arrow",
+                r##""points":[[0,0],[100,50]],"endArrowhead":"arrow","startArrowhead":"dot""##,
+            ),
+            (
+                "arrow",
+                r##""points":[[0,0],[100,50]],"endArrowhead":"triangle","startArrowhead":"diamond""##,
+            ),
+            (
+                "freedraw",
+                r##""points":[[0,0],[10,5],[20,15],[40,20]],"pressures":[],"simulatePressure":true"##,
+            ),
             ("text", r##""text":"Hi","fontSize":20,"fontFamily":5"##),
         ] {
             let e = el(&format!(
@@ -656,7 +797,10 @@ mod tests {
             assert!(!s.layers.is_empty(), "{kind} {extra}");
             // Deterministic per seed.
             let s2 = generate(&e);
-            assert_eq!(format!("{:?}", s.layers[0].ops), format!("{:?}", s2.layers[0].ops));
+            assert_eq!(
+                format!("{:?}", s.layers[0].ops),
+                format!("{:?}", s2.layers[0].ops)
+            );
         }
     }
 }

@@ -54,11 +54,7 @@ where
         .filter(|a| !a.starts_with('-') && !a.is_empty())
         .filter_map(|a| {
             let p = PathBuf::from(&a);
-            let p = if p.is_absolute() {
-                p
-            } else {
-                cwd?.join(p)
-            };
+            let p = if p.is_absolute() { p } else { cwd?.join(p) };
             p.is_file().then(|| p.to_string_lossy().into_owned())
         })
         .collect()
@@ -82,14 +78,22 @@ fn dirname(path: &str) -> &str {
 }
 
 pub fn is_inside(root: &str, path: &str) -> bool {
-    if root.ends_with('/') { path.starts_with(root) } else { path.starts_with(&format!("{root}/")) }
+    if root.ends_with('/') {
+        path.starts_with(root)
+    } else {
+        path.starts_with(&format!("{root}/"))
+    }
 }
 
 /// Decides where a file handed over by the OS should open (issue #38): no
 /// vault yet -> its folder becomes the vault; inside the vault -> a tab;
 /// anywhere else -> a standalone editor window. Returns the root in effect
 /// afterwards so a batch of files is routed consistently.
-pub fn route_open_request(path: &str, root: Option<&str>, h: &mut dyn OpenRequestHandlers) -> Option<String> {
+pub fn route_open_request(
+    path: &str,
+    root: Option<&str>,
+    h: &mut dyn OpenRequestHandlers,
+) -> Option<String> {
     match root {
         None => {
             let dir = dirname(path).to_string();
@@ -117,10 +121,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let note = dir.path().join("note.md");
         std::fs::write(&note, "# hi").unwrap();
-        let got = paths_from_args(
-            ["--flag", "note.md", "missing.md", ""],
-            Some(dir.path()),
-        );
+        let got = paths_from_args(["--flag", "note.md", "missing.md", ""], Some(dir.path()));
         assert_eq!(got, vec![note.to_string_lossy().into_owned()]);
     }
 
@@ -131,7 +132,10 @@ mod tests {
         q.push(&tx, vec![]);
         assert!(rx.try_recv().is_err());
         q.push(&tx, vec!["/a.md".into()]);
-        assert_eq!(rx.try_recv().unwrap(), CoreEvent::OpenFiles(vec!["/a.md".into()]));
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            CoreEvent::OpenFiles(vec!["/a.md".into()])
+        );
         assert_eq!(q.take(), vec!["/a.md".to_string()]);
         assert!(q.take().is_empty());
     }

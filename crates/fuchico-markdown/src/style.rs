@@ -139,10 +139,9 @@ impl StyleId {
             StyleId::Property => ColorToken::Foreground,
             StyleId::Punctuation | StyleId::Quote => ColorToken::Muted,
             StyleId::Invalid => ColorToken::Destructive,
-            StyleId::Heading
-            | StyleId::Emphasis
-            | StyleId::Strong
-            | StyleId::Strikethrough => return None,
+            StyleId::Heading | StyleId::Emphasis | StyleId::Strong | StyleId::Strikethrough => {
+                return None;
+            }
         })
     }
 }
@@ -175,7 +174,9 @@ impl StyleSet {
     }
 
     pub fn iter(self) -> impl Iterator<Item = StyleId> {
-        StyleId::ALL.into_iter().filter(move |id| self.contains(*id))
+        StyleId::ALL
+            .into_iter()
+            .filter(move |id| self.contains(*id))
     }
 
     /// Space-separated names, for tests and debugging.
@@ -434,7 +435,10 @@ pub fn flatten_spans(spans: &[(Range<usize>, StyleId)]) -> Vec<StyleRun> {
         }
         match runs.last_mut() {
             Some(last) if last.range.end == a && last.styles == set => last.range.end = b,
-            _ => runs.push(StyleRun { range: a..b, styles: set }),
+            _ => runs.push(StyleRun {
+                range: a..b,
+                styles: set,
+            }),
         }
     }
     runs
@@ -463,6 +467,8 @@ mod tests {
         let runs = flatten_spans(&[(0..10, StyleId::Strong), (2..4, StyleId::Emphasis)]);
         assert_eq!(runs.len(), 3);
         assert_eq!(runs[1].range, 2..4);
-        assert!(runs[1].styles.contains(StyleId::Strong) && runs[1].styles.contains(StyleId::Emphasis));
+        assert!(
+            runs[1].styles.contains(StyleId::Strong) && runs[1].styles.contains(StyleId::Emphasis)
+        );
     }
 }

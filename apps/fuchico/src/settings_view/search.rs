@@ -23,14 +23,20 @@ pub fn visibility(terms: &[String], head: &str, fields: &[Option<&str>]) -> Opti
     if terms.is_empty() || matches(head, terms) {
         return Some(vec![true; fields.len()]);
     }
-    let shown: Vec<bool> = fields.iter().map(|f| f.is_none_or(|t| matches(t, terms))).collect();
+    let shown: Vec<bool> = fields
+        .iter()
+        .map(|f| f.is_none_or(|t| matches(t, terms)))
+        .collect();
     let any_field = fields.iter().zip(&shown).any(|(f, s)| f.is_some() && *s);
     let has_fields = fields.iter().any(Option::is_some);
     if any_field {
         return Some(shown);
     }
     if !has_fields {
-        let all: String = std::iter::once(head).chain(fields.iter().flatten().copied()).collect::<Vec<_>>().join(" ");
+        let all: String = std::iter::once(head)
+            .chain(fields.iter().flatten().copied())
+            .collect::<Vec<_>>()
+            .join(" ");
         return matches(&all, terms).then(|| vec![true; fields.len()]);
     }
     None
@@ -57,15 +63,25 @@ mod tests {
     #[test]
     fn head_match_shows_everything() {
         let t = terms("theme");
-        assert_eq!(visibility(&t, "Theme A theme is", &[Some("Palette"), None]), Some(vec![true, true]));
+        assert_eq!(
+            visibility(&t, "Theme A theme is", &[Some("Palette"), None]),
+            Some(vec![true, true])
+        );
     }
 
     #[test]
     fn fields_filter_individually() {
         let t = terms("rulers");
-        let v = visibility(&t, "Editor Behavior Gutter", &[Some("Relative line numbers"), Some("Vertical rulers"), None]);
+        let v = visibility(
+            &t,
+            "Editor Behavior Gutter",
+            &[Some("Relative line numbers"), Some("Vertical rulers"), None],
+        );
         assert_eq!(v, Some(vec![false, true, true]));
-        assert_eq!(visibility(&terms("zzz"), "Editor Behavior", &[Some("Tab size"), None]), None);
+        assert_eq!(
+            visibility(&terms("zzz"), "Editor Behavior", &[Some("Tab size"), None]),
+            None
+        );
     }
 
     #[test]

@@ -22,8 +22,8 @@ use fuchico_core::events::CoreEvent;
 use fuchico_core::fs::file::{ReadResult, fs_read_file, fs_write_file};
 use fuchico_excalidraw::{ExcalidrawEvent, ExcalidrawStyle, ExcalidrawView, Scene};
 use gpui_kit::{
-    App, AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement,
-    ParentElement, Render, Styled, Subscription, Window, div,
+    App, AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
+    IntoElement, ParentElement, Render, Styled, Subscription, Window, div,
 };
 
 use crate::bus::{self, AppEvent};
@@ -93,13 +93,24 @@ fn same_dir(a: &str, b: &str) -> bool {
 }
 
 fn style_for(cx: &App) -> ExcalidrawStyle {
-    if AppTheme::get(cx).appearance.is_dark() { ExcalidrawStyle::dark() } else { ExcalidrawStyle::light() }
+    if AppTheme::get(cx).appearance.is_dark() {
+        ExcalidrawStyle::dark()
+    } else {
+        ExcalidrawStyle::light()
+    }
 }
 
 impl ExcalidrawPane {
-    pub fn new(path: String, pcx: PaneContext, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        path: String,
+        pcx: PaneContext,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let p = path.clone();
-        let read = cx.background_spawn(async move { (interpret_read(fs_read_file(p.clone())), parent_dirs(&p)) });
+        let read = cx.background_spawn(async move {
+            (interpret_read(fs_read_file(p.clone())), parent_dirs(&p))
+        });
         cx.spawn_in(window, async move |this, cx| {
             let (loaded, dirs) = read.await;
             this.update_in(cx, |this, window, cx| {
@@ -120,7 +131,10 @@ impl ExcalidrawPane {
                 v.update(cx, |_, cx| cx.notify());
             }
         });
-        let dirs = Path::new(&path).parent().map(|p| vec![p.to_string_lossy().into_owned()]).unwrap_or_default();
+        let dirs = Path::new(&path)
+            .parent()
+            .map(|p| vec![p.to_string_lossy().into_owned()])
+            .unwrap_or_default();
         ExcalidrawPane {
             save_path: Rc::new(RefCell::new(path.clone())),
             path,
@@ -273,7 +287,10 @@ impl PaneItem for ExcalidrawPane {
 
     fn set_path(&mut self, path: String, cx: &mut Context<Self>) {
         *self.save_path.borrow_mut() = path.clone();
-        self.dirs = Path::new(&path).parent().map(|p| vec![p.to_string_lossy().into_owned()]).unwrap_or_default();
+        self.dirs = Path::new(&path)
+            .parent()
+            .map(|p| vec![p.to_string_lossy().into_owned()])
+            .unwrap_or_default();
         self.path = path;
         cx.notify();
     }
@@ -303,13 +320,19 @@ impl Render for ExcalidrawPane {
                 .justify_center()
                 .bg(th.colors.background)
                 .text_size(u(13.))
-                .text_color(if error { th.colors.destructive } else { th.colors.muted_foreground })
+                .text_color(if error {
+                    th.colors.destructive
+                } else {
+                    th.colors.muted_foreground
+                })
                 .child(text)
         };
         match &self.state {
             State::Loading => status(t!(CommonLoading), false),
             State::Failed(e) => status(e.clone(), true),
-            State::Ready(v) if v.read(cx).error().is_some() => status(t!(ExcalidrawMalformed), true),
+            State::Ready(v) if v.read(cx).error().is_some() => {
+                status(t!(ExcalidrawMalformed), true)
+            }
             State::Ready(v) => div().size_full().min_h_0().child(v.clone()),
         }
     }
@@ -324,7 +347,11 @@ pub fn drawing_template() -> String {
 /// name has no `.` (the original's `defaultExt`).
 pub fn drawing_file_name(name: &str) -> String {
     let name = name.trim();
-    if name.contains('.') { name.to_string() } else { format!("{name}.excalidraw") }
+    if name.contains('.') {
+        name.to_string()
+    } else {
+        format!("{name}.excalidraw")
+    }
 }
 
 /// Creates `<dir>/<name>` holding an empty drawing (emits
@@ -336,7 +363,12 @@ pub fn create_drawing(dir: &str, name: &str) -> Result<String, String> {
     if Path::new(&path).exists() {
         return Err(format!("{file} already exists"));
     }
-    fs_write_file(path.clone(), drawing_template(), Some("template".into()), &*bus::sink())?;
+    fs_write_file(
+        path.clone(),
+        drawing_template(),
+        Some("template".into()),
+        &*bus::sink(),
+    )?;
     Ok(path)
 }
 
@@ -349,10 +381,19 @@ mod tests {
 
     #[test]
     fn read_results() {
-        let ok = Ok(ReadResult::Text { content: "{}".into(), size: 2 });
+        let ok = Ok(ReadResult::Text {
+            content: "{}".into(),
+            size: 2,
+        });
         assert_eq!(interpret_read(ok), Loaded::Json("{}".into()));
-        assert_eq!(interpret_read(Ok(ReadResult::Binary { size: 3 })), Loaded::Error(t!(ExcalidrawNotValid)));
-        assert_eq!(interpret_read(Err("boom".into())), Loaded::Error("boom".into()));
+        assert_eq!(
+            interpret_read(Ok(ReadResult::Binary { size: 3 })),
+            Loaded::Error(t!(ExcalidrawNotValid))
+        );
+        assert_eq!(
+            interpret_read(Err("boom".into())),
+            Loaded::Error("boom".into())
+        );
     }
 
     #[test]

@@ -24,7 +24,10 @@ use gpui_kit::component::menu::PopupMenu;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Icon, IconName};
 use gpui_kit::prelude::*;
-use gpui_kit::{AnyElement, Context, EventEmitter, FontWeight, SharedString, Subscription, WeakEntity, Window, div};
+use gpui_kit::{
+    AnyElement, Context, EventEmitter, FontWeight, SharedString, Subscription, WeakEntity, Window,
+    div,
+};
 
 use crate::assets::AppIcon;
 use crate::bus::{self, AppEvent};
@@ -36,7 +39,10 @@ use crate::workspace::view::{DockEvent, ViewEvent};
 pub enum LinkIndex {
     Idle,
     Loading,
-    Loaded { refs: Rc<Vec<LinkRef>>, files: Rc<Vec<String>> },
+    Loaded {
+        refs: Rc<Vec<LinkRef>>,
+        files: Rc<Vec<String>>,
+    },
     Error(String),
 }
 
@@ -52,9 +58,15 @@ pub struct BacklinksPane {
 }
 
 impl BacklinksPane {
-    pub fn new(root: Option<String>, target: Option<String>, _window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        root: Option<String>,
+        target: Option<String>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let sub = bus::subscribe(cx, |this: &mut BacklinksPane, ev, cx| {
-            if let AppEvent::Core(CoreEvent::FileWritten { .. } | CoreEvent::FsChanged { .. }) = ev {
+            if let AppEvent::Core(CoreEvent::FileWritten { .. } | CoreEvent::FsChanged { .. }) = ev
+            {
                 this.scan(cx);
             }
         });
@@ -107,7 +119,9 @@ impl BacklinksPane {
 
     /// `scan(root)`: "loading" only before the first result.
     fn scan(&mut self, cx: &mut Context<Self>) {
-        let Some(root) = self.root.clone() else { return };
+        let Some(root) = self.root.clone() else {
+            return;
+        };
         if self.scanning {
             self.rescan = true;
             return;
@@ -132,7 +146,10 @@ impl BacklinksPane {
                 }
                 this.scanning = false;
                 this.index = match res {
-                    Ok((refs, files)) => LinkIndex::Loaded { refs: Rc::new(refs), files: Rc::new(files) },
+                    Ok((refs, files)) => LinkIndex::Loaded {
+                        refs: Rc::new(refs),
+                        files: Rc::new(files),
+                    },
                     Err(e) => LinkIndex::Error(e),
                 };
                 this.regroup();
@@ -147,7 +164,10 @@ impl BacklinksPane {
     }
 
     fn open(&self, path: &str, line: Option<usize>, cx: &mut Context<Self>) {
-        cx.emit(ViewEvent::OpenFile { path: path.to_string(), line: line.map(|l| l as u32) });
+        cx.emit(ViewEvent::OpenFile {
+            path: path.to_string(),
+            line: line.map(|l| l as u32),
+        });
     }
 
     fn render_header(&self, total: usize, cx: &mut Context<Self>) -> impl IntoElement + use<> {
@@ -175,7 +195,11 @@ impl BacklinksPane {
             .border_b_1()
             .border_color(th.colors.border)
             .bg(th.colors.card)
-            .child(Icon::new(AppIcon::Link2).size(u(14.)).text_color(th.colors.foreground))
+            .child(
+                Icon::new(AppIcon::Link2)
+                    .size(u(14.))
+                    .text_color(th.colors.foreground),
+            )
             .child(
                 div()
                     .mr_auto()
@@ -210,7 +234,13 @@ impl BacklinksPane {
     fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let th = AppTheme::get(cx).clone();
         let empty = |text: String| {
-            div().px(u(16.)).py(u(24.)).text_center().text_color(th.colors.muted_foreground).child(text).into_any_element()
+            div()
+                .px(u(16.))
+                .py(u(24.))
+                .text_center()
+                .text_color(th.colors.muted_foreground)
+                .child(text)
+                .into_any_element()
         };
         let mut children: Vec<AnyElement> = Vec::new();
         match (&self.target, &self.index) {
@@ -239,7 +269,12 @@ impl BacklinksPane {
     }
 }
 
-fn render_group(view: &WeakEntity<BacklinksPane>, gi: usize, g: &BacklinkGroup, th: &AppTheme) -> AnyElement {
+fn render_group(
+    view: &WeakEntity<BacklinksPane>,
+    gi: usize,
+    g: &BacklinkGroup,
+    th: &AppTheme,
+) -> AnyElement {
     let (hover_bg, hover_fg) = (alpha(th.colors.accent, 0.6), th.colors.accent_foreground);
     let menu = |view: WeakEntity<BacklinksPane>, path: String| {
         move |menu, _: &mut Window, _: &mut Context<PopupMenu>| {
@@ -271,13 +306,24 @@ fn render_group(view: &WeakEntity<BacklinksPane>, gi: usize, g: &BacklinkGroup, 
         .cursor_pointer()
         .hover(move |s| s.bg(hover_bg).text_color(hover_fg))
         .child(Icon::new(IconName::File).size(u(13.)).flex_none())
-        .child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_ellipsis().child(note_name(&g.path)))
+        .child(
+            div()
+                .min_w_0()
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .text_ellipsis()
+                .child(note_name(&g.path)),
+        )
         .tooltip(move |w, cx| Tooltip::new(tip.clone()).build(w, cx))
         .on_click(move |_, _, cx| {
             v.update(cx, |this, cx| this.open(&p, None, cx)).ok();
         })
         .debug_selector(|| format!("backlinks-file:{gi}"));
-    let file_row = with_context_menu(("backlinks-file-menu", gi), file_row, menu(view.clone(), g.path.clone()));
+    let file_row = with_context_menu(
+        ("backlinks-file-menu", gi),
+        file_row,
+        menu(view.clone(), g.path.clone()),
+    );
     let rows = g.refs.iter().enumerate().map(|(ri, r)| {
         let (p, v, line) = (g.path.clone(), view.clone(), r.line);
         let row = div()
@@ -301,14 +347,29 @@ fn render_group(view: &WeakEntity<BacklinksPane>, gi: usize, g: &BacklinkGroup, 
                     .opacity(0.7)
                     .child(r.line.to_string()),
             )
-            .child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_ellipsis().child(r.context.clone()))
+            .child(
+                div()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
+                    .child(r.context.clone()),
+            )
             .on_click(move |_, _, cx| {
                 v.update(cx, |this, cx| this.open(&p, Some(line), cx)).ok();
             })
             .debug_selector(|| format!("backlinks-row-{gi}-{ri}"));
-        with_context_menu(SharedString::from(format!("backlinks-row-menu-{gi}-{ri}")), row, menu(view.clone(), g.path.clone()))
+        with_context_menu(
+            SharedString::from(format!("backlinks-row-menu-{gi}-{ri}")),
+            row,
+            menu(view.clone(), g.path.clone()),
+        )
     });
-    div().py(u(4.)).child(file_row).children(rows).into_any_element()
+    div()
+        .py(u(4.))
+        .child(file_row)
+        .children(rows)
+        .into_any_element()
 }
 
 /// The pane's `basename`: last `/` segment without `.md`/`.markdown`
@@ -375,28 +436,43 @@ mod ui_tests {
         let dir = tempfile::tempdir().unwrap();
         let root = std::fs::canonicalize(dir.path()).unwrap();
         std::fs::write(root.join("target.md"), "# Target\n").unwrap();
-        std::fs::write(root.join("a.md"), "intro\nsee [[target]]\nand [[Target|again]]\n").unwrap();
+        std::fs::write(
+            root.join("a.md"),
+            "intro\nsee [[target]]\nand [[Target|again]]\n",
+        )
+        .unwrap();
         std::fs::write(root.join("b.md"), "[link](target.md)\n").unwrap();
         std::fs::write(root.join("c.md"), "no links\n").unwrap();
         let p = |n: &str| root.join(n).to_string_lossy().into_owned();
         let (root_s, target) = (root.to_string_lossy().into_owned(), p("target.md"));
         let t2 = target.clone();
-        let (mut ui, pane) =
-            test_ui::open(cx, (900., 640.), move |window, cx| BacklinksPane::new(Some(root_s), Some(t2), window, cx));
+        let (mut ui, pane) = test_ui::open(cx, (900., 640.), move |window, cx| {
+            BacklinksPane::new(Some(root_s), Some(t2), window, cx)
+        });
         let opens: Rc<RefCell<Vec<ViewEvent>>> = Rc::default();
         let closed = Rc::new(RefCell::new(false));
         let (o, c) = (opens.clone(), closed.clone());
         cx.update(|cx| {
-            cx.subscribe(&pane, move |_, e: &ViewEvent, _| o.borrow_mut().push(e.clone())).detach();
-            cx.subscribe(&pane, move |_, _: &DockEvent, _| *c.borrow_mut() = true).detach();
+            cx.subscribe(&pane, move |_, e: &ViewEvent, _| {
+                o.borrow_mut().push(e.clone())
+            })
+            .detach();
+            cx.subscribe(&pane, move |_, _: &DockEvent, _| *c.borrow_mut() = true)
+                .detach();
         });
 
         let pv = pane.clone();
-        ui.wait("link index", move |cx| matches!(pv.read(cx).index, LinkIndex::Loaded { .. })).await;
+        ui.wait("link index", move |cx| {
+            matches!(pv.read(cx).index, LinkIndex::Loaded { .. })
+        })
+        .await;
         let groups = cx.update(|cx| pane.read(cx).groups().to_vec());
         assert_eq!(groups.len(), 2, "{groups:?}");
         assert_eq!(groups[0].path, p("a.md"));
-        assert_eq!(groups[0].refs.iter().map(|r| r.line).collect::<Vec<_>>(), vec![2, 3]);
+        assert_eq!(
+            groups[0].refs.iter().map(|r| r.line).collect::<Vec<_>>(),
+            vec![2, 3]
+        );
         assert_eq!(groups[1].path, p("b.md"));
 
         ui.click("backlinks-row-0-1");
@@ -405,8 +481,14 @@ mod ui_tests {
         assert_eq!(
             *opens.borrow(),
             vec![
-                ViewEvent::OpenFile { path: p("a.md"), line: Some(3) },
-                ViewEvent::OpenFile { path: p("b.md"), line: None },
+                ViewEvent::OpenFile {
+                    path: p("a.md"),
+                    line: Some(3)
+                },
+                ViewEvent::OpenFile {
+                    path: p("b.md"),
+                    line: None
+                },
             ]
         );
         assert!(*closed.borrow());
@@ -424,8 +506,14 @@ mod ui_tests {
         // A new linking note shows up after fs:changed.
         std::fs::write(root.join("d.md"), "[[target]]\n").unwrap();
         let d = root.to_string_lossy().into_owned();
-        cx.update(|cx| bus::emit(cx, AppEvent::Core(CoreEvent::FsChanged { dir: d, from: None })));
+        cx.update(|cx| {
+            bus::emit(
+                cx,
+                AppEvent::Core(CoreEvent::FsChanged { dir: d, from: None }),
+            )
+        });
         let pv = pane.clone();
-        ui.wait("rescan", move |cx| pv.read(cx).groups().len() == 3).await;
+        ui.wait("rescan", move |cx| pv.read(cx).groups().len() == 3)
+            .await;
     }
 }

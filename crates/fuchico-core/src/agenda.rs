@@ -18,20 +18,34 @@ pub struct CalendarCell {
 pub fn month_weeks(year: i32, month: u32) -> Vec<Vec<CalendarCell>> {
     let first = NaiveDate::from_ymd_opt(year, month + 1, 1).expect("valid month");
     let start_weekday = first.weekday().num_days_from_sunday();
-    let next = if month == 11 { NaiveDate::from_ymd_opt(year + 1, 1, 1) } else { NaiveDate::from_ymd_opt(year, month + 2, 1) }.unwrap();
+    let next = if month == 11 {
+        NaiveDate::from_ymd_opt(year + 1, 1, 1)
+    } else {
+        NaiveDate::from_ymd_opt(year, month + 2, 1)
+    }
+    .unwrap();
     let days_in_month = (next - first).num_days() as u32;
 
     let mut cells = Vec::new();
     for i in 0..start_weekday {
-        cells.push(CalendarCell { key: format!("{year}-{month}-lead-{i}"), iso: None });
+        cells.push(CalendarCell {
+            key: format!("{year}-{month}-lead-{i}"),
+            iso: None,
+        });
     }
     for d in 1..=days_in_month {
         let iso = format!("{year}-{:02}-{d:02}", month + 1);
-        cells.push(CalendarCell { key: iso.clone(), iso: Some(iso) });
+        cells.push(CalendarCell {
+            key: iso.clone(),
+            iso: Some(iso),
+        });
     }
     let mut trail = 0;
     while cells.len() % 7 != 0 {
-        cells.push(CalendarCell { key: format!("{year}-{month}-trail-{trail}"), iso: None });
+        cells.push(CalendarCell {
+            key: format!("{year}-{month}-trail-{trail}"),
+            iso: None,
+        });
         trail += 1;
     }
     cells.chunks(7).map(|c| c.to_vec()).collect()
@@ -59,17 +73,40 @@ pub struct AgendaBuckets<'a> {
 
 /// `today` and `selected_date` are `YYYY-MM-DD` strings (compared
 /// lexicographically like the TS).
-pub fn bucket_items<'a>(items: &'a [AgendaItem], today: &str, selected_date: Option<&str>) -> AgendaBuckets<'a> {
+pub fn bucket_items<'a>(
+    items: &'a [AgendaItem],
+    today: &str,
+    selected_date: Option<&str>,
+) -> AgendaBuckets<'a> {
     let filtered: Vec<&AgendaItem> = match selected_date {
-        Some(d) => items.iter().filter(|i| i.date.as_deref() == Some(d)).collect(),
+        Some(d) => items
+            .iter()
+            .filter(|i| i.date.as_deref() == Some(d))
+            .collect(),
         None => items.iter().collect(),
     };
     let due_date = selected_date.unwrap_or(today);
     AgendaBuckets {
-        overdue: filtered.iter().copied().filter(|i| !i.checked && i.date.as_deref().is_some_and(|d| d < today)).collect(),
-        due: filtered.iter().copied().filter(|i| i.date.as_deref() == Some(due_date)).collect(),
-        upcoming: filtered.iter().copied().filter(|i| i.date.as_deref().is_some_and(|d| d > today)).collect(),
-        no_date: filtered.iter().copied().filter(|i| i.date.is_none() && i.recurrence.is_none()).collect(),
+        overdue: filtered
+            .iter()
+            .copied()
+            .filter(|i| !i.checked && i.date.as_deref().is_some_and(|d| d < today))
+            .collect(),
+        due: filtered
+            .iter()
+            .copied()
+            .filter(|i| i.date.as_deref() == Some(due_date))
+            .collect(),
+        upcoming: filtered
+            .iter()
+            .copied()
+            .filter(|i| i.date.as_deref().is_some_and(|d| d > today))
+            .collect(),
+        no_date: filtered
+            .iter()
+            .copied()
+            .filter(|i| i.date.is_none() && i.recurrence.is_none())
+            .collect(),
         routines: items.iter().filter(|i| i.recurrence.is_some()).collect(),
     }
 }
@@ -101,7 +138,10 @@ mod tests {
         assert_eq!(weeks[0].iter().filter(|c| c.iso.is_none()).count(), 6);
         assert_eq!(weeks[0][6].iso.as_deref(), Some("2026-08-01"));
         assert!(weeks.last().unwrap().iter().any(|c| c.iso.is_some()));
-        assert_eq!(weeks.iter().flatten().filter(|c| c.iso.is_some()).count(), 31);
+        assert_eq!(
+            weeks.iter().flatten().filter(|c| c.iso.is_some()).count(),
+            31
+        );
         assert_eq!(weeks[0][0].key, "2026-7-lead-0");
     }
 

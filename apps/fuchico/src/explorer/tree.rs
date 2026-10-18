@@ -68,14 +68,26 @@ pub struct PendingCreate {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Row {
-    Entry { entry: Entry, depth: usize, expanded: bool },
+    Entry {
+        entry: Entry,
+        depth: usize,
+        expanded: bool,
+    },
     /// The entry being renamed (inline input).
     Rename { entry: Entry, depth: usize },
     /// The pending-create input inside an expanded folder.
-    Pending { depth: usize, kind: PendingKind, placeholder: Option<String> },
+    Pending {
+        depth: usize,
+        kind: PendingKind,
+        placeholder: Option<String>,
+    },
     /// "Loading…" / error line under an expanded folder (`depth` is the
     /// row's own depth, i.e. the folder's depth + 1).
-    Status { depth: usize, text: String, error: bool },
+    Status {
+        depth: usize,
+        text: String,
+        error: bool,
+    },
 }
 
 impl Row {
@@ -106,13 +118,21 @@ pub fn read_dir(dir: &str) -> DirState {
 }
 
 pub fn join(dir: &str, name: &str) -> String {
-    if dir.ends_with('/') { format!("{dir}{name}") } else { format!("{dir}/{name}") }
+    if dir.ends_with('/') {
+        format!("{dir}{name}")
+    } else {
+        format!("{dir}/{name}")
+    }
 }
 
 /// `dirname` of the original (`"/"` for top-level paths).
 pub fn parent_dir(path: &str) -> Option<String> {
     let i = path.rfind('/')?;
-    Some(if i == 0 { "/".to_string() } else { path[..i].to_string() })
+    Some(if i == 0 {
+        "/".to_string()
+    } else {
+        path[..i].to_string()
+    })
 }
 
 fn dirname(path: &str) -> String {
@@ -120,7 +140,10 @@ fn dirname(path: &str) -> String {
 }
 
 pub fn basename(path: &str) -> &str {
-    path.trim_end_matches('/').rsplit('/').next().unwrap_or(path)
+    path.trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or(path)
 }
 
 /// Depth-first walk over loaded, expanded folders.
@@ -132,7 +155,12 @@ pub fn flatten(
     pending: Option<&PendingCreate>,
 ) -> Vec<Row> {
     let mut out = Vec::new();
-    let ctx = Walk { tree, expanded, renaming, pending };
+    let ctx = Walk {
+        tree,
+        expanded,
+        renaming,
+        pending,
+    };
     ctx.walk(root, 0, &mut out);
     out
 }
@@ -146,28 +174,45 @@ struct Walk<'a> {
 
 impl Walk<'_> {
     fn walk(&self, dir: &str, depth: usize, out: &mut Vec<Row>) {
-        let Some(DirState::Loaded(entries)) = self.tree.get(dir) else { return };
+        let Some(DirState::Loaded(entries)) = self.tree.get(dir) else {
+            return;
+        };
         for e in entries {
             let open = e.is_dir && self.expanded.contains(&e.path);
             if self.renaming == Some(e.path.as_str()) {
-                out.push(Row::Rename { entry: e.clone(), depth });
+                out.push(Row::Rename {
+                    entry: e.clone(),
+                    depth,
+                });
             } else {
-                out.push(Row::Entry { entry: e.clone(), depth, expanded: open });
+                out.push(Row::Entry {
+                    entry: e.clone(),
+                    depth,
+                    expanded: open,
+                });
             }
             if !open {
                 continue;
             }
             if let Some(p) = self.pending.filter(|p| p.parent == e.path) {
-                out.push(Row::Pending { depth: depth + 1, kind: p.kind, placeholder: p.placeholder.clone() });
+                out.push(Row::Pending {
+                    depth: depth + 1,
+                    kind: p.kind,
+                    placeholder: p.placeholder.clone(),
+                });
             }
             match self.tree.get(&e.path) {
                 Some(DirState::Loaded(_)) => self.walk(&e.path, depth + 1, out),
-                Some(DirState::Error(msg)) => {
-                    out.push(Row::Status { depth: depth + 1, text: msg.clone(), error: true })
-                }
-                Some(DirState::Loading) => {
-                    out.push(Row::Status { depth: depth + 1, text: crate::t!(CommonLoading), error: false })
-                }
+                Some(DirState::Error(msg)) => out.push(Row::Status {
+                    depth: depth + 1,
+                    text: msg.clone(),
+                    error: true,
+                }),
+                Some(DirState::Loading) => out.push(Row::Status {
+                    depth: depth + 1,
+                    text: crate::t!(CommonLoading),
+                    error: false,
+                }),
                 None => {}
             }
         }
@@ -176,7 +221,9 @@ impl Walk<'_> {
 
 /// Paths of the visible entry rows, in order (`entryPaths`).
 pub fn entry_paths(rows: &[Row]) -> Vec<String> {
-    rows.iter().filter_map(|r| r.entry_path().map(str::to_string)).collect()
+    rows.iter()
+        .filter_map(|r| r.entry_path().map(str::to_string))
+        .collect()
 }
 
 /// `movePath` skip rules: not into its own parent, not into itself or a
@@ -188,7 +235,11 @@ pub fn can_move(from: &str, to_dir: &str) -> bool {
 /// Where a drop/paste on a row lands: folders receive it, files stand in
 /// for their parent folder.
 pub fn drop_dir_for(path: &str, is_dir: bool) -> String {
-    if is_dir { path.to_string() } else { dirname(path) }
+    if is_dir {
+        path.to_string()
+    } else {
+        dirname(path)
+    }
 }
 
 /// `commitCreate` name: trimmed, `None` when empty; `default_ext` appended
@@ -233,18 +284,26 @@ pub struct ImportResult {
 pub fn import_files(files: &[PathBuf], to_dir: &str, ts: &str) -> ImportResult {
     let mut out = ImportResult::default();
     for f in files {
-        let Some(name) = f.file_name().and_then(|n| n.to_str()).filter(|n| !n.is_empty()) else { continue };
-        let res = std::fs::read(f).map_err(|e| e.to_string()).and_then(|bytes| {
-            let path = join(to_dir, name);
-            match fuchico_core::fs::file::fs_write_binary_bytes(&path, &bytes) {
-                Ok(()) => Ok(path),
-                Err(e) if e.contains("already exists") => {
-                    let path = join(to_dir, &unique_import_name(name, ts));
-                    fuchico_core::fs::file::fs_write_binary_bytes(&path, &bytes).map(|_| path)
+        let Some(name) = f
+            .file_name()
+            .and_then(|n| n.to_str())
+            .filter(|n| !n.is_empty())
+        else {
+            continue;
+        };
+        let res = std::fs::read(f)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| {
+                let path = join(to_dir, name);
+                match fuchico_core::fs::file::fs_write_binary_bytes(&path, &bytes) {
+                    Ok(()) => Ok(path),
+                    Err(e) if e.contains("already exists") => {
+                        let path = join(to_dir, &unique_import_name(name, ts));
+                        fuchico_core::fs::file::fs_write_binary_bytes(&path, &bytes).map(|_| path)
+                    }
+                    Err(e) => Err(e),
                 }
-                Err(e) => Err(e),
-            }
-        });
+            });
         match res {
             Ok(p) => out.imported.push(p),
             Err(e) => out.errors.push(format!("{name}: {e}")),
@@ -310,7 +369,11 @@ impl Selection {
 
     /// `targetsFor`: the whole selection when `path` is in it, else `path`.
     pub fn targets_for(&self, path: &str) -> Vec<String> {
-        if self.contains(path) { self.paths.clone() } else { vec![path.to_string()] }
+        if self.contains(path) {
+            self.paths.clone()
+        } else {
+            vec![path.to_string()]
+        }
     }
 
     /// Drops paths whose rows are no longer visible; returns whether
@@ -333,12 +396,18 @@ pub fn type_ahead_target(buffer: &str, names: &[String], current: Option<usize>)
     let first = buffer.chars().next()?;
     let len = buffer.chars().count();
     let cycling = len > 1 && buffer.chars().all(|c| c == first);
-    let prefix: String = if cycling { first.to_string() } else { buffer.to_string() };
+    let prefix: String = if cycling {
+        first.to_string()
+    } else {
+        buffer.to_string()
+    };
     let cur = current.map(|c| c as isize).unwrap_or(-1);
     let start = if cycling || len == 1 { cur + 1 } else { cur };
     let n = names.len();
     let start = start.max(0) as usize;
-    (0..n).map(|step| (start + step) % n).find(|&i| names[i].to_lowercase().starts_with(&prefix))
+    (0..n)
+        .map(|step| (start + step) % n)
+        .find(|&i| names[i].to_lowercase().starts_with(&prefix))
 }
 
 #[cfg(test)]
@@ -346,7 +415,11 @@ mod tests {
     use super::*;
 
     fn e(dir: &str, name: &str, is_dir: bool) -> Entry {
-        Entry { name: name.into(), path: join(dir, name), is_dir }
+        Entry {
+            name: name.into(),
+            path: join(dir, name),
+            is_dir,
+        }
     }
 
     fn label(r: &Row) -> String {
@@ -360,8 +433,18 @@ mod tests {
 
     fn sample() -> (Tree, HashSet<String>) {
         let mut t = Tree::default();
-        t.set("/v".into(), DirState::Loaded(vec![e("/v", "a", true), e("/v", "b", true), e("/v", "z.md", false)]));
-        t.set("/v/a".into(), DirState::Loaded(vec![e("/v/a", "x.md", false)]));
+        t.set(
+            "/v".into(),
+            DirState::Loaded(vec![
+                e("/v", "a", true),
+                e("/v", "b", true),
+                e("/v", "z.md", false),
+            ]),
+        );
+        t.set(
+            "/v/a".into(),
+            DirState::Loaded(vec![e("/v/a", "x.md", false)]),
+        );
         t.set("/v/b".into(), DirState::Loading);
         let ex: HashSet<String> = ["/v/a", "/v/b"].iter().map(|s| s.to_string()).collect();
         (t, ex)
@@ -370,17 +453,35 @@ mod tests {
     #[test]
     fn flattens_expanded_folders_only() {
         let (t, ex) = sample();
-        let rows: Vec<_> = flatten(&t, "/v", &ex, None, None).iter().map(label).collect();
+        let rows: Vec<_> = flatten(&t, "/v", &ex, None, None)
+            .iter()
+            .map(label)
+            .collect();
         assert_eq!(rows, ["0:a", "1:x.md", "0:b", "1:status", "0:z.md"]);
     }
 
     #[test]
     fn pending_comes_first_and_rename_replaces_row() {
         let (t, ex) = sample();
-        let p = PendingCreate { parent: "/v/a".into(), kind: PendingKind::File, default_ext: None, placeholder: None };
+        let p = PendingCreate {
+            parent: "/v/a".into(),
+            kind: PendingKind::File,
+            default_ext: None,
+            placeholder: None,
+        };
         let rows = flatten(&t, "/v", &ex, Some("/v/z.md"), Some(&p));
         let labels: Vec<_> = rows.iter().map(label).collect();
-        assert_eq!(labels, ["0:a", "1:pending", "1:x.md", "0:b", "1:status", "0:rename:z.md"]);
+        assert_eq!(
+            labels,
+            [
+                "0:a",
+                "1:pending",
+                "1:x.md",
+                "0:b",
+                "1:status",
+                "0:rename:z.md"
+            ]
+        );
         assert_eq!(entry_paths(&rows), ["/v/a", "/v/a/x.md", "/v/b"]);
     }
 
@@ -407,17 +508,29 @@ mod tests {
     fn create_and_rename_names() {
         assert_eq!(create_name("  ", None), None);
         assert_eq!(create_name(" foo ", None).as_deref(), Some("foo"));
-        assert_eq!(create_name("sketch", Some("excalidraw")).as_deref(), Some("sketch.excalidraw"));
-        assert_eq!(create_name("s.json", Some("excalidraw")).as_deref(), Some("s.json"));
+        assert_eq!(
+            create_name("sketch", Some("excalidraw")).as_deref(),
+            Some("sketch.excalidraw")
+        );
+        assert_eq!(
+            create_name("s.json", Some("excalidraw")).as_deref(),
+            Some("s.json")
+        );
         assert_eq!(rename_target("/v/a.md", " a.md "), None);
         assert_eq!(rename_target("/v/a.md", ""), None);
         assert_eq!(rename_target("/v/a.md", "b.md").as_deref(), Some("/v/b.md"));
-        assert_eq!(rename_target("/v/a.md", "d/b.md").as_deref(), Some("/v/d/b.md"));
+        assert_eq!(
+            rename_target("/v/a.md", "d/b.md").as_deref(),
+            Some("/v/d/b.md")
+        );
     }
 
     #[test]
     fn import_names() {
-        assert_eq!(unique_import_name("pic.png", "20260101-101010"), "pic-20260101-101010.png");
+        assert_eq!(
+            unique_import_name("pic.png", "20260101-101010"),
+            "pic-20260101-101010.png"
+        );
         assert_eq!(unique_import_name("README", "T"), "README-T");
         assert_eq!(unique_import_name(".env", "T"), ".env-T");
         assert_eq!(unique_import_name("a.tar.gz", "T"), "a.tar-T.gz");
@@ -431,7 +544,11 @@ mod tests {
         std::fs::create_dir_all(&dst).unwrap();
         std::fs::write(src.join("a.png"), b"new").unwrap();
         std::fs::write(dst.join("a.png"), b"old").unwrap();
-        let r = import_files(&[src.join("a.png"), src.join("missing.txt")], dst.to_str().unwrap(), "TS");
+        let r = import_files(
+            &[src.join("a.png"), src.join("missing.txt")],
+            dst.to_str().unwrap(),
+            "TS",
+        );
         assert_eq!(r.imported, [join(dst.to_str().unwrap(), "a-TS.png")]);
         assert_eq!(r.errors.len(), 1);
         assert!(r.errors[0].starts_with("missing.txt: "));
@@ -483,8 +600,16 @@ mod tests {
         assert_eq!(type_ahead_target("a", &names, None), Some(0));
         assert_eq!(type_ahead_target("a", &names, Some(0)), Some(2));
         assert_eq!(type_ahead_target("a", &names, Some(3)), Some(0), "wraps");
-        assert_eq!(type_ahead_target("aa", &names, Some(2)), Some(3), "repeat cycles");
-        assert_eq!(type_ahead_target("ap", &names, Some(2)), Some(2), "mixed starts at current");
+        assert_eq!(
+            type_ahead_target("aa", &names, Some(2)),
+            Some(3),
+            "repeat cycles"
+        );
+        assert_eq!(
+            type_ahead_target("ap", &names, Some(2)),
+            Some(2),
+            "mixed starts at current"
+        );
         assert_eq!(type_ahead_target("ba", &names, Some(1)), Some(4));
         assert_eq!(type_ahead_target("zz", &names, Some(1)), None);
         assert_eq!(type_ahead_target("", &names, None), None);
@@ -496,7 +621,9 @@ mod tests {
         std::fs::create_dir_all(d.join("sub")).unwrap();
         std::fs::write(d.join("n.md"), "x").unwrap();
         std::fs::write(d.join(".hidden"), "x").unwrap();
-        let DirState::Loaded(es) = read_dir(d.to_str().unwrap()) else { panic!() };
+        let DirState::Loaded(es) = read_dir(d.to_str().unwrap()) else {
+            panic!()
+        };
         let names: Vec<_> = es.iter().map(|e| (e.name.as_str(), e.is_dir)).collect();
         assert_eq!(names, [("sub", true), ("n.md", false)]);
         std::fs::remove_dir_all(d).ok();

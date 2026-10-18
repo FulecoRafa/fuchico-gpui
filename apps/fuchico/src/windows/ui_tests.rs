@@ -3,7 +3,9 @@
 
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::prelude::*;
-use gpui_kit::{ClipboardItem, Context, Entity, FocusHandle, KeyDownEvent, TestAppContext, Window, div};
+use gpui_kit::{
+    ClipboardItem, Context, Entity, FocusHandle, KeyDownEvent, TestAppContext, Window, div,
+};
 
 use crate::actions::*;
 use crate::settings::SettingsStore;
@@ -17,7 +19,11 @@ struct EditHost {
 
 impl EditHost {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        EditHost { input: cx.new(|cx| InputState::new(window, cx)), raw: cx.focus_handle(), keys: Vec::new() }
+        EditHost {
+            input: cx.new(|cx| InputState::new(window, cx)),
+            raw: cx.focus_handle(),
+            keys: Vec::new(),
+        }
     }
 }
 
@@ -27,9 +33,9 @@ impl Render for EditHost {
             .size_full()
             .child(Input::new(&self.input))
             // A view that reads raw keys (like the drawing canvas).
-            .child(div().track_focus(&self.raw).size_20().on_key_down(cx.listener(
-                |this, ev: &KeyDownEvent, _, _| this.keys.push(ev.keystroke.unparse()),
-            )))
+            .child(div().track_focus(&self.raw).size_20().on_key_down(
+                cx.listener(|this, ev: &KeyDownEvent, _, _| this.keys.push(ev.keystroke.unparse())),
+            ))
     }
 }
 
@@ -45,7 +51,9 @@ fn setup(cx: &mut TestAppContext) -> (Ui, Entity<EditHost>) {
 
 fn value(ui: &mut Ui, host: &Entity<EditHost>) -> String {
     let host = host.clone();
-    ui.cx.cx.update(|cx| host.read(cx).input.read(cx).value().to_string())
+    ui.cx
+        .cx
+        .update(|cx| host.read(cx).input.read(cx).value().to_string())
 }
 
 fn menu(ui: &mut Ui, action: impl gpui_kit::Action) {
@@ -60,7 +68,8 @@ async fn edit_menu_forwards_to_the_focused_input_or_keys(cx: &mut TestAppContext
     let input = ui.cx.cx.update(|cx| host.read(cx).input.clone());
     // The menu targets the key window (test platform only; nothing real).
     ui.cx.update(|window, _| window.activate_window());
-    ui.cx.update(|window, cx| input.update(cx, |i, cx| i.focus(window, cx)));
+    ui.cx
+        .update(|window, cx| input.update(cx, |i, cx| i.focus(window, cx)));
     ui.frame();
     ui.type_text("hello");
     assert_eq!(value(&mut ui, &host), "hello");
@@ -68,14 +77,30 @@ async fn edit_menu_forwards_to_the_focused_input_or_keys(cx: &mut TestAppContext
     menu(&mut ui, MenuSelectAll);
     menu(&mut ui, MenuCut);
     assert_eq!(value(&mut ui, &host), "");
-    assert_eq!(ui.cx.cx.read_from_clipboard().and_then(|c| c.text()).as_deref(), Some("hello"));
+    assert_eq!(
+        ui.cx
+            .cx
+            .read_from_clipboard()
+            .and_then(|c| c.text())
+            .as_deref(),
+        Some("hello")
+    );
 
-    ui.cx.cx.write_to_clipboard(ClipboardItem::new_string("abc".into()));
+    ui.cx
+        .cx
+        .write_to_clipboard(ClipboardItem::new_string("abc".into()));
     menu(&mut ui, MenuPaste);
     assert_eq!(value(&mut ui, &host), "abc");
     menu(&mut ui, MenuSelectAll);
     menu(&mut ui, MenuCopy);
-    assert_eq!(ui.cx.cx.read_from_clipboard().and_then(|c| c.text()).as_deref(), Some("abc"));
+    assert_eq!(
+        ui.cx
+            .cx
+            .read_from_clipboard()
+            .and_then(|c| c.text())
+            .as_deref(),
+        Some("abc")
+    );
 
     menu(&mut ui, MenuUndo);
     assert_ne!(value(&mut ui, &host), "abc", "undo reverts the paste");
@@ -99,7 +124,11 @@ async fn edit_menu_forwards_to_the_focused_input_or_keys(cx: &mut TestAppContext
 #[gpui_kit::test]
 async fn zoom_keys_follow_the_original(cx: &mut TestAppContext) {
     let (mut ui, _host) = setup(cx);
-    let font = |ui: &mut Ui| ui.cx.cx.update(|cx| SettingsStore::get(cx).editor_font_size);
+    let font = |ui: &mut Ui| {
+        ui.cx
+            .cx
+            .update(|cx| SettingsStore::get(cx).editor_font_size)
+    };
     let scale = |ui: &mut Ui| ui.cx.cx.update(|cx| SettingsStore::get(cx).ui_scale);
     let f0 = font(&mut ui);
     let s0 = scale(&mut ui);

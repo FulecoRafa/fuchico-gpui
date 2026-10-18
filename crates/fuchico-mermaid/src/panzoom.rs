@@ -30,7 +30,11 @@ struct Drag {
 
 impl Default for PanZoom {
     fn default() -> Self {
-        Self { x: 0.0, y: 0.0, scale: 1.0 }
+        Self {
+            x: 0.0,
+            y: 0.0,
+            scale: 1.0,
+        }
     }
 }
 
@@ -77,13 +81,22 @@ impl PanZoom {
     /// Scale and offset that fit a `content_w` x `content_h` diagram inside
     /// the canvas with `margin` px around it, centred. Not used by the
     /// original UI (it only has reset); provided for embedders.
-    pub fn fit(&mut self, canvas_w: f32, canvas_h: f32, content_w: f32, content_h: f32, margin: f32) {
+    pub fn fit(
+        &mut self,
+        canvas_w: f32,
+        canvas_h: f32,
+        content_w: f32,
+        content_h: f32,
+        margin: f32,
+    ) {
         if content_w <= 0.0 || content_h <= 0.0 {
             return;
         }
         let avail_w = (canvas_w - 2.0 * margin).max(1.0);
         let avail_h = (canvas_h - 2.0 * margin).max(1.0);
-        let scale = (avail_w / content_w).min(avail_h / content_h).clamp(MIN_SCALE, MAX_SCALE);
+        let scale = (avail_w / content_w)
+            .min(avail_h / content_h)
+            .clamp(MIN_SCALE, MAX_SCALE);
         self.scale = scale;
         self.x = (canvas_w - content_w * scale) / 2.0;
         self.y = (canvas_h - content_h * scale) / 2.0;
@@ -97,7 +110,12 @@ pub struct DragState(Option<Drag>);
 
 impl DragState {
     pub fn begin(&mut self, pz: &PanZoom, px: f32, py: f32) {
-        self.0 = Some(Drag { start_x: px, start_y: py, orig_x: pz.x, orig_y: pz.y });
+        self.0 = Some(Drag {
+            start_x: px,
+            start_y: py,
+            orig_x: pz.x,
+            orig_y: pz.y,
+        });
     }
 
     /// Returns true when the transform changed.
@@ -127,14 +145,29 @@ mod tests {
 
     #[test]
     fn reset_is_origin_scale_one() {
-        let mut p = PanZoom { x: 5.0, y: 9.0, scale: 3.0 };
+        let mut p = PanZoom {
+            x: 5.0,
+            y: 9.0,
+            scale: 3.0,
+        };
         p.reset();
-        assert_eq!(p, PanZoom { x: 0.0, y: 0.0, scale: 1.0 });
+        assert_eq!(
+            p,
+            PanZoom {
+                x: 0.0,
+                y: 0.0,
+                scale: 1.0
+            }
+        );
     }
 
     #[test]
     fn zoom_keeps_anchor_fixed() {
-        let mut p = PanZoom { x: 30.0, y: -10.0, scale: 1.5 };
+        let mut p = PanZoom {
+            x: 30.0,
+            y: -10.0,
+            scale: 1.5,
+        };
         let (cx, cy) = (120.0, 80.0);
         // content point under the cursor before and after
         let before = ((cx - p.x) / p.scale, (cy - p.y) / p.scale);
@@ -182,7 +215,11 @@ mod tests {
 
     #[test]
     fn drag_pans_relative_to_start() {
-        let mut p = PanZoom { x: 10.0, y: 20.0, scale: 2.0 };
+        let mut p = PanZoom {
+            x: 10.0,
+            y: 20.0,
+            scale: 2.0,
+        };
         let mut d = DragState::default();
         assert!(!d.moved(&mut p, 5.0, 5.0));
         d.begin(&p, 100.0, 100.0);

@@ -9,8 +9,16 @@ use crate::ui::u;
 
 /// `"{n} word" | "{n} words" · "{m} min read"`.
 pub fn stats_text(stats: &DocStats) -> (String, String) {
-    let words = if stats.words == 1 { "1 word".to_string() } else { format!("{} words", stats.words) };
-    let read = if stats.words == 0 { "0 min read".to_string() } else { format!("{} min read", stats.reading_time_min) };
+    let words = if stats.words == 1 {
+        "1 word".to_string()
+    } else {
+        format!("{} words", stats.words)
+    };
+    let read = if stats.words == 0 {
+        "0 min read".to_string()
+    } else {
+        format!("{} min read", stats.reading_time_min)
+    };
     (words, read)
 }
 
@@ -47,7 +55,12 @@ mod tests {
 
     #[test]
     fn pluralizes_and_zero_reads() {
-        let s = |words, reading_time_min| stats_text(&DocStats { words, reading_time_min });
+        let s = |words, reading_time_min| {
+            stats_text(&DocStats {
+                words,
+                reading_time_min,
+            })
+        };
         assert_eq!(s(0, 0), ("0 words".into(), "0 min read".into()));
         assert_eq!(s(1, 1), ("1 word".into(), "1 min read".into()));
         assert_eq!(s(450, 2), ("450 words".into(), "2 min read".into()));

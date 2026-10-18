@@ -6,7 +6,9 @@
 use gpui_kit::component::IconName;
 use gpui_kit::component::input::{Enter, Escape, InputEvent, InputState, MoveDown, MoveUp};
 use gpui_kit::prelude::*;
-use gpui_kit::{Context, Entity, EventEmitter, FocusHandle, Focusable, ScrollHandle, Subscription, Window, div};
+use gpui_kit::{
+    Context, Entity, EventEmitter, FocusHandle, Focusable, ScrollHandle, Subscription, Window, div,
+};
 
 use super::OverlayEvent;
 use super::files::{FileRow, rank_files, walk_vault};
@@ -41,7 +43,8 @@ impl Focusable for QuickSwitcher {
 
 impl QuickSwitcher {
     pub fn new(root: Option<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let input = cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(PaletteGoToFile)));
+        let input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(PaletteGoToFile)));
         input.update(cx, |s, cx| s.focus(window, cx));
         let subs = vec![
             cx.subscribe_in(&input, window, |this, _, ev: &InputEvent, _, cx| {
@@ -50,7 +53,9 @@ impl QuickSwitcher {
                 }
             }),
             cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
-                this.input.update(cx, |s, cx| s.set_placeholder(crate::t!(PaletteGoToFile), window, cx));
+                this.input.update(cx, |s, cx| {
+                    s.set_placeholder(crate::t!(PaletteGoToFile), window, cx)
+                });
                 cx.notify();
             }),
         ];
@@ -86,7 +91,9 @@ impl QuickSwitcher {
 
     fn recompute(&mut self, cx: &mut Context<Self>) {
         let results = match (&self.root, &self.files) {
-            (Some(root), FilesState::Loaded(files)) => rank_files(root, files, &self.input.read(cx).value()),
+            (Some(root), FilesState::Loaded(files)) => {
+                rank_files(root, files, &self.input.read(cx).value())
+            }
             _ => vec![],
         };
         if results != self.results {
@@ -121,7 +128,9 @@ impl QuickSwitcher {
         match &self.files {
             FilesState::Loading => Some(crate::t!(PaletteScanningVault)),
             FilesState::Error(e) => Some(crate::t!(PaletteCantReadVault, message = e)),
-            FilesState::Loaded(_) if self.results.is_empty() => Some(crate::t!(PaletteNoFilesFound)),
+            FilesState::Loaded(_) if self.results.is_empty() => {
+                Some(crate::t!(PaletteNoFilesFound))
+            }
             FilesState::Loaded(_) => None,
         }
     }
@@ -141,16 +150,23 @@ impl Render for QuickSwitcher {
                 .iter()
                 .enumerate()
                 .map(|(i, r)| {
-                    overlay::item(("switcher-file", i), IconName::FileText, &r.rel, &r.indices, i == self.active, cx)
-                        .debug_selector(move || format!("switcher-row-{i}"))
-                        .on_mouse_move(cx.listener(move |this, _, _, cx| {
-                            if this.active != i {
-                                this.active = i;
-                                cx.notify();
-                            }
-                        }))
-                        .on_click(cx.listener(move |this, _, _, cx| this.open(i, cx)))
-                        .into_any_element()
+                    overlay::item(
+                        ("switcher-file", i),
+                        IconName::FileText,
+                        &r.rel,
+                        &r.indices,
+                        i == self.active,
+                        cx,
+                    )
+                    .debug_selector(move || format!("switcher-row-{i}"))
+                    .on_mouse_move(cx.listener(move |this, _, _, cx| {
+                        if this.active != i {
+                            this.active = i;
+                            cx.notify();
+                        }
+                    }))
+                    .on_click(cx.listener(move |this, _, _, cx| this.open(i, cx)))
+                    .into_any_element()
                 })
                 .collect(),
         };
@@ -175,6 +191,13 @@ impl Render for QuickSwitcher {
                 cx.stop_propagation();
                 this.open(this.active, cx);
             }))
-            .child(overlay::frame("quick-switcher", &self.input, rows, &self.scroll, backdrop, cx))
+            .child(overlay::frame(
+                "quick-switcher",
+                &self.input,
+                rows,
+                &self.scroll,
+                backdrop,
+                cx,
+            ))
     }
 }

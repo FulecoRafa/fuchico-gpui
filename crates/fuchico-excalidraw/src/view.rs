@@ -12,7 +12,7 @@ use gpui_kit::*;
 use crate::color::Rgba;
 use crate::geom::{self, P};
 use crate::model::{BoundElement, Element, Num};
-use crate::render::{Camera, Caches, Palette};
+use crate::render::{Caches, Camera, Palette};
 use crate::scene::{self, ItemDefaults, Scene, Snapshot};
 use crate::style::ExcalidrawStyle;
 use crate::text;
@@ -131,15 +131,48 @@ impl Handle {
 
 #[derive(Clone, Debug)]
 pub(crate) enum Drag {
-    Pan { start: Point<Pixels>, cam: Camera },
-    Marquee { start: P, current: P },
-    Move { start: P, ids: Vec<String>, orig: HashMap<String, Element>, moved: bool },
-    Resize { handle: Handle, orig: HashMap<String, Element>, bbox: [f64; 4], single: Option<String> },
-    Rotate { center: P, start_angle: f64, orig: HashMap<String, Element> },
-    Create { id: String, start: P },
-    Linear { id: String, start: P, moved: bool, start_bind: Option<String> },
-    Freedraw { id: String },
-    Point { id: String, index: usize },
+    Pan {
+        start: Point<Pixels>,
+        cam: Camera,
+    },
+    Marquee {
+        start: P,
+        current: P,
+    },
+    Move {
+        start: P,
+        ids: Vec<String>,
+        orig: HashMap<String, Element>,
+        moved: bool,
+    },
+    Resize {
+        handle: Handle,
+        orig: HashMap<String, Element>,
+        bbox: [f64; 4],
+        single: Option<String>,
+    },
+    Rotate {
+        center: P,
+        start_angle: f64,
+        orig: HashMap<String, Element>,
+    },
+    Create {
+        id: String,
+        start: P,
+    },
+    Linear {
+        id: String,
+        start: P,
+        moved: bool,
+        start_bind: Option<String>,
+    },
+    Freedraw {
+        id: String,
+    },
+    Point {
+        id: String,
+        index: usize,
+    },
     Erase,
 }
 
@@ -203,7 +236,9 @@ fn load_source(src: &DrawingSource) -> Result<String, String> {
     match src {
         DrawingSource::Json(s) => Ok(s.clone()),
         DrawingSource::Path(p) => match std::fs::read(p) {
-            Ok(bytes) => String::from_utf8(bytes).map_err(|_| "Not a valid drawing file".to_string()),
+            Ok(bytes) => {
+                String::from_utf8(bytes).map_err(|_| "Not a valid drawing file".to_string())
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
             Err(e) => Err(e.to_string()),
         },
@@ -219,12 +254,14 @@ fn camera_from(scene: &Scene) -> Camera {
         if let Some(y) = a.get("scrollY").and_then(|v| v.as_f64()) {
             cam.scroll_y = y;
         }
-        if let Some(z) = a
-            .get("zoom")
-            .and_then(|v| v.get("value").and_then(|v| v.as_f64()).or_else(|| v.as_f64()))
-            && z > 0.0 {
-                cam.zoom = z;
-            }
+        if let Some(z) = a.get("zoom").and_then(|v| {
+            v.get("value")
+                .and_then(|v| v.as_f64())
+                .or_else(|| v.as_f64())
+        }) && z > 0.0
+        {
+            cam.zoom = z;
+        }
     }
     cam
 }
@@ -444,13 +481,15 @@ impl ExcalidrawView {
 
     fn schedule_save(&mut self, cx: &mut Context<Self>) {
         self.set_dirty(true, cx);
-        self.save_task = Some(cx.spawn(async move |this: WeakEntity<Self>, cx: &mut AsyncApp| {
-            cx.background_executor().timer(SAVE_DEBOUNCE).await;
-            let _ = this.update(cx, |v, cx| {
-                v.flush_app(cx);
-                cx.notify();
-            });
-        }));
+        self.save_task = Some(
+            cx.spawn(async move |this: WeakEntity<Self>, cx: &mut AsyncApp| {
+                cx.background_executor().timer(SAVE_DEBOUNCE).await;
+                let _ = this.update(cx, |v, cx| {
+                    v.flush_app(cx);
+                    cx.notify();
+                });
+            }),
+        );
     }
 
     // ------------------------------------------------------------ history
@@ -522,8 +561,12 @@ impl ExcalidrawView {
 
     pub(crate) fn palette(&self, cx: &App) -> Palette {
         let dark = self.style(cx).dark;
-        let bg = crate::color::parse(&self.scene.view_background()).unwrap_or(Rgba::new(1.0, 1.0, 1.0, 1.0));
-        Palette { dark, canvas: if dark { bg.dark_filter() } else { bg } }
+        let bg = crate::color::parse(&self.scene.view_background())
+            .unwrap_or(Rgba::new(1.0, 1.0, 1.0, 1.0));
+        Palette {
+            dark,
+            canvas: if dark { bg.dark_filter() } else { bg },
+        }
     }
 
     fn tol(&self) -> f64 {
@@ -547,9 +590,10 @@ impl ExcalidrawView {
             }
             if geom::hit(el, p, tol) {
                 if let Some(c) = el.container_id()
-                    && self.scene.get(c).is_some() {
-                        return Some(c.to_string());
-                    }
+                    && self.scene.get(c).is_some()
+                {
+                    return Some(c.to_string());
+                }
                 return Some(el.id.clone());
             }
             // A container's text area counts as the container.
@@ -580,7 +624,8 @@ impl ExcalidrawView {
             }
             let q = geom::to_local(el, p);
             let b = geom::local_bounds(el);
-            if q[0] >= b[0] - tol && q[1] >= b[1] - tol && q[0] <= b[2] + tol && q[1] <= b[3] + tol {
+            if q[0] >= b[0] - tol && q[1] >= b[1] - tol && q[0] <= b[2] + tol && q[1] <= b[3] + tol
+            {
                 return Some(el.id.clone());
             }
         }
@@ -588,11 +633,17 @@ impl ExcalidrawView {
     }
 
     pub(crate) fn selection_list(&self) -> Vec<&Element> {
-        self.scene.elements().filter(|e| self.selected.contains(&e.id)).collect()
+        self.scene
+            .elements()
+            .filter(|e| self.selected.contains(&e.id))
+            .collect()
     }
 
     pub(crate) fn selection_bbox(&self) -> Option<[f64; 4]> {
-        self.selection_list().iter().map(|e| geom::aabb(e)).reduce(geom::union)
+        self.selection_list()
+            .iter()
+            .map(|e| geom::aabb(e))
+            .reduce(geom::union)
     }
 
     /// The single selected non-linear element, if any.
@@ -613,7 +664,8 @@ impl ExcalidrawView {
             let b = geom::local_bounds(el);
             let (x0, y0, x1, y1) = (b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad);
             let (mx, my) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
-            let small = (b[2] - b[0]) * self.cam.zoom < 30.0 || (b[3] - b[1]) * self.cam.zoom < 30.0;
+            let small =
+                (b[2] - b[0]) * self.cam.zoom < 30.0 || (b[3] - b[1]) * self.cam.zoom < 30.0;
             let mut hs = vec![
                 (Handle::NW, [x0, y0]),
                 (Handle::NE, [x1, y0]),
@@ -638,16 +690,17 @@ impl ExcalidrawView {
                 out.push((h, geom::to_world(el, p)));
             }
         } else if self.selected.len() > 1
-            && let Some(b) = self.selection_bbox() {
-                let (x0, y0, x1, y1) = (b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad);
-                out = vec![
-                    (Handle::NW, [x0, y0]),
-                    (Handle::NE, [x1, y0]),
-                    (Handle::SE, [x1, y1]),
-                    (Handle::SW, [x0, y1]),
-                    (Handle::Rotate, [(x0 + x1) / 2.0, y0 - rot]),
-                ];
-            }
+            && let Some(b) = self.selection_bbox()
+        {
+            let (x0, y0, x1, y1) = (b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad);
+            out = vec![
+                (Handle::NW, [x0, y0]),
+                (Handle::NE, [x1, y0]),
+                (Handle::SE, [x1, y1]),
+                (Handle::SW, [x0, y1]),
+                (Handle::Rotate, [(x0 + x1) / 2.0, y0 - rot]),
+            ];
+        }
         out
     }
 
@@ -661,13 +714,18 @@ impl ExcalidrawView {
 
     /// Point handles of a single selected linear element: (index, world, is_midpoint).
     pub(crate) fn point_handles(&self) -> Vec<(usize, P, bool)> {
-        let Some(el) = self.single() else { return Vec::new() };
+        let Some(el) = self.single() else {
+            return Vec::new();
+        };
         if !el.is_linear() || el.locked() || self.multi.is_some() {
             return Vec::new();
         }
         let pts = el.points();
-        let mut out: Vec<(usize, P, bool)> =
-            pts.iter().enumerate().map(|(i, p)| (i, geom::to_world(el, *p), false)).collect();
+        let mut out: Vec<(usize, P, bool)> = pts
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (i, geom::to_world(el, *p), false))
+            .collect();
         for i in 0..pts.len().saturating_sub(1) {
             let a = geom::to_world(el, pts[i]);
             let b = geom::to_world(el, pts[i + 1]);
@@ -680,7 +738,12 @@ impl ExcalidrawView {
 
     // ------------------------------------------------------------ pointer
 
-    pub(crate) fn on_down(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_down(
+        &mut self,
+        ev: &MouseDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         window.focus(&self.focus, cx);
         self.menu_open = false;
         if self.error.is_some() {
@@ -689,7 +752,10 @@ impl ExcalidrawView {
         let p = self.world(ev.position);
         self.pointer = Some(ev.position);
         if ev.button == MouseButton::Middle || self.space_down || self.tool == Tool::Hand {
-            self.drag = Some(Drag::Pan { start: ev.position, cam: self.cam });
+            self.drag = Some(Drag::Pan {
+                start: ev.position,
+                cam: self.cam,
+            });
             cx.notify();
             return;
         }
@@ -756,22 +822,36 @@ impl ExcalidrawView {
             }
             Tool::Text => {
                 if let Some(id) = self.hit_element(p)
-                    && self.start_text_edit_on(&id, p, cx) {
-                        return;
-                    }
+                    && self.start_text_edit_on(&id, p, cx)
+                {
+                    return;
+                }
                 self.create_text_at(p, None, cx);
             }
             Tool::Image => self.prompt_image(window, cx),
             Tool::Arrow | Tool::Line => {
                 let p = self.grid_snap(p, &ev.modifiers);
-                let kind = if self.tool == Tool::Arrow { "arrow" } else { "line" };
+                let kind = if self.tool == Tool::Arrow {
+                    "arrow"
+                } else {
+                    "line"
+                };
                 let mut el = Scene::new_element(kind, p[0], p[1], &self.defaults);
                 el.set_points(&[[0.0, 0.0], [0.0, 0.0]]);
                 let id = el.id.clone();
                 self.scene.add(el);
-                let start_bind = if kind == "arrow" { self.bind_target(p, &id) } else { None };
+                let start_bind = if kind == "arrow" {
+                    self.bind_target(p, &id)
+                } else {
+                    None
+                };
                 self.selected = [id.clone()].into();
-                self.drag = Some(Drag::Linear { id, start: p, moved: false, start_bind });
+                self.drag = Some(Drag::Linear {
+                    id,
+                    start: p,
+                    moved: false,
+                    start_bind,
+                });
             }
             Tool::Freedraw => {
                 let el = Scene::new_element("freedraw", p[0], p[1], &self.defaults);
@@ -806,7 +886,13 @@ impl ExcalidrawView {
         cx.notify();
     }
 
-    fn selection_down(&mut self, ev: &MouseDownEvent, p: P, _window: &mut Window, cx: &mut Context<Self>) {
+    fn selection_down(
+        &mut self,
+        ev: &MouseDownEvent,
+        p: P,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let shift = ev.modifiers.shift;
         // Double-click: text editing.
         if ev.click_count >= 2 {
@@ -851,10 +937,19 @@ impl ExcalidrawView {
                     None => [(bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0],
                 };
                 let start_angle = (p[1] - center[1]).atan2(p[0] - center[0]);
-                self.drag = Some(Drag::Rotate { center, start_angle, orig });
+                self.drag = Some(Drag::Rotate {
+                    center,
+                    start_angle,
+                    orig,
+                });
             } else {
                 let single = self.single().map(|e| e.id.clone());
-                self.drag = Some(Drag::Resize { handle: h, orig, bbox, single });
+                self.drag = Some(Drag::Resize {
+                    handle: h,
+                    orig,
+                    bbox,
+                    single,
+                });
             }
             return;
         }
@@ -890,7 +985,10 @@ impl ExcalidrawView {
                     if !shift {
                         self.selected.clear();
                     }
-                    self.drag = Some(Drag::Marquee { start: p, current: p });
+                    self.drag = Some(Drag::Marquee {
+                        start: p,
+                        current: p,
+                    });
                 }
             }
         }
@@ -901,34 +999,57 @@ impl ExcalidrawView {
         // Bound text and frame children move along.
         for el in self.scene.elements() {
             if let Some(c) = el.container_id()
-                && ids.contains(c) {
-                    ids.insert(el.id.clone());
-                }
+                && ids.contains(c)
+            {
+                ids.insert(el.id.clone());
+            }
         }
         let frames: HashSet<String> = ids
             .iter()
-            .filter(|id| self.scene.get(id).map(|e| e.kind == "frame").unwrap_or(false))
+            .filter(|id| {
+                self.scene
+                    .get(id)
+                    .map(|e| e.kind == "frame")
+                    .unwrap_or(false)
+            })
             .cloned()
             .collect();
         for el in self.scene.elements() {
-            if el.f.frame_id.get().map(|f| frames.contains(f)).unwrap_or(false) {
+            if el
+                .f
+                .frame_id
+                .get()
+                .map(|f| frames.contains(f))
+                .unwrap_or(false)
+            {
                 ids.insert(el.id.clone());
             }
         }
         for el in self.scene.elements() {
             if let Some(c) = el.container_id()
-                && ids.contains(c) {
-                    ids.insert(el.id.clone());
-                }
+                && ids.contains(c)
+            {
+                ids.insert(el.id.clone());
+            }
         }
         let orig = ids
             .iter()
             .filter_map(|id| self.scene.get(id).map(|e| (id.clone(), e.clone())))
             .collect();
-        self.drag = Some(Drag::Move { start: p, ids: ids.into_iter().collect(), orig, moved: false });
+        self.drag = Some(Drag::Move {
+            start: p,
+            ids: ids.into_iter().collect(),
+            orig,
+            moved: false,
+        });
     }
 
-    pub(crate) fn on_move(&mut self, ev: &MouseMoveEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_move(
+        &mut self,
+        ev: &MouseMoveEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let prev = self.pointer;
         self.pointer = Some(ev.position);
         let p = self.world(ev.position);
@@ -936,7 +1057,9 @@ impl ExcalidrawView {
             if let Some(id) = self.multi.clone() {
                 self.set_last_point(&id, p, ev.modifiers.shift);
                 cx.notify();
-            } else if prev != self.pointer && (self.tool == Tool::Eraser || !self.selected.is_empty()) {
+            } else if prev != self.pointer
+                && (self.tool == Tool::Eraser || !self.selected.is_empty())
+            {
                 cx.notify();
             }
             return;
@@ -950,19 +1073,32 @@ impl ExcalidrawView {
             }
             Drag::Marquee { start, .. } => {
                 self.drag = Some(Drag::Marquee { start, current: p });
-                let r = [start[0].min(p[0]), start[1].min(p[1]), start[0].max(p[0]), start[1].max(p[1])];
+                let r = [
+                    start[0].min(p[0]),
+                    start[1].min(p[1]),
+                    start[0].max(p[0]),
+                    start[1].max(p[1]),
+                ];
                 let ids: HashSet<String> = self
                     .scene
                     .elements()
-                    .filter(|e| !e.locked() && e.container_id().is_none() && geom::inside_rect(e, r))
+                    .filter(|e| {
+                        !e.locked() && e.container_id().is_none() && geom::inside_rect(e, r)
+                    })
                     .map(|e| e.id.clone())
                     .collect();
                 self.selected = self.scene.expand_groups(&ids);
             }
-            Drag::Move { start, ids, orig, .. } => {
+            Drag::Move {
+                start, ids, orig, ..
+            } => {
                 let (mut dx, mut dy) = (p[0] - start[0], p[1] - start[1]);
                 if ev.modifiers.shift {
-                    if dx.abs() > dy.abs() { dy = 0.0 } else { dx = 0.0 }
+                    if dx.abs() > dy.abs() {
+                        dy = 0.0
+                    } else {
+                        dx = 0.0
+                    }
                 }
                 self.guides.clear();
                 let bbox = ids
@@ -970,17 +1106,29 @@ impl ExcalidrawView {
                     .filter_map(|id| orig.get(id))
                     .filter(|e| e.container_id().is_none())
                     .map(geom::aabb)
-                    .reduce(|a, b| [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])]);
+                    .reduce(|a, b| {
+                        [
+                            a[0].min(b[0]),
+                            a[1].min(b[1]),
+                            a[2].max(b[2]),
+                            a[3].max(b[3]),
+                        ]
+                    });
                 if let Some(bb) = bbox {
                     let moved_bb = [bb[0] + dx, bb[1] + dy, bb[2] + dx, bb[3] + dy];
-                    if self.scene.grid_enabled() && !(ev.modifiers.platform || ev.modifiers.control) {
-                        let s = crate::snap::snap_to_grid([moved_bb[0], moved_bb[1]], self.scene.grid_size());
+                    if self.scene.grid_enabled() && !(ev.modifiers.platform || ev.modifiers.control)
+                    {
+                        let s = crate::snap::snap_to_grid(
+                            [moved_bb[0], moved_bb[1]],
+                            self.scene.grid_size(),
+                        );
                         dx += s[0] - moved_bb[0];
                         dy += s[1] - moved_bb[1];
                     } else if self.object_snap_on(&ev.modifiers) {
                         let exclude: HashSet<String> = ids.iter().cloned().collect();
                         let targets = self.snap_targets(&exclude);
-                        let (off, guides) = crate::snap::snap_box(moved_bb, &targets, 8.0 / self.cam.zoom);
+                        let (off, guides) =
+                            crate::snap::snap_box(moved_bb, &targets, 8.0 / self.cam.zoom);
                         dx += off[0];
                         dy += off[1];
                         self.guides = guides;
@@ -994,12 +1142,26 @@ impl ExcalidrawView {
                 }
                 let set: HashSet<String> = ids.iter().cloned().collect();
                 self.scene.update_bound_arrows(&set);
-                self.drag = Some(Drag::Move { start, ids, orig, moved: true });
+                self.drag = Some(Drag::Move {
+                    start,
+                    ids,
+                    orig,
+                    moved: true,
+                });
             }
-            Drag::Resize { handle, orig, bbox, single } => {
+            Drag::Resize {
+                handle,
+                orig,
+                bbox,
+                single,
+            } => {
                 self.resize(handle, &orig, bbox, single.as_deref(), p, ev.modifiers);
             }
-            Drag::Rotate { center, start_angle, orig } => {
+            Drag::Rotate {
+                center,
+                start_angle,
+                orig,
+            } => {
                 let mut delta = (p[1] - center[1]).atan2(p[0] - center[0]) - start_angle;
                 let snap = ev.modifiers.shift;
                 for (id, o) in &orig {
@@ -1046,29 +1208,57 @@ impl ExcalidrawView {
                     el.f.height.set(Num(h.abs()));
                 }
             }
-            Drag::Linear { id, start, moved, start_bind } => {
+            Drag::Linear {
+                id,
+                start,
+                moved,
+                start_bind,
+            } => {
                 let p = self.grid_snap(p, &ev.modifiers);
                 let moved = moved || geom::dist(start, p) * self.cam.zoom > 5.0;
                 self.set_last_point(&id, p, ev.modifiers.shift);
-                self.bind_hint = if self.scene.get(&id).map(|e| e.kind == "arrow").unwrap_or(false) {
+                self.bind_hint = if self
+                    .scene
+                    .get(&id)
+                    .map(|e| e.kind == "arrow")
+                    .unwrap_or(false)
+                {
                     self.bind_target(p, &id)
                 } else {
                     None
                 };
                 // Elbow arrows route orthogonally around their (prospective) targets.
-                if self.scene.get(&id).is_some_and(|e| e.f.elbowed.get().copied().unwrap_or(false)) {
-                    let pts = self.scene.elbow_route(start, start_bind.as_deref(), p, self.bind_hint.as_deref());
+                if self
+                    .scene
+                    .get(&id)
+                    .is_some_and(|e| e.f.elbowed.get().copied().unwrap_or(false))
+                {
+                    let pts = self.scene.elbow_route(
+                        start,
+                        start_bind.as_deref(),
+                        p,
+                        self.bind_hint.as_deref(),
+                    );
                     if let Some(el) = self.scene.get_mut(&id) {
                         crate::scene::set_world_points(el, &pts);
                     }
                 }
-                self.drag = Some(Drag::Linear { id, start, moved, start_bind });
+                self.drag = Some(Drag::Linear {
+                    id,
+                    start,
+                    moved,
+                    start_bind,
+                });
             }
             Drag::Freedraw { id } => {
                 if let Some(el) = self.scene.get_mut(&id) {
                     let mut pts = el.points();
                     let q = [p[0] - el.x(), p[1] - el.y()];
-                    if pts.last().map(|l| geom::dist(*l, q) * self.cam.zoom > 0.75).unwrap_or(true) {
+                    if pts
+                        .last()
+                        .map(|l| geom::dist(*l, q) * self.cam.zoom > 0.75)
+                        .unwrap_or(true)
+                    {
                         pts.push(q);
                         el.set_points(&pts);
                         let b = geom::local_bounds(el);
@@ -1079,7 +1269,11 @@ impl ExcalidrawView {
             }
             Drag::Point { id, index } => {
                 if let Some(el) = self.scene.get(&id).cloned() {
-                    let mut world: Vec<P> = el.points().iter().map(|q| geom::to_world(&el, *q)).collect();
+                    let mut world: Vec<P> = el
+                        .points()
+                        .iter()
+                        .map(|q| geom::to_world(&el, *q))
+                        .collect();
                     let p = self.grid_snap(p, &ev.modifiers);
                     if index < world.len() {
                         world[index] = p;
@@ -1112,7 +1306,9 @@ impl ExcalidrawView {
                     // Arrows moved without their targets come unbound.
                     let set: HashSet<String> = ids.iter().cloned().collect();
                     for id in &ids {
-                        let Some(el) = self.scene.get(id) else { continue };
+                        let Some(el) = self.scene.get(id) else {
+                            continue;
+                        };
                         if el.kind != "arrow" {
                             continue;
                         }
@@ -1122,9 +1318,10 @@ impl ExcalidrawView {
                         ];
                         for (start, t) in ends {
                             if let Some(t) = t
-                                && !set.contains(&t) {
-                                    self.scene.bind(id, start, None);
-                                }
+                                && !set.contains(&t)
+                            {
+                                self.scene.bind(id, start, None);
+                            }
                         }
                     }
                     self.update_frames(&set);
@@ -1142,7 +1339,12 @@ impl ExcalidrawView {
                     self.scene.remove(&[id.clone()].into());
                     self.selected.clear();
                 } else {
-                    if self.scene.get(&id).map(|e| e.kind == "frame").unwrap_or(false) {
+                    if self
+                        .scene
+                        .get(&id)
+                        .map(|e| e.kind == "frame")
+                        .unwrap_or(false)
+                    {
                         self.adopt_into_frame(&id);
                     } else {
                         self.update_frames(&[id.clone()].into());
@@ -1153,7 +1355,12 @@ impl ExcalidrawView {
                     }
                 }
             }
-            Drag::Linear { id, moved, start_bind, .. } => {
+            Drag::Linear {
+                id,
+                moved,
+                start_bind,
+                ..
+            } => {
                 if moved {
                     self.finish_linear(&id, start_bind, Some(p), cx);
                 } else {
@@ -1161,7 +1368,8 @@ impl ExcalidrawView {
                     if let Some(el) = self.scene.get_mut(&id) {
                         el.set_points(&[[0.0, 0.0], [0.0, 0.0]]);
                         if let Some(sb) = start_bind {
-                            el.f.extra.insert("__startBind".into(), serde_json::Value::from(sb));
+                            el.f.extra
+                                .insert("__startBind".into(), serde_json::Value::from(sb));
                         }
                     }
                     self.multi = Some(id);
@@ -1196,8 +1404,14 @@ impl ExcalidrawView {
     }
 
     fn set_last_point(&mut self, id: &str, p: P, shift: bool) {
-        let Some(el) = self.scene.get(id).cloned() else { return };
-        let mut world: Vec<P> = el.points().iter().map(|q| geom::to_world(&el, *q)).collect();
+        let Some(el) = self.scene.get(id).cloned() else {
+            return;
+        };
+        let mut world: Vec<P> = el
+            .points()
+            .iter()
+            .map(|q| geom::to_world(&el, *q))
+            .collect();
         if world.len() < 2 {
             world.push(p);
         }
@@ -1240,15 +1454,20 @@ impl ExcalidrawView {
     /// Ends multi-point creation (drops the trailing preview point).
     pub(crate) fn finish_multi(&mut self, cx: &mut Context<Self>) {
         let Some(id) = self.multi.take() else { return };
-        let Some(el) = self.scene.get(&id).cloned() else { return };
-        let mut world: Vec<P> = el.points().iter().map(|q| geom::to_world(&el, *q)).collect();
+        let Some(el) = self.scene.get(&id).cloned() else {
+            return;
+        };
+        let mut world: Vec<P> = el
+            .points()
+            .iter()
+            .map(|q| geom::to_world(&el, *q))
+            .collect();
         world.pop();
-        let start_bind = el
-            .f
-            .extra
-            .get("__startBind")
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let start_bind =
+            el.f.extra
+                .get("__startBind")
+                .and_then(|v| v.as_str())
+                .map(String::from);
         if let Some(e) = self.scene.get_mut(&id) {
             e.f.extra.remove("__startBind");
         }
@@ -1264,8 +1483,18 @@ impl ExcalidrawView {
         self.finish_linear(&id, start_bind, Some(end), cx);
     }
 
-    fn finish_linear(&mut self, id: &str, start_bind: Option<String>, end: Option<P>, cx: &mut Context<Self>) {
-        let is_arrow = self.scene.get(id).map(|e| e.kind == "arrow").unwrap_or(false);
+    fn finish_linear(
+        &mut self,
+        id: &str,
+        start_bind: Option<String>,
+        end: Option<P>,
+        cx: &mut Context<Self>,
+    ) {
+        let is_arrow = self
+            .scene
+            .get(id)
+            .map(|e| e.kind == "arrow")
+            .unwrap_or(false);
         if is_arrow {
             let end_t = end.and_then(|p| self.bind_target(p, id));
             if let Some(s) = &start_bind {
@@ -1292,7 +1521,11 @@ impl ExcalidrawView {
             .scene
             .elements()
             .filter(|e| !e.locked() && geom::hit(e, p, tol))
-            .map(|e| e.container_id().map(String::from).unwrap_or_else(|| e.id.clone()))
+            .map(|e| {
+                e.container_id()
+                    .map(String::from)
+                    .unwrap_or_else(|| e.id.clone())
+            })
             .collect();
         if hits.is_empty() {
             return;
@@ -1301,7 +1534,15 @@ impl ExcalidrawView {
         self.erasing.extend(set);
     }
 
-    fn resize(&mut self, handle: Handle, orig: &HashMap<String, Element>, bbox: [f64; 4], single: Option<&str>, p: P, m: Modifiers) {
+    fn resize(
+        &mut self,
+        handle: Handle,
+        orig: &HashMap<String, Element>,
+        bbox: [f64; 4],
+        single: Option<&str>,
+        p: P,
+        m: Modifiers,
+    ) {
         if let Some(id) = single {
             let Some(o) = orig.get(id) else { return };
             let b = geom::local_bounds(o);
@@ -1309,18 +1550,35 @@ impl ExcalidrawView {
             let (sx, sy) = handle.sides();
             let (mut x0, mut y0, mut x1, mut y1) = (b[0], b[1], b[2], b[3]);
             let (w0, h0) = ((b[2] - b[0]).max(1e-6), (b[3] - b[1]).max(1e-6));
-            if sx < 0 { x0 = q[0] }
-            if sx > 0 { x1 = q[0] }
-            if sy < 0 { y0 = q[1] }
-            if sy > 0 { y1 = q[1] }
+            if sx < 0 {
+                x0 = q[0]
+            }
+            if sx > 0 {
+                x1 = q[0]
+            }
+            if sy < 0 {
+                y0 = q[1]
+            }
+            if sy > 0 {
+                y1 = q[1]
+            }
             if o.kind == "text" && sy == 0 && sx != 0 {
                 // Side handles fix the text width (autoResize off) and re-wrap.
-                let original = o.f.original_text.get().cloned().unwrap_or_else(|| o.text().to_string());
+                let original =
+                    o.f.original_text
+                        .get()
+                        .cloned()
+                        .unwrap_or_else(|| o.text().to_string());
                 let min_w = o.font_size() * 0.6;
-                let (l, r) = if sx < 0 { (q[0].min(b[2] - min_w), b[2]) } else { (b[0], q[0].max(b[0] + min_w)) };
+                let (l, r) = if sx < 0 {
+                    (q[0].min(b[2] - min_w), b[2])
+                } else {
+                    (b[0], q[0].max(b[0] + min_w))
+                };
                 let w = r - l;
                 let wrapped = text::wrap(&original, o.font_family(), o.font_size(), w);
-                let (_, h) = text::measure(&wrapped, o.font_family(), o.font_size(), o.line_height());
+                let (_, h) =
+                    text::measure(&wrapped, o.font_family(), o.font_size(), o.line_height());
                 let mut el = o.clone();
                 let nw = geom::to_world(o, [l, b[1]]);
                 let ow = geom::to_world(o, [b[0], b[1]]);
@@ -1335,20 +1593,45 @@ impl ExcalidrawView {
                 }
                 return;
             }
-            let keep_aspect = (o.kind == "image" || o.kind == "text") != m.shift && handle.is_corner()
+            let keep_aspect = (o.kind == "image" || o.kind == "text") != m.shift
+                && handle.is_corner()
                 || (o.kind == "text");
             if keep_aspect {
                 let s = ((x1 - x0) / w0).abs().max(((y1 - y0) / h0).abs());
                 let (nw, nh) = (w0 * s, h0 * s);
-                if sx < 0 { x0 = x1 - nw } else { x1 = x0 + nw }
-                if sy < 0 { y0 = y1 - nh } else { y1 = y0 + nh }
-                if sy == 0 { let cy = (b[1] + b[3]) / 2.0; y0 = cy - nh / 2.0; y1 = cy + nh / 2.0; }
-                if sx == 0 { let cx = (b[0] + b[2]) / 2.0; x0 = cx - nw / 2.0; x1 = cx + nw / 2.0; }
+                if sx < 0 {
+                    x0 = x1 - nw
+                } else {
+                    x1 = x0 + nw
+                }
+                if sy < 0 {
+                    y0 = y1 - nh
+                } else {
+                    y1 = y0 + nh
+                }
+                if sy == 0 {
+                    let cy = (b[1] + b[3]) / 2.0;
+                    y0 = cy - nh / 2.0;
+                    y1 = cy + nh / 2.0;
+                }
+                if sx == 0 {
+                    let cx = (b[0] + b[2]) / 2.0;
+                    x0 = cx - nw / 2.0;
+                    x1 = cx + nw / 2.0;
+                }
             }
             if m.alt {
                 let (cx, cy) = ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
-                if sx != 0 { let hw = (if sx < 0 { cx - x0 } else { x1 - cx }).abs(); x0 = cx - hw; x1 = cx + hw; }
-                if sy != 0 { let hh = (if sy < 0 { cy - y0 } else { y1 - cy }).abs(); y0 = cy - hh; y1 = cy + hh; }
+                if sx != 0 {
+                    let hw = (if sx < 0 { cx - x0 } else { x1 - cx }).abs();
+                    x0 = cx - hw;
+                    x1 = cx + hw;
+                }
+                if sy != 0 {
+                    let hh = (if sy < 0 { cy - y0 } else { y1 - cy }).abs();
+                    y0 = cy - hh;
+                    y1 = cy + hh;
+                }
             }
             let (nx0, nx1) = (x0.min(x1), x0.max(x1));
             let (ny0, ny1) = (y0.min(y1), y0.max(y1));
@@ -1369,11 +1652,17 @@ impl ExcalidrawView {
             // Multi-element: proportional scale of the group box.
             let (w0, h0) = ((bbox[2] - bbox[0]).max(1e-6), (bbox[3] - bbox[1]).max(1e-6));
             let (sx, sy) = handle.sides();
-            let anchor = [if sx < 0 { bbox[2] } else { bbox[0] }, if sy < 0 { bbox[3] } else { bbox[1] }];
+            let anchor = [
+                if sx < 0 { bbox[2] } else { bbox[0] },
+                if sy < 0 { bbox[3] } else { bbox[1] },
+            ];
             let s = (((p[0] - anchor[0]).abs() / w0).max((p[1] - anchor[1]).abs() / h0)).max(0.05);
             for (id, o) in orig {
                 let c = geom::center(o);
-                let nc = [anchor[0] + (c[0] - anchor[0]) * s, anchor[1] + (c[1] - anchor[1]) * s];
+                let nc = [
+                    anchor[0] + (c[0] - anchor[0]) * s,
+                    anchor[1] + (c[1] - anchor[1]) * s,
+                ];
                 let mut el = o.clone();
                 apply_scale(&mut el, o, s, s);
                 let lc = geom::local_center(&el);
@@ -1393,12 +1682,19 @@ impl ExcalidrawView {
 
     /// Sets `frameId` of `ids` to the innermost frame fully containing them.
     fn update_frames(&mut self, ids: &HashSet<String>) {
-        let frames: Vec<Element> = self.scene.elements().filter(|e| e.kind == "frame").cloned().collect();
+        let frames: Vec<Element> = self
+            .scene
+            .elements()
+            .filter(|e| e.kind == "frame")
+            .cloned()
+            .collect();
         if frames.is_empty() {
             return;
         }
         for id in ids {
-            let Some(el) = self.scene.get(id) else { continue };
+            let Some(el) = self.scene.get(id) else {
+                continue;
+            };
             if el.kind == "frame" || el.container_id().is_some() {
                 continue;
             }
@@ -1409,7 +1705,12 @@ impl ExcalidrawView {
                 .map(|f| f.id.clone());
             let cur = el.f.frame_id.get().cloned();
             if cur != target {
-                let bound: Vec<String> = el.bound_elements().iter().filter(|b| b.kind == "text").map(|b| b.id.clone()).collect();
+                let bound: Vec<String> = el
+                    .bound_elements()
+                    .iter()
+                    .filter(|b| b.kind == "text")
+                    .map(|b| b.id.clone())
+                    .collect();
                 for x in std::iter::once(id.clone()).chain(bound) {
                     if let Some(e) = self.scene.get_mut(&x) {
                         e.f.frame_id.set_opt(target.clone());
@@ -1420,7 +1721,9 @@ impl ExcalidrawView {
     }
 
     fn adopt_into_frame(&mut self, frame: &str) {
-        let Some(f) = self.scene.get(frame).cloned() else { return };
+        let Some(f) = self.scene.get(frame).cloned() else {
+            return;
+        };
         let r = geom::aabb(&f);
         let ids: Vec<String> = self
             .scene
@@ -1443,24 +1746,44 @@ impl ExcalidrawView {
 
     /// Starts editing `id` (a text element or a container's bound text).
     fn start_text_edit_on(&mut self, id: &str, p: P, cx: &mut Context<Self>) -> bool {
-        let Some(el) = self.scene.get(id).cloned() else { return false };
+        let Some(el) = self.scene.get(id).cloned() else {
+            return false;
+        };
         if el.kind == "text" {
             self.selected = [id.to_string()].into();
-            let caret = el.f.original_text.get().map(|s| s.chars().count()).unwrap_or(el.text().chars().count());
-            self.editing = Some(TextEdit { id: id.to_string(), caret });
+            let caret =
+                el.f.original_text
+                    .get()
+                    .map(|s| s.chars().count())
+                    .unwrap_or(el.text().chars().count());
+            self.editing = Some(TextEdit {
+                id: id.to_string(),
+                caret,
+            });
             self.place_caret(p);
             cx.notify();
             return true;
         }
-        if matches!(el.kind.as_str(), "rectangle" | "diamond" | "ellipse" | "arrow" | "line") {
+        if matches!(
+            el.kind.as_str(),
+            "rectangle" | "diamond" | "ellipse" | "arrow" | "line"
+        ) {
             if let Some(t) = el.bound_elements().iter().find(|b| b.kind == "text")
-                && let Some(te) = self.scene.get(&t.id) {
-                    let n = te.f.original_text.get().map(|s| s.chars().count()).unwrap_or(0);
-                    self.editing = Some(TextEdit { id: t.id.clone(), caret: n });
-                    self.selected = [t.id.clone()].into();
-                    cx.notify();
-                    return true;
-                }
+                && let Some(te) = self.scene.get(&t.id)
+            {
+                let n =
+                    te.f.original_text
+                        .get()
+                        .map(|s| s.chars().count())
+                        .unwrap_or(0);
+                self.editing = Some(TextEdit {
+                    id: t.id.clone(),
+                    caret: n,
+                });
+                self.selected = [t.id.clone()].into();
+                cx.notify();
+                return true;
+            }
             if el.kind == "line" {
                 return false;
             }
@@ -1471,7 +1794,12 @@ impl ExcalidrawView {
         false
     }
 
-    pub(crate) fn create_text_at(&mut self, p: P, container: Option<String>, cx: &mut Context<Self>) {
+    pub(crate) fn create_text_at(
+        &mut self,
+        p: P,
+        container: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
         let mut d = self.defaults.clone();
         if container.is_some() {
             d.text_align = "center".into();
@@ -1492,12 +1820,19 @@ impl ExcalidrawView {
         if let Some(c) = &container {
             if let Some(ce) = self.scene.get_mut(c) {
                 let mut b = ce.bound_elements().to_vec();
-                b.push(BoundElement { id: id.clone(), kind: "text".into(), extra: Default::default() });
+                b.push(BoundElement {
+                    id: id.clone(),
+                    kind: "text".into(),
+                    extra: Default::default(),
+                });
                 ce.f.bound_elements.set(b);
             }
             self.scene.layout_bound_text(c);
         }
-        self.editing = Some(TextEdit { id: id.clone(), caret: 0 });
+        self.editing = Some(TextEdit {
+            id: id.clone(),
+            caret: 0,
+        });
         self.selected = [id].into();
         cx.notify();
     }
@@ -1505,14 +1840,23 @@ impl ExcalidrawView {
     pub(crate) fn edit_string(&self) -> Option<String> {
         let ed = self.editing.as_ref()?;
         let el = self.scene.get(&ed.id)?;
-        Some(el.f.original_text.get().cloned().unwrap_or_else(|| el.text().to_string()))
+        Some(
+            el.f.original_text
+                .get()
+                .cloned()
+                .unwrap_or_else(|| el.text().to_string()),
+        )
     }
 
     pub(crate) fn set_edit_string(&mut self, s: String, caret: usize) {
-        let Some(ed) = self.editing.as_mut() else { return };
+        let Some(ed) = self.editing.as_mut() else {
+            return;
+        };
         ed.caret = caret;
         let id = ed.id.clone();
-        let Some(el) = self.scene.get_mut(&id) else { return };
+        let Some(el) = self.scene.get_mut(&id) else {
+            return;
+        };
         el.f.original_text.set(s.clone());
         let container = el.container_id().map(String::from);
         match container {
@@ -1523,7 +1867,8 @@ impl ExcalidrawView {
             None if el.f.auto_resize.get() == Some(&false) => {
                 // Fixed width: wrap, grow only vertically.
                 let wrapped = text::wrap(&s, el.font_family(), el.font_size(), el.width());
-                let (_, h) = text::measure(&wrapped, el.font_family(), el.font_size(), el.line_height());
+                let (_, h) =
+                    text::measure(&wrapped, el.font_family(), el.font_size(), el.line_height());
                 el.f.text.set(wrapped);
                 el.f.height.set(Num(h));
             }
@@ -1563,13 +1908,23 @@ impl ExcalidrawView {
             _ => 0.0,
         };
         let lh = size * el.line_height();
-        Some((x0 + stops.get(col).copied().unwrap_or(lw), line as f64 * lh, lh))
+        Some((
+            x0 + stops.get(col).copied().unwrap_or(lw),
+            line as f64 * lh,
+            lh,
+        ))
     }
 
     fn place_caret(&mut self, p: P) {
-        let Some(ed) = self.editing.clone() else { return };
-        let Some(el) = self.scene.get(&ed.id).cloned() else { return };
-        let Some(original) = self.edit_string() else { return };
+        let Some(ed) = self.editing.clone() else {
+            return;
+        };
+        let Some(el) = self.scene.get(&ed.id).cloned() else {
+            return;
+        };
+        let Some(original) = self.edit_string() else {
+            return;
+        };
         let q = geom::to_local(&el, p);
         let lh = el.font_size() * el.line_height();
         let display = el.text().to_string();
@@ -1598,16 +1953,25 @@ impl ExcalidrawView {
     /// Finishes text editing: empty text is removed, otherwise committed.
     pub(crate) fn commit_text(&mut self, cx: &mut Context<Self>) {
         self.marked = None;
-        let Some(ed) = self.editing.take() else { return };
-        let Some(el) = self.scene.get(&ed.id).cloned() else { return };
-        let s = el.f.original_text.get().cloned().unwrap_or_else(|| el.text().to_string());
+        let Some(ed) = self.editing.take() else {
+            return;
+        };
+        let Some(el) = self.scene.get(&ed.id).cloned() else {
+            return;
+        };
+        let s =
+            el.f.original_text
+                .get()
+                .cloned()
+                .unwrap_or_else(|| el.text().to_string());
         if s.trim().is_empty() {
             self.scene.remove(&[ed.id.clone()].into());
             if let Some(c) = el.container_id() {
                 if let Some(ce) = self.scene.get_mut(c)
-                    && let Some(b) = ce.f.bound_elements.get_mut() {
-                        b.retain(|x| x.id != ed.id);
-                    }
+                    && let Some(b) = ce.f.bound_elements.get_mut()
+                {
+                    b.retain(|x| x.id != ed.id);
+                }
                 self.selected = [c.to_string()].into();
             } else {
                 self.selected.clear();
@@ -1624,8 +1988,12 @@ impl ExcalidrawView {
     }
 
     fn text_key(&mut self, ks: &Keystroke, cx: &mut Context<Self>) -> bool {
-        let Some(ed) = self.editing.clone() else { return false };
-        let Some(s) = self.edit_string() else { return false };
+        let Some(ed) = self.editing.clone() else {
+            return false;
+        };
+        let Some(s) = self.edit_string() else {
+            return false;
+        };
         let chars: Vec<char> = s.chars().collect();
         let m = &ks.modifiers;
         let primary = m.platform || m.control;
@@ -1654,9 +2022,21 @@ impl ExcalidrawView {
                 if caret > 0 {
                     let start = if m.alt || primary {
                         let mut i = caret;
-                        while i > 0 && chars[i - 1].is_whitespace() { i -= 1; }
-                        while i > 0 && !chars[i - 1].is_whitespace() { i -= 1; }
-                        if primary { chars[..caret].iter().rposition(|c| *c == '\n').map(|x| x + 1).unwrap_or(0) } else { i }
+                        while i > 0 && chars[i - 1].is_whitespace() {
+                            i -= 1;
+                        }
+                        while i > 0 && !chars[i - 1].is_whitespace() {
+                            i -= 1;
+                        }
+                        if primary {
+                            chars[..caret]
+                                .iter()
+                                .rposition(|c| *c == '\n')
+                                .map(|x| x + 1)
+                                .unwrap_or(0)
+                        } else {
+                            i
+                        }
                     } else {
                         caret - 1
                     };
@@ -1681,19 +2061,35 @@ impl ExcalidrawView {
                 self.editing.as_mut().unwrap().caret = caret;
             }
             "home" => {
-                caret = chars[..caret].iter().rposition(|c| *c == '\n').map(|x| x + 1).unwrap_or(0);
+                caret = chars[..caret]
+                    .iter()
+                    .rposition(|c| *c == '\n')
+                    .map(|x| x + 1)
+                    .unwrap_or(0);
                 self.editing.as_mut().unwrap().caret = caret;
             }
             "end" => {
-                caret = chars[caret..].iter().position(|c| *c == '\n').map(|x| x + caret).unwrap_or(chars.len());
+                caret = chars[caret..]
+                    .iter()
+                    .position(|c| *c == '\n')
+                    .map(|x| x + caret)
+                    .unwrap_or(chars.len());
                 self.editing.as_mut().unwrap().caret = caret;
             }
             "up" | "down" => {
-                let line_start = chars[..caret].iter().rposition(|c| *c == '\n').map(|x| x + 1).unwrap_or(0);
+                let line_start = chars[..caret]
+                    .iter()
+                    .rposition(|c| *c == '\n')
+                    .map(|x| x + 1)
+                    .unwrap_or(0);
                 let col = caret - line_start;
                 if ks.key == "up" {
                     if line_start > 0 {
-                        let prev_start = chars[..line_start - 1].iter().rposition(|c| *c == '\n').map(|x| x + 1).unwrap_or(0);
+                        let prev_start = chars[..line_start - 1]
+                            .iter()
+                            .rposition(|c| *c == '\n')
+                            .map(|x| x + 1)
+                            .unwrap_or(0);
                         caret = (prev_start + col).min(line_start - 1);
                     } else {
                         caret = 0;
@@ -1702,7 +2098,11 @@ impl ExcalidrawView {
                     match chars[caret..].iter().position(|c| *c == '\n') {
                         Some(nl) => {
                             let next_start = caret + nl + 1;
-                            let next_end = chars[next_start..].iter().position(|c| *c == '\n').map(|x| x + next_start).unwrap_or(chars.len());
+                            let next_end = chars[next_start..]
+                                .iter()
+                                .position(|c| *c == '\n')
+                                .map(|x| x + next_start)
+                                .unwrap_or(chars.len());
                             caret = (next_start + col).min(next_end);
                         }
                         None => caret = chars.len(),
@@ -1733,7 +2133,11 @@ impl ExcalidrawView {
                 }
                 // Printable input goes through the platform input handler
                 // (`input.rs`), which also handles IME composition.
-                if ks.key_char.as_ref().is_some_and(|kc| !kc.chars().any(|c| c.is_control())) {
+                if ks
+                    .key_char
+                    .as_ref()
+                    .is_some_and(|kc| !kc.chars().any(|c| c.is_control()))
+                {
                     return false;
                 }
             }
@@ -1744,7 +2148,12 @@ impl ExcalidrawView {
 
     // ------------------------------------------------------------ keyboard
 
-    pub(crate) fn on_key_down(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_key_down(
+        &mut self,
+        ev: &KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.error.is_some() {
             return;
         }
@@ -1768,7 +2177,9 @@ impl ExcalidrawView {
             cx.notify();
             return;
         }
-        if key == "escape" && (self.context_menu.is_some() || self.dialog.is_some() || self.picker.is_some()) {
+        if key == "escape"
+            && (self.context_menu.is_some() || self.dialog.is_some() || self.picker.is_some())
+        {
             self.context_menu = None;
             self.dialog = None;
             self.picker = None;
@@ -1889,7 +2300,12 @@ impl ExcalidrawView {
         }
     }
 
-    pub(crate) fn on_key_up(&mut self, ev: &KeyUpEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_key_up(
+        &mut self,
+        ev: &KeyUpEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if ev.keystroke.key == "space" || ev.keystroke.key == " " {
             self.space_down = false;
             cx.notify();
@@ -1949,9 +2365,14 @@ impl ExcalidrawView {
     }
 
     pub(crate) fn zoom_to_fit(&mut self) {
-        let Some(bb) = self.scene.elements().map(geom::aabb).reduce(geom::union) else { return };
+        let Some(bb) = self.scene.elements().map(geom::aabb).reduce(geom::union) else {
+            return;
+        };
         let b = self.bounds.get();
-        let (vw, vh) = (f64::from(f32::from(b.size.width)), f64::from(f32::from(b.size.height)));
+        let (vw, vh) = (
+            f64::from(f32::from(b.size.width)),
+            f64::from(f32::from(b.size.height)),
+        );
         let (w, h) = ((bb[2] - bb[0]).max(1.0), (bb[3] - bb[1]).max(1.0));
         let z = ((vw - 100.0) / w).min((vh - 160.0) / h).clamp(0.1, 1.0);
         self.cam.zoom = z;
@@ -1959,7 +2380,12 @@ impl ExcalidrawView {
         self.cam.scroll_y = vh / 2.0 / z - (bb[1] + bb[3]) / 2.0;
     }
 
-    pub(crate) fn on_scroll(&mut self, ev: &ScrollWheelEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_scroll(
+        &mut self,
+        ev: &ScrollWheelEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let d = ev.delta.pixel_delta(px(20.0));
         let (dx, dy) = (f64::from(f32::from(d.x)), f64::from(f32::from(d.y)));
         if ev.modifiers.platform || ev.modifiers.control {
@@ -1980,7 +2406,12 @@ impl ExcalidrawView {
         cx.notify();
     }
 
-    pub(crate) fn on_pinch(&mut self, ev: &PinchEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_pinch(
+        &mut self,
+        ev: &PinchEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let o = self.origin();
         let a = [
             f64::from(f32::from(ev.position.x - o.x)),
@@ -1995,26 +2426,43 @@ impl ExcalidrawView {
 
     /// Applies a property to the selection (or the defaults when nothing
     /// is selected), as one undo step.
-    pub(crate) fn apply(&mut self, f: impl Fn(&mut Element, &mut ItemDefaults), cx: &mut Context<Self>) {
+    pub(crate) fn apply(
+        &mut self,
+        f: impl Fn(&mut Element, &mut ItemDefaults),
+        cx: &mut Context<Self>,
+    ) {
         let mut d = self.defaults.clone();
         let mut ids: HashSet<String> = self.selected.clone();
         for el in self.scene.elements() {
             if let Some(c) = el.container_id()
-                && ids.contains(c) {
-                    ids.insert(el.id.clone());
-                }
+                && ids.contains(c)
+            {
+                ids.insert(el.id.clone());
+            }
         }
         for id in &ids {
             if let Some(el) = self.scene.get_mut(id) {
                 f(el, &mut d);
             }
         }
-        f(&mut Element { id: String::new(), kind: String::new(), f: Default::default() }, &mut d);
+        f(
+            &mut Element {
+                id: String::new(),
+                kind: String::new(),
+                f: Default::default(),
+            },
+            &mut d,
+        );
         self.defaults = d;
         // Text metrics may have changed.
         let texts: Vec<String> = ids
             .iter()
-            .filter(|id| self.scene.get(id).map(|e| e.kind == "text").unwrap_or(false))
+            .filter(|id| {
+                self.scene
+                    .get(id)
+                    .map(|e| e.kind == "text")
+                    .unwrap_or(false)
+            })
             .cloned()
             .collect();
         for t in texts {
@@ -2025,7 +2473,12 @@ impl ExcalidrawView {
                     self.scene.layout_bound_text(&c);
                 }
                 None => {
-                    let (w, h) = text::measure(el.text(), el.font_family(), el.font_size(), el.line_height());
+                    let (w, h) = text::measure(
+                        el.text(),
+                        el.font_family(),
+                        el.font_size(),
+                        el.line_height(),
+                    );
                     let e = self.scene.get_mut(&t).unwrap();
                     e.f.width.set(Num(w));
                     e.f.height.set(Num(h));
@@ -2057,16 +2510,22 @@ impl ExcalidrawView {
         let mut files = serde_json::Map::new();
         for e in self.scene.elements().filter(|e| ids.contains(&e.id)) {
             if let Some(fid) = e.f.file_id.get()
-                && let Some(f) = self.scene.files.get(fid) {
-                    files.insert(fid.clone(), f.clone());
-                }
+                && let Some(f) = self.scene.files.get(fid)
+            {
+                files.insert(fid.clone(), f.clone());
+            }
         }
-        let v = serde_json::json!({ "type": "excalidraw/clipboard", "elements": els, "files": files });
-        cx.write_to_clipboard(ClipboardItem::new_string(serde_json::to_string(&v).unwrap_or_default()));
+        let v =
+            serde_json::json!({ "type": "excalidraw/clipboard", "elements": els, "files": files });
+        cx.write_to_clipboard(ClipboardItem::new_string(
+            serde_json::to_string(&v).unwrap_or_default(),
+        ));
     }
 
     pub(crate) fn paste(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(item) = cx.read_from_clipboard() else { return };
+        let Some(item) = cx.read_from_clipboard() else {
+            return;
+        };
         for entry in item.entries() {
             if let ClipboardEntry::Image(img) = entry {
                 let bytes = img.bytes.clone();
@@ -2075,14 +2534,21 @@ impl ExcalidrawView {
             }
         }
         let Some(text) = item.text() else { return };
-        let at = self.pointer.map(|p| self.world(p)).unwrap_or_else(|| self.viewport_center());
+        let at = self
+            .pointer
+            .map(|p| self.world(p))
+            .unwrap_or_else(|| self.viewport_center());
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
             let ty = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
             if ty == "excalidraw/clipboard" || ty == "excalidraw" {
                 let mut els: Vec<Element> = v
                     .get("elements")
                     .and_then(|e| e.as_array())
-                    .map(|a| a.iter().filter_map(|x| serde_json::from_value(x.clone()).ok()).collect())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|x| serde_json::from_value(x.clone()).ok())
+                            .collect()
+                    })
                     .unwrap_or_default();
                 els.retain(|e| !e.is_deleted());
                 if els.is_empty() {
@@ -2090,7 +2556,10 @@ impl ExcalidrawView {
                 }
                 if let Some(files) = v.get("files").and_then(|f| f.as_object()) {
                     for (k, f) in files {
-                        self.scene.files.entry(k.clone()).or_insert_with(|| f.clone());
+                        self.scene
+                            .files
+                            .entry(k.clone())
+                            .or_insert_with(|| f.clone());
                     }
                 }
                 scene::remap_ids(&mut els);
@@ -2147,9 +2616,10 @@ impl ExcalidrawView {
             let paths = rx.await.ok().and_then(|r| r.ok()).flatten();
             let _ = this.update(cx, |v, cx| {
                 if let Some(p) = paths.and_then(|p| p.into_iter().next())
-                    && let Ok(bytes) = std::fs::read(&p) {
-                        v.insert_image_bytes(&bytes, None, cx);
-                    }
+                    && let Ok(bytes) = std::fs::read(&p)
+                {
+                    v.insert_image_bytes(&bytes, None, cx);
+                }
                 if !v.tool_locked {
                     v.tool = Tool::Selection;
                 }
@@ -2159,17 +2629,34 @@ impl ExcalidrawView {
         .detach();
     }
 
-    pub(crate) fn insert_image_bytes(&mut self, bytes: &[u8], at: Option<P>, cx: &mut Context<Self>) -> bool {
+    pub(crate) fn insert_image_bytes(
+        &mut self,
+        bytes: &[u8],
+        at: Option<P>,
+        cx: &mut Context<Self>,
+    ) -> bool {
         use base64::Engine;
         let (mime, (iw, ih)) = if crate::render::looks_like_svg(bytes) {
-            let Some(sz) = crate::render::svg_size(bytes) else { return false };
+            let Some(sz) = crate::render::svg_size(bytes) else {
+                return false;
+            };
             ("image/svg+xml", sz)
         } else {
-            let Ok(fmt) = image::guess_format(bytes) else { return false };
-            let Ok(img) = image::load_from_memory_with_format(bytes, fmt) else { return false };
-            (fmt.to_mime_type(), (img.width() as f64, img.height() as f64))
+            let Ok(fmt) = image::guess_format(bytes) else {
+                return false;
+            };
+            let Ok(img) = image::load_from_memory_with_format(bytes, fmt) else {
+                return false;
+            };
+            (
+                fmt.to_mime_type(),
+                (img.width() as f64, img.height() as f64),
+            )
         };
-        let url = format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes));
+        let url = format!(
+            "data:{mime};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        );
         let fid = self.scene.add_file(mime, url);
         let max = 500.0 / self.cam.zoom.max(0.1);
         let s = (max / iw.max(ih)).min(1.0);
@@ -2188,10 +2675,17 @@ impl ExcalidrawView {
         true
     }
 
-    pub(crate) fn on_drop_paths(&mut self, paths: &ExternalPaths, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_drop_paths(
+        &mut self,
+        paths: &ExternalPaths,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let at = self.pointer.map(|p| self.world(p));
         for p in paths.paths() {
-            if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("excalidrawlib")) {
+            if p.extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("excalidrawlib"))
+            {
                 self.import_library_file(p);
                 cx.notify();
                 continue;
@@ -2224,18 +2718,34 @@ impl ExcalidrawView {
             return Some("Click on last point or press Escape or Enter to finish");
         }
         match &self.drag {
-            Some(Drag::Resize { .. }) => return Some("Hold SHIFT to keep aspect ratio, ALT to resize from the center"),
-            Some(Drag::Rotate { .. }) => return Some("Hold SHIFT while rotating to constrain angles"),
-            Some(Drag::Freedraw { .. }) => return Some("Click and drag, release when you're finished"),
+            Some(Drag::Resize { .. }) => {
+                return Some("Hold SHIFT to keep aspect ratio, ALT to resize from the center");
+            }
+            Some(Drag::Rotate { .. }) => {
+                return Some("Hold SHIFT while rotating to constrain angles");
+            }
+            Some(Drag::Freedraw { .. }) => {
+                return Some("Click and drag, release when you're finished");
+            }
             _ => {}
         }
         match self.tool {
-            Tool::Arrow | Tool::Line => return Some("Click to start multiple points, drag for single line"),
+            Tool::Arrow | Tool::Line => {
+                return Some("Click to start multiple points, drag for single line");
+            }
             Tool::Freedraw => return Some("Click and drag, release when you're finished"),
-            Tool::Text => return Some("Tip: you can also add text by double-clicking anywhere with the selection tool"),
-            Tool::Image => return Some("Click to place the image, or click and drag to set its size manually"),
+            Tool::Text => {
+                return Some(
+                    "Tip: you can also add text by double-clicking anywhere with the selection tool",
+                );
+            }
+            Tool::Image => {
+                return Some("Click to place the image, or click and drag to set its size manually");
+            }
             Tool::Eraser => return None,
-            Tool::Hand | Tool::Rectangle | Tool::Diamond | Tool::Ellipse | Tool::Frame => return None,
+            Tool::Hand | Tool::Rectangle | Tool::Diamond | Tool::Ellipse | Tool::Frame => {
+                return None;
+            }
             Tool::Selection => {}
         }
         if let Some(el) = self.single() {
@@ -2251,7 +2761,9 @@ impl ExcalidrawView {
             return None;
         }
         if self.selected.is_empty() {
-            return Some("To move canvas, hold mouse wheel or spacebar while dragging, or use the hand tool");
+            return Some(
+                "To move canvas, hold mouse wheel or spacebar while dragging, or use the hand tool",
+            );
         }
         None
     }
@@ -2317,7 +2829,10 @@ pub(crate) fn map_caret(original: &str, display: &str, caret: usize) -> (usize, 
             return (li + 1, 0);
         }
     }
-    (lines.len().saturating_sub(1), lines.last().map(|l| l.len()).unwrap_or(0))
+    (
+        lines.len().saturating_sub(1),
+        lines.last().map(|l| l.len()).unwrap_or(0),
+    )
 }
 
 /// Inverse of [`map_caret`].

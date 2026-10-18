@@ -18,7 +18,11 @@ pub struct BacklinkGroup {
 /// Groups every link that resolves to `target_path` by the note it lives in.
 /// Groups are sorted by path with JS `localeCompare` semantics (see
 /// [`crate::collate`]); the sort is stable, like `Array.prototype.sort`.
-pub fn backlinks_for<S: AsRef<str>>(refs: &[LinkRef], target_path: &str, vault_files: &[S]) -> Vec<BacklinkGroup> {
+pub fn backlinks_for<S: AsRef<str>>(
+    refs: &[LinkRef],
+    target_path: &str,
+    vault_files: &[S],
+) -> Vec<BacklinkGroup> {
     let mut groups: Vec<BacklinkGroup> = Vec::new();
     for r in refs {
         if r.path == target_path {
@@ -34,13 +38,19 @@ pub fn backlinks_for<S: AsRef<str>>(refs: &[LinkRef], target_path: &str, vault_f
         let idx = match groups.iter().position(|g| g.path == r.path) {
             Some(i) => i,
             None => {
-                groups.push(BacklinkGroup { path: r.path.clone(), refs: vec![] });
+                groups.push(BacklinkGroup {
+                    path: r.path.clone(),
+                    refs: vec![],
+                });
                 groups.len() - 1
             }
         };
         let list = &mut groups[idx].refs;
         if !list.iter().any(|b| b.line == r.line) {
-            list.push(Backlink { line: r.line, context: r.context.clone() });
+            list.push(Backlink {
+                line: r.line,
+                context: r.context.clone(),
+            });
         }
     }
     groups.sort_by(|a, b| crate::collate::locale_compare(&a.path, &b.path));
@@ -52,7 +62,13 @@ mod tests {
     use super::*;
 
     fn lr(path: &str, line: usize, target: &str, kind: LinkKind, ctx: &str) -> LinkRef {
-        LinkRef { path: path.into(), line, target: target.into(), kind, context: ctx.into() }
+        LinkRef {
+            path: path.into(),
+            line,
+            target: target.into(),
+            kind,
+            context: ctx.into(),
+        }
     }
 
     #[test]
@@ -69,8 +85,20 @@ mod tests {
         assert_eq!(
             groups,
             vec![
-                BacklinkGroup { path: "/v/a.md".into(), refs: vec![Backlink { line: 3, context: "x".into() }] },
-                BacklinkGroup { path: "/v/c.md".into(), refs: vec![Backlink { line: 1, context: "y".into() }] },
+                BacklinkGroup {
+                    path: "/v/a.md".into(),
+                    refs: vec![Backlink {
+                        line: 3,
+                        context: "x".into()
+                    }]
+                },
+                BacklinkGroup {
+                    path: "/v/c.md".into(),
+                    refs: vec![Backlink {
+                        line: 1,
+                        context: "y".into()
+                    }]
+                },
             ]
         );
     }
@@ -78,9 +106,32 @@ mod tests {
     #[test]
     fn groups_sort_like_js_locale_compare() {
         let files = ["/v/t.md"];
-        let sources = ["/v/eb.md", "/v/~x.md", "/v/A.md", "/v/éa.md", "/v/a.md", "/v/B.md"];
-        let refs: Vec<_> = sources.iter().map(|p| lr(p, 1, "t", LinkKind::Wiki, "")).collect();
-        let order: Vec<_> = backlinks_for(&refs, "/v/t.md", &files).into_iter().map(|g| g.path).collect();
-        assert_eq!(order, vec!["/v/~x.md", "/v/a.md", "/v/A.md", "/v/B.md", "/v/éa.md", "/v/eb.md"]);
+        let sources = [
+            "/v/eb.md",
+            "/v/~x.md",
+            "/v/A.md",
+            "/v/éa.md",
+            "/v/a.md",
+            "/v/B.md",
+        ];
+        let refs: Vec<_> = sources
+            .iter()
+            .map(|p| lr(p, 1, "t", LinkKind::Wiki, ""))
+            .collect();
+        let order: Vec<_> = backlinks_for(&refs, "/v/t.md", &files)
+            .into_iter()
+            .map(|g| g.path)
+            .collect();
+        assert_eq!(
+            order,
+            vec![
+                "/v/~x.md",
+                "/v/a.md",
+                "/v/A.md",
+                "/v/B.md",
+                "/v/éa.md",
+                "/v/eb.md"
+            ]
+        );
     }
 }

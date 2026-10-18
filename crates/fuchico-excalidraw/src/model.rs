@@ -366,7 +366,11 @@ impl Element {
         Self::num(&self.f.angle, 0.0)
     }
     pub fn stroke_color(&self) -> &str {
-        self.f.stroke_color.get().map(|s| s.as_str()).unwrap_or("#1e1e1e")
+        self.f
+            .stroke_color
+            .get()
+            .map(|s| s.as_str())
+            .unwrap_or("#1e1e1e")
     }
     pub fn background_color(&self) -> &str {
         self.f
@@ -376,13 +380,21 @@ impl Element {
             .unwrap_or("transparent")
     }
     pub fn fill_style(&self) -> &str {
-        self.f.fill_style.get().map(|s| s.as_str()).unwrap_or("solid")
+        self.f
+            .fill_style
+            .get()
+            .map(|s| s.as_str())
+            .unwrap_or("solid")
     }
     pub fn stroke_width(&self) -> f64 {
         Self::num(&self.f.stroke_width, 2.0)
     }
     pub fn stroke_style(&self) -> &str {
-        self.f.stroke_style.get().map(|s| s.as_str()).unwrap_or("solid")
+        self.f
+            .stroke_style
+            .get()
+            .map(|s| s.as_str())
+            .unwrap_or("solid")
     }
     pub fn roughness(&self) -> f64 {
         Self::num(&self.f.roughness, 1.0)
@@ -427,16 +439,28 @@ impl Element {
         self.f.text.get().map(|s| s.as_str()).unwrap_or("")
     }
     pub fn text_align(&self) -> &str {
-        self.f.text_align.get().map(|s| s.as_str()).unwrap_or("left")
+        self.f
+            .text_align
+            .get()
+            .map(|s| s.as_str())
+            .unwrap_or("left")
     }
     pub fn vertical_align(&self) -> &str {
-        self.f.vertical_align.get().map(|s| s.as_str()).unwrap_or("top")
+        self.f
+            .vertical_align
+            .get()
+            .map(|s| s.as_str())
+            .unwrap_or("top")
     }
     pub fn container_id(&self) -> Option<&str> {
         self.f.container_id.get().map(|s| s.as_str())
     }
     pub fn bound_elements(&self) -> &[BoundElement] {
-        self.f.bound_elements.get().map(|v| v.as_slice()).unwrap_or(&[])
+        self.f
+            .bound_elements
+            .get()
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
     pub fn is_linear(&self) -> bool {
         matches!(self.kind.as_str(), "line" | "arrow")

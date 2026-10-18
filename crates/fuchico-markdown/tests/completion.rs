@@ -2,7 +2,9 @@ mod common;
 use chrono::NaiveDate;
 use common::*;
 use fuchico_core::fuzzy::fuzzy_match;
-use fuchico_markdown::completion::{extract_headings, should_open_completion, MAX_RENDERED_OPTIONS};
+use fuchico_markdown::completion::{
+    MAX_RENDERED_OPTIONS, extract_headings, should_open_completion,
+};
 use fuchico_markdown::*;
 
 fn no_read(_: &str) -> Option<String> {
@@ -27,7 +29,12 @@ fn s(v: &[&str]) -> Vec<String> {
 
 #[test]
 fn wikilink_ranking_and_apply() {
-    let files = s(&["/v/Alpha.md", "/v/sub/alphabet.md", "/v/Beta.md", "/v/al.md"]);
+    let files = s(&[
+        "/v/Alpha.md",
+        "/v/sub/alphabet.md",
+        "/v/Beta.md",
+        "/v/al.md",
+    ]);
     let doc = "see [[al";
     let opts = run(doc, doc.len(), &files, &[]);
     let labels: Vec<_> = opts.iter().map(|o| o.label.as_str()).collect();
@@ -44,8 +51,20 @@ fn wikilink_ranking_and_apply() {
     let o = &opts[0];
     assert_eq!(o.source, CompletionSource::Wikilink);
     assert_eq!(o.range, 6..8);
-    assert_eq!(o.detail.as_deref(), Some(files.iter().find(|f| f.contains(&format!("/{}.md", o.label))).unwrap().as_str()));
-    assert_eq!(apply_edits(doc, std::slice::from_ref(&o.edit)), format!("see [[{}]]", o.label));
+    assert_eq!(
+        o.detail.as_deref(),
+        Some(
+            files
+                .iter()
+                .find(|f| f.contains(&format!("/{}.md", o.label)))
+                .unwrap()
+                .as_str()
+        )
+    );
+    assert_eq!(
+        apply_edits(doc, std::slice::from_ref(&o.edit)),
+        format!("see [[{}]]", o.label)
+    );
     assert_eq!(o.cursor, 6 + o.label.len() + 2);
     assert!(o.picked);
     // Existing `]]` is not duplicated.
@@ -61,7 +80,10 @@ fn heading_completion() {
     let opts = run(doc, doc.len(), &[], &[]);
     assert_eq!(opts[0].label, "Two");
     assert_eq!(opts[0].source, CompletionSource::Heading);
-    assert_eq!(apply_edits(doc, &[opts[0].edit.clone()]), "# One\n## Two ##\n```\n# Not\n```\n[[#Two]]");
+    assert_eq!(
+        apply_edits(doc, &[opts[0].edit.clone()]),
+        "# One\n## Two ##\n```\n# Not\n```\n[[#Two]]"
+    );
     assert_eq!(extract_headings(doc), vec!["One", "Two"]);
     // Other note via the host reader.
     let files = s(&["/v/Other.md"]);
@@ -75,7 +97,10 @@ fn heading_completion() {
         read_note: &read,
     };
     let o = m.completions(&ctx);
-    assert_eq!(o.iter().map(|o| o.label.as_str()).collect::<Vec<_>>(), vec!["Remote"]);
+    assert_eq!(
+        o.iter().map(|o| o.label.as_str()).collect::<Vec<_>>(),
+        vec!["Remote"]
+    );
     // Unresolvable target: nothing from the heading source (the wikilink
     // source does not match because `#` is excluded from its query? no: it
     // is not, `[^[\]]*` accepts `#`).
@@ -88,22 +113,36 @@ fn tag_completion() {
     let tags = s(&["project", "personal", "pro/x", "zzz"]);
     let doc = "a #pro";
     let opts = run(doc, doc.len(), &[], &tags);
-    let labels: Vec<_> = opts.iter().filter(|o| o.source == CompletionSource::Tag).map(|o| o.label.clone()).collect();
+    let labels: Vec<_> = opts
+        .iter()
+        .filter(|o| o.source == CompletionSource::Tag)
+        .map(|o| o.label.clone())
+        .collect();
     assert!(labels.contains(&"project".to_string()));
     assert!(!labels.contains(&"zzz".to_string()));
     let o = opts.iter().find(|o| o.label == "project").unwrap();
     assert_eq!(o.range, 3..6);
-    assert_eq!(apply_edits(doc, std::slice::from_ref(&o.edit)), "a #project");
+    assert_eq!(
+        apply_edits(doc, std::slice::from_ref(&o.edit)),
+        "a #project"
+    );
     assert_eq!(o.kind, CompletionType::Text);
     // `#` must follow whitespace or line start.
-    assert!(run("a#pro", 5, &[], &tags).iter().all(|o| o.source != CompletionSource::Tag));
+    assert!(
+        run("a#pro", 5, &[], &tags)
+            .iter()
+            .all(|o| o.source != CompletionSource::Tag)
+    );
 }
 
 #[test]
 fn task_completion() {
     let doc = "- [ ] pay @due";
     let opts = run(doc, doc.len(), &[], &[]);
-    let t: Vec<_> = opts.iter().filter(|o| o.source == CompletionSource::Task).collect();
+    let t: Vec<_> = opts
+        .iter()
+        .filter(|o| o.source == CompletionSource::Task)
+        .collect();
     assert!(!t.is_empty());
     assert_eq!(t[0].kind, CompletionType::Keyword);
     assert!(!t[0].picked);
@@ -137,7 +176,11 @@ fn word_completion() {
     let doc = "elephant\n```rust\nelep\n```";
     assert!(run(doc, doc.len() - 4, &[], &[]).is_empty());
     let doc = "elephant [[elep";
-    assert!(run(doc, doc.len(), &[], &[]).iter().all(|o| o.source != CompletionSource::Word));
+    assert!(
+        run(doc, doc.len(), &[], &[])
+            .iter()
+            .all(|o| o.source != CompletionSource::Word)
+    );
 }
 
 #[test]

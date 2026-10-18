@@ -17,7 +17,10 @@ pub const DOCK_HANDLE_WIDTH: f32 = 5.;
 
 /// What the dock shows.
 pub enum Dock {
-    Mermaid { block_key: String, pane: Entity<MermaidPane> },
+    Mermaid {
+        block_key: String,
+        pane: Entity<MermaidPane>,
+    },
     Backlinks(Entity<BacklinksPane>),
 }
 
@@ -47,7 +50,9 @@ impl DockDrag {
 /// The backlinks target for the active tab: none for drawings
 /// (`.excalidraw`, case-sensitive as in the original).
 pub fn backlinks_target(active: Option<&str>) -> Option<String> {
-    active.filter(|p| !p.ends_with(".excalidraw")).map(str::to_string)
+    active
+        .filter(|p| !p.ends_with(".excalidraw"))
+        .map(str::to_string)
 }
 
 /// Shared panel chrome: a header with the title and a close button above
@@ -69,7 +74,12 @@ pub fn dock_frame(
         .px(u(10.))
         .border_b_1()
         .border_color(th.colors.border)
-        .child(div().text_size(u(12.)).font_weight(FontWeight::SEMIBOLD).child(title.into()))
+        .child(
+            div()
+                .text_size(u(12.))
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(title.into()),
+        )
         .child(icon_button(
             SharedString::from(format!("{id}-close")),
             crate::assets::AppIcon::X,
@@ -87,7 +97,15 @@ pub fn dock_frame(
         .text_size(u(13.))
         .text_color(th.colors.foreground)
         .child(header)
-        .child(div().id(id).flex_1().overflow_y_scroll().p(u(12.)).text_color(th.colors.muted_foreground).child(body))
+        .child(
+            div()
+                .id(id)
+                .flex_1()
+                .overflow_y_scroll()
+                .p(u(12.))
+                .text_color(th.colors.muted_foreground)
+                .child(body),
+        )
 }
 
 #[cfg(test)]
@@ -96,7 +114,10 @@ mod tests {
 
     #[test]
     fn drag_clamps_and_inverts() {
-        let d = DockDrag { start_x: 600., start_width: 380. };
+        let d = DockDrag {
+            start_x: 600.,
+            start_width: 380.,
+        };
         assert_eq!(d.width_at(500.), 480.);
         assert_eq!(d.width_at(700.), 280.);
         assert_eq!(d.width_at(0.), DOCK_MAX_WIDTH);
@@ -107,7 +128,10 @@ mod tests {
     fn backlinks_skip_drawings_case_sensitively() {
         assert_eq!(backlinks_target(Some("/v/a.md")), Some("/v/a.md".into()));
         assert_eq!(backlinks_target(Some("/v/a.excalidraw")), None);
-        assert_eq!(backlinks_target(Some("/v/a.Excalidraw")), Some("/v/a.Excalidraw".into()));
+        assert_eq!(
+            backlinks_target(Some("/v/a.Excalidraw")),
+            Some("/v/a.Excalidraw".into())
+        );
         assert_eq!(backlinks_target(None), None);
     }
 }

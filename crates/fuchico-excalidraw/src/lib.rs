@@ -19,8 +19,10 @@ pub mod text;
 mod ui;
 pub mod view;
 
+pub use export::ExportOptions;
 pub use model::{ExcalidrawFile, LoadError};
 pub use scene::Scene;
 pub use style::ExcalidrawStyle;
-pub use view::{DrawingSource, ExcalidrawEvent, ExcalidrawView, OnChange, StyleFn, Tool, SAVE_DEBOUNCE};
-pub use export::ExportOptions;
+pub use view::{
+    DrawingSource, ExcalidrawEvent, ExcalidrawView, OnChange, SAVE_DEBOUNCE, StyleFn, Tool,
+};

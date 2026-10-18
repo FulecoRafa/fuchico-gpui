@@ -732,6 +732,34 @@ pub enum Msg {
     EditorTooLarge,
     /// `editor.saveFailed` (native port; the original hardcoded it)
     EditorSaveFailed,
+    /// `editor.find` (native port; the original hardcoded it)
+    EditorFind,
+    /// `editor.replace` (native port; the original hardcoded it)
+    EditorReplace,
+    /// `editor.findNext` (native port; the original hardcoded it)
+    EditorFindNext,
+    /// `editor.findPrevious` (native port; the original hardcoded it)
+    EditorFindPrevious,
+    /// `editor.findAll` (native port; the original hardcoded it)
+    EditorFindAll,
+    /// `editor.matchCase` (native port; the original hardcoded it)
+    EditorMatchCase,
+    /// `editor.regexp` (native port; the original hardcoded it)
+    EditorRegexp,
+    /// `editor.byWord` (native port; the original hardcoded it)
+    EditorByWord,
+    /// `editor.replaceOne` (native port; the original hardcoded it)
+    EditorReplaceOne,
+    /// `editor.replaceAll` (native port; the original hardcoded it)
+    EditorReplaceAll,
+    /// `editor.goToLine` (native port; the original hardcoded it)
+    EditorGoToLine,
+    /// `editor.go` (native port; the original hardcoded it)
+    EditorGo,
+    /// `editor.goToHeader` (native port; the original hardcoded it)
+    EditorGoToHeader,
+    /// `editor.noHeaders` (native port; the original hardcoded it)
+    EditorNoHeaders,
 }
 
 impl Msg {
@@ -1099,6 +1127,20 @@ impl Msg {
         Msg::EditorBinaryFile,
         Msg::EditorTooLarge,
         Msg::EditorSaveFailed,
+        Msg::EditorFind,
+        Msg::EditorReplace,
+        Msg::EditorFindNext,
+        Msg::EditorFindPrevious,
+        Msg::EditorFindAll,
+        Msg::EditorMatchCase,
+        Msg::EditorRegexp,
+        Msg::EditorByWord,
+        Msg::EditorReplaceOne,
+        Msg::EditorReplaceAll,
+        Msg::EditorGoToLine,
+        Msg::EditorGo,
+        Msg::EditorGoToHeader,
+        Msg::EditorNoHeaders,
     ];
 
     /// The original dotted key, e.g. `"common.loading"`.
@@ -1388,8 +1430,12 @@ impl Msg {
             Msg::ShortcutsFixedTabMenuKeys => "shortcuts.fixed.tabMenu.keys",
             Msg::ShortcutActionOpenOutlineLabel => "shortcutAction.openOutline.label",
             Msg::ShortcutActionOpenOutlineDesc => "shortcutAction.openOutline.desc",
-            Msg::ShortcutActionToggleCheckboxAtCursorLabel => "shortcutAction.toggleCheckboxAtCursor.label",
-            Msg::ShortcutActionToggleCheckboxAtCursorDesc => "shortcutAction.toggleCheckboxAtCursor.desc",
+            Msg::ShortcutActionToggleCheckboxAtCursorLabel => {
+                "shortcutAction.toggleCheckboxAtCursor.label"
+            }
+            Msg::ShortcutActionToggleCheckboxAtCursorDesc => {
+                "shortcutAction.toggleCheckboxAtCursor.desc"
+            }
             Msg::ShortcutActionInsertDateLabel => "shortcutAction.insertDate.label",
             Msg::ShortcutActionInsertDateDesc => "shortcutAction.insertDate.desc",
             Msg::ShortcutActionInsertDateTimeLabel => "shortcutAction.insertDateTime.label",
@@ -1466,6 +1512,20 @@ impl Msg {
             Msg::EditorBinaryFile => "editor.binaryFile",
             Msg::EditorTooLarge => "editor.tooLarge",
             Msg::EditorSaveFailed => "editor.saveFailed",
+            Msg::EditorFind => "editor.find",
+            Msg::EditorReplace => "editor.replace",
+            Msg::EditorFindNext => "editor.findNext",
+            Msg::EditorFindPrevious => "editor.findPrevious",
+            Msg::EditorFindAll => "editor.findAll",
+            Msg::EditorMatchCase => "editor.matchCase",
+            Msg::EditorRegexp => "editor.regexp",
+            Msg::EditorByWord => "editor.byWord",
+            Msg::EditorReplaceOne => "editor.replaceOne",
+            Msg::EditorReplaceAll => "editor.replaceAll",
+            Msg::EditorGoToLine => "editor.goToLine",
+            Msg::EditorGo => "editor.go",
+            Msg::EditorGoToHeader => "editor.goToHeader",
+            Msg::EditorNoHeaders => "editor.noHeaders",
         }
     }
 }
@@ -1566,7 +1626,9 @@ pub fn en(m: Msg) -> &'static str {
         Msg::SearchLine => "line {n}",
         Msg::SearchScopeInFile => "in {file}",
         Msg::SearchScopeAcrossFiles => "across {files}",
-        Msg::SearchConfirmReplace => "Replace every \"{query}\" with \"{replacement}\" {scope}? This cannot be undone.",
+        Msg::SearchConfirmReplace => {
+            "Replace every \"{query}\" with \"{replacement}\" {scope}? This cannot be undone."
+        }
         Msg::SearchReplaced => "Replaced {occurrences} in {files}.",
         Msg::SearchReplaceFailed => "Replace failed: {error}",
         Msg::SearchReplaceAllInFile => "Replace all in {file}",
@@ -1602,21 +1664,29 @@ pub fn en(m: Msg) -> &'static str {
         Msg::SettingsNoResults => "No settings match \"{query}\".",
         Msg::SettingsSectionsAria => "Settings sections",
         Msg::SettingsLanguageTitle => "Language",
-        Msg::SettingsLanguageDesc => "Language of the app interface. \"System\" follows your operating system language.",
+        Msg::SettingsLanguageDesc => {
+            "Language of the app interface. \"System\" follows your operating system language."
+        }
         Msg::SettingsLanguageLabel => "Language",
         Msg::SettingsLanguageSystem => "System",
         Msg::SettingsThemeTitle => "Theme",
-        Msg::SettingsThemeDesc => "A theme is a color choice, independent of light/dark mode. Each palette may support a light and/or dark variant.",
+        Msg::SettingsThemeDesc => {
+            "A theme is a color choice, independent of light/dark mode. Each palette may support a light and/or dark variant."
+        }
         Msg::SettingsThemePalette => "Palette",
         Msg::SettingsThemePaletteCustom => "Custom",
         Msg::SettingsThemeMode => "Mode",
         Msg::SettingsThemeModeSystem => "System",
         Msg::SettingsThemeModeLight => "Light",
         Msg::SettingsThemeModeDark => "Dark",
-        Msg::SettingsThemeDraculaHint => "Dracula only ships a dark palette, so mode is fixed to dark.",
+        Msg::SettingsThemeDraculaHint => {
+            "Dracula only ships a dark palette, so mode is fixed to dark."
+        }
         Msg::SettingsThemeCustomCss => "Custom CSS variables",
         Msg::SettingsThemeCustomCssHintPrefix => "Declarations are injected as-is into a",
-        Msg::SettingsThemeCustomCssHintSuffix => "rule. Preview updates as you type; click Apply to use it across the whole app.",
+        Msg::SettingsThemeCustomCssHintSuffix => {
+            "rule. Preview updates as you type; click Apply to use it across the whole app."
+        }
         Msg::SettingsThemeAutocompleteHint => "Type -- to autocomplete the app's theme variables.",
         Msg::SettingsThemeNewTheme => "New theme",
         Msg::SettingsThemeNewThemeName => "My theme",
@@ -1658,7 +1728,9 @@ pub fn en(m: Msg) -> &'static str {
         Msg::SettingsPreviewSecondary => "Secondary",
         Msg::SettingsPreviewPangram => "The quick brown fox jumps over the lazy dog.",
         Msg::SettingsFontTitle => "Font",
-        Msg::SettingsFontDesc => "Choose fonts installed on this machine for the app's interface and for the editor.",
+        Msg::SettingsFontDesc => {
+            "Choose fonts installed on this machine for the app's interface and for the editor."
+        }
         Msg::SettingsFontUiFont => "UI font",
         Msg::SettingsFontEditorFont => "Editor font",
         Msg::SettingsFontLoading => "Loading system fonts…",
@@ -1668,7 +1740,9 @@ pub fn en(m: Msg) -> &'static str {
         Msg::SettingsFontUiZoom => "UI zoom",
         Msg::SettingsFontUiZoomHint => "Percent. Also Cmd/Ctrl Shift +, − and 0 to reset.",
         Msg::SettingsKeybindingsTitle => "Keybindings",
-        Msg::SettingsKeybindingsDesc => "Choose how the editor interprets keystrokes. Takes effect immediately in any open file.",
+        Msg::SettingsKeybindingsDesc => {
+            "Choose how the editor interprets keystrokes. Takes effect immediately in any open file."
+        }
         Msg::SettingsKeybindingsHelixDesc => "Modal editing, Helix-style selection-first commands.",
         Msg::SettingsKeybindingsVimDesc => "Modal editing, Vim keybindings.",
         Msg::SettingsKeybindingsNormalLabel => "Normal",
@@ -1679,14 +1753,22 @@ pub fn en(m: Msg) -> &'static str {
         Msg::SettingsBehaviorAbsolute => "Absolute",
         Msg::SettingsBehaviorAbsoluteTitle => "Every line shows its absolute number.",
         Msg::SettingsBehaviorRelative => "Relative",
-        Msg::SettingsBehaviorRelativeTitle => "The current line shows its absolute number; every other line shows its distance from the cursor.",
-        Msg::SettingsBehaviorRelativeHint => "Helix/Vim-style: handy for jumping N lines with motion commands.",
+        Msg::SettingsBehaviorRelativeTitle => {
+            "The current line shows its absolute number; every other line shows its distance from the cursor."
+        }
+        Msg::SettingsBehaviorRelativeHint => {
+            "Helix/Vim-style: handy for jumping N lines with motion commands."
+        }
         Msg::SettingsBehaviorTabSize => "Tab size",
         Msg::SettingsBehaviorTabSizeHint => "Spaces per indent level and per tab stop.",
         Msg::SettingsBehaviorRulers => "Vertical rulers",
-        Msg::SettingsBehaviorRulersHint => "Comma-separated columns where a guide line is drawn (e.g. 80, 120). Leave empty for none.",
+        Msg::SettingsBehaviorRulersHint => {
+            "Comma-separated columns where a guide line is drawn (e.g. 80, 120). Leave empty for none."
+        }
         Msg::SettingsFoldingTitle => "Fold Regions",
-        Msg::SettingsFoldingDesc => "Wrap any lines between a start and end marker to make them foldable — this is an app-specific convention, not part of Markdown. The rest of the start-marker line becomes the region's name.",
+        Msg::SettingsFoldingDesc => {
+            "Wrap any lines between a start and end marker to make them foldable — this is an app-specific convention, not part of Markdown. The rest of the start-marker line becomes the region's name."
+        }
         Msg::SettingsFoldingStartMarker => "Start marker",
         Msg::SettingsFoldingEndMarker => "End marker",
         Msg::SettingsFoldingEg => "e.g.",
@@ -1695,7 +1777,9 @@ pub fn en(m: Msg) -> &'static str {
         Msg::SettingsFoldingCollapsed => "Collapsed",
         Msg::SettingsFoldingLinesExample => "3 lines",
         Msg::SettingsVaultTitle => "Vault Folders",
-        Msg::SettingsVaultDescPrefix => "Relative to the open vault. \"Open Today's Daily Note\" and \"New Note from Template\" live in the command palette (Cmd/Ctrl-Shift-P); templates may use",
+        Msg::SettingsVaultDescPrefix => {
+            "Relative to the open vault. \"Open Today's Daily Note\" and \"New Note from Template\" live in the command palette (Cmd/Ctrl-Shift-P); templates may use"
+        }
         Msg::SettingsVaultAnd => "and",
         Msg::SettingsVaultDescImages => ". Pasted images go to",
         Msg::SettingsVaultDailyNotesFolder => "Daily notes folder",
@@ -1703,13 +1787,21 @@ pub fn en(m: Msg) -> &'static str {
         Msg::SettingsVaultTemplatesHintPrefix => "A",
         Msg::SettingsVaultTemplatesHintSuffix => "here seeds new daily notes.",
         Msg::SettingsVaultExternalTool => "External tool",
-        Msg::SettingsVaultExternalToolPlaceholder => "e.g. \"Visual Studio Code\" (empty = OS default)",
-        Msg::SettingsVaultExternalToolHint => "Used by \"Open with…\" in the file explorer's right-click menu.",
+        Msg::SettingsVaultExternalToolPlaceholder => {
+            "e.g. \"Visual Studio Code\" (empty = OS default)"
+        }
+        Msg::SettingsVaultExternalToolHint => {
+            "Used by \"Open with…\" in the file explorer's right-click menu."
+        }
         Msg::SettingsAboutTitle => "About",
-        Msg::SettingsAboutDesc => "Fuchico {version} — a keyboard-first Markdown notes app with Helix editing, tasks and agenda.",
+        Msg::SettingsAboutDesc => {
+            "Fuchico {version} — a keyboard-first Markdown notes app with Helix editing, tasks and agenda."
+        }
         Msg::SettingsAboutGithub => "Source & issues on GitHub",
         Msg::ShortcutsTitle => "Keyboard Shortcuts",
-        Msg::ShortcutsDesc => "Everything the keyboard can do, in one place. Editor actions are rebindable: click a binding, then press the new key combination.",
+        Msg::ShortcutsDesc => {
+            "Everything the keyboard can do, in one place. Editor actions are rebindable: click a binding, then press the new key combination."
+        }
         Msg::ShortcutsSearchPlaceholder => "Search shortcuts…",
         Msg::ShortcutsEditorRebindable => "Editor (rebindable)",
         Msg::ShortcutsPressKeys => "Press keys…",
@@ -1727,28 +1819,42 @@ pub fn en(m: Msg) -> &'static str {
         Msg::ShortcutsFixedUiZoomLabel => "UI zoom",
         Msg::ShortcutsFixedUiZoomDesc => "Zoom the whole app in / out / reset.",
         Msg::ShortcutsFixedHelixPaletteLabel => "Command palette from Helix",
-        Msg::ShortcutsFixedHelixPaletteDesc => "In Helix normal mode, : opens the command palette; :q, :w, :wq and :<line> work as aliases.",
+        Msg::ShortcutsFixedHelixPaletteDesc => {
+            "In Helix normal mode, : opens the command palette; :q, :w, :wq and :<line> work as aliases."
+        }
         Msg::ShortcutsFixedSaveLabel => "Save",
         Msg::ShortcutsFixedSaveDesc => "Write the current file to disk.",
         Msg::ShortcutsFixedFindReplaceLabel => "Find / replace",
         Msg::ShortcutsFixedFindReplaceDesc => "Search within the current file.",
         Msg::ShortcutsFixedTaskAutocompleteLabel => "Task date / repeat autocomplete",
-        Msg::ShortcutsFixedTaskAutocompleteDesc => "Type @due, @today, @repeat (or 📅 / 🔁) on a task line to pick a date or rule.",
+        Msg::ShortcutsFixedTaskAutocompleteDesc => {
+            "Type @due, @today, @repeat (or 📅 / 🔁) on a task line to pick a date or rule."
+        }
         Msg::ShortcutsFixedPasteImageLabel => "Paste image",
-        Msg::ShortcutsFixedPasteImageDesc => "Paste or drop an image to save it under attachments/ and link it.",
+        Msg::ShortcutsFixedPasteImageDesc => {
+            "Paste or drop an image to save it under attachments/ and link it."
+        }
         Msg::ShortcutsFixedFollowLinkLabel => "Follow link",
-        Msg::ShortcutsFixedFollowLinkDesc => "Open the [[wikilink]] or Markdown link under the cursor.",
+        Msg::ShortcutsFixedFollowLinkDesc => {
+            "Open the [[wikilink]] or Markdown link under the cursor."
+        }
         Msg::ShortcutsFixedFollowLinkKeys => "Click",
         Msg::ShortcutsFixedExplorerNavigateLabel => "Navigate",
         Msg::ShortcutsFixedExplorerNavigateDesc => "Move selection, expand/collapse folders.",
         Msg::ShortcutsFixedExplorerOpenLabel => "Open / toggle folder",
-        Msg::ShortcutsFixedExplorerOpenDesc => "Open the selected file or expand/collapse the folder.",
+        Msg::ShortcutsFixedExplorerOpenDesc => {
+            "Open the selected file or expand/collapse the folder."
+        }
         Msg::ShortcutsFixedExplorerRenameLabel => "Rename",
         Msg::ShortcutsFixedExplorerRenameDesc => "Rename the selected entry.",
         Msg::ShortcutsFixedExplorerDeleteLabel => "Delete",
-        Msg::ShortcutsFixedExplorerDeleteDesc => "Delete the selected entry (asks for confirmation).",
+        Msg::ShortcutsFixedExplorerDeleteDesc => {
+            "Delete the selected entry (asks for confirmation)."
+        }
         Msg::ShortcutsFixedExplorerTypeAheadLabel => "Type-ahead",
-        Msg::ShortcutsFixedExplorerTypeAheadDesc => "Type a name prefix to jump to the matching entry.",
+        Msg::ShortcutsFixedExplorerTypeAheadDesc => {
+            "Type a name prefix to jump to the matching entry."
+        }
         Msg::ShortcutsFixedExplorerMenuLabel => "Context menu",
         Msg::ShortcutsFixedExplorerMenuDesc => "New file/folder, rename, delete.",
         Msg::ShortcutsFixedExplorerMenuKeys => "Right-click",
@@ -1756,32 +1862,50 @@ pub fn en(m: Msg) -> &'static str {
         Msg::ShortcutsFixedTabMenuDesc => "Close, close others, close all.",
         Msg::ShortcutsFixedTabMenuKeys => "Right-click",
         Msg::ShortcutActionOpenOutlineLabel => "Go to header",
-        Msg::ShortcutActionOpenOutlineDesc => "Open the document outline (fuzzy-searchable header list).",
+        Msg::ShortcutActionOpenOutlineDesc => {
+            "Open the document outline (fuzzy-searchable header list)."
+        }
         Msg::ShortcutActionToggleCheckboxAtCursorLabel => "Toggle checkbox",
-        Msg::ShortcutActionToggleCheckboxAtCursorDesc => "Mark/unmark the checkbox on the cursor's line.",
+        Msg::ShortcutActionToggleCheckboxAtCursorDesc => {
+            "Mark/unmark the checkbox on the cursor's line."
+        }
         Msg::ShortcutActionInsertDateLabel => "Insert date",
         Msg::ShortcutActionInsertDateDesc => "Insert today's date at the cursor.",
         Msg::ShortcutActionInsertDateTimeLabel => "Insert date & time",
         Msg::ShortcutActionInsertDateTimeDesc => "Insert the current date and time at the cursor.",
         Msg::ShortcutActionInsertRegionLabel => "Insert fold region",
-        Msg::ShortcutActionInsertRegionDesc => "Wrap the selected lines in a foldable region (or insert an empty one at the cursor).",
+        Msg::ShortcutActionInsertRegionDesc => {
+            "Wrap the selected lines in a foldable region (or insert an empty one at the cursor)."
+        }
         Msg::ShortcutActionInsertTableLabel => "Insert table",
-        Msg::ShortcutActionInsertTableDesc => "Insert a 2x2 Markdown table at the cursor and start editing the header.",
+        Msg::ShortcutActionInsertTableDesc => {
+            "Insert a 2x2 Markdown table at the cursor and start editing the header."
+        }
         Msg::ShortcutActionToggleTaskLineLabel => "Toggle task",
-        Msg::ShortcutActionToggleTaskLineDesc => "Turn the current line into a `- [ ]` task (or back into plain text).",
+        Msg::ShortcutActionToggleTaskLineDesc => {
+            "Turn the current line into a `- [ ]` task (or back into plain text)."
+        }
         Msg::ShortcutActionPickDueDateLabel => "Set due date…",
-        Msg::ShortcutActionPickDueDateDesc => "Add or change the 📅 due date on the current line via a quick-pick list.",
+        Msg::ShortcutActionPickDueDateDesc => {
+            "Add or change the 📅 due date on the current line via a quick-pick list."
+        }
         Msg::ShortcutActionPickRecurrenceLabel => "Set recurrence…",
-        Msg::ShortcutActionPickRecurrenceDesc => "Add or change the 🔁 repeat rule on the current line via a quick-pick list.",
+        Msg::ShortcutActionPickRecurrenceDesc => {
+            "Add or change the 🔁 repeat rule on the current line via a quick-pick list."
+        }
         Msg::CaldavTitle => "CalDAV Sync",
-        Msg::CaldavDesc => "Link folders to a CalDAV calendar (e.g. iCloud Reminders) so checkbox tasks in your notes sync to your phone and back.",
+        Msg::CaldavDesc => {
+            "Link folders to a CalDAV calendar (e.g. iCloud Reminders) so checkbox tasks in your notes sync to your phone and back."
+        }
         Msg::CaldavAccounts => "Accounts",
         Msg::CaldavRemoveAccount => "Remove account",
         Msg::CaldavServerUrl => "Server URL",
         Msg::CaldavUsername => "Username",
         Msg::CaldavUsernamePlaceholder => "you@icloud.com",
         Msg::CaldavPassword => "Password",
-        Msg::CaldavIcloudHint => "iCloud requires an app-specific password, not your Apple ID password.",
+        Msg::CaldavIcloudHint => {
+            "iCloud requires an app-specific password, not your Apple ID password."
+        }
         Msg::CaldavIcloudLink => "Generate one at appleid.apple.com",
         Msg::CaldavTestConnection => "Test Connection",
         Msg::CaldavTesting => "Testing…",
@@ -1808,7 +1932,9 @@ pub fn en(m: Msg) -> &'static str {
         Msg::CaldavSync => "Sync",
         Msg::CaldavSyncNow => "Sync Now",
         Msg::CaldavSyncing => "Syncing…",
-        Msg::CaldavReportSummary => "+{new} new, {pushed} pushed, {pulled} pulled, {fromServer} from server",
+        Msg::CaldavReportSummary => {
+            "+{new} new, {pushed} pushed, {pulled} pulled, {fromServer} from server"
+        }
         Msg::CaldavReportErrors => ", {n} error(s)",
         Msg::ShortcutsReset => "Reset",
         Msg::ShortcutsResetTitle => "Restore the default binding ({binding})",
@@ -1835,6 +1961,20 @@ pub fn en(m: Msg) -> &'static str {
         Msg::EditorBinaryFile => "Binary file · {size}",
         Msg::EditorTooLarge => "File too large · {size}",
         Msg::EditorSaveFailed => "Couldn't save {name}: {error}",
+        Msg::EditorFind => "Find",
+        Msg::EditorReplace => "Replace",
+        Msg::EditorFindNext => "next",
+        Msg::EditorFindPrevious => "previous",
+        Msg::EditorFindAll => "all",
+        Msg::EditorMatchCase => "match case",
+        Msg::EditorRegexp => "regexp",
+        Msg::EditorByWord => "by word",
+        Msg::EditorReplaceOne => "replace",
+        Msg::EditorReplaceAll => "replace all",
+        Msg::EditorGoToLine => "Go to line",
+        Msg::EditorGo => "go",
+        Msg::EditorGoToHeader => "Go to header…",
+        Msg::EditorNoHeaders => "No headers found",
     }
 }
 
@@ -1921,7 +2061,9 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ExportSaved => "Exportado para {path}",
         Msg::ExportFailed => "Falha ao exportar: {message}",
         Msg::ExportPrint => "Imprimir / Salvar como PDF",
-        Msg::ExportPrintHint => "Use a caixa de diálogo de impressão para salvar esta nota como PDF.",
+        Msg::ExportPrintHint => {
+            "Use a caixa de diálogo de impressão para salvar esta nota como PDF."
+        }
         Msg::CommandGoToLine => "Ir para a linha {n}",
         Msg::SearchOpenFolderToSearch => "Abra uma pasta para buscar",
         Msg::SearchPlaceholder => "Buscar nos arquivos…",
@@ -1934,7 +2076,9 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::SearchLine => "linha {n}",
         Msg::SearchScopeInFile => "em {file}",
         Msg::SearchScopeAcrossFiles => "em {files}",
-        Msg::SearchConfirmReplace => "Substituir toda ocorrência de \"{query}\" por \"{replacement}\" {scope}? Isso não pode ser desfeito.",
+        Msg::SearchConfirmReplace => {
+            "Substituir toda ocorrência de \"{query}\" por \"{replacement}\" {scope}? Isso não pode ser desfeito."
+        }
         Msg::SearchReplaced => "{occurrences} substituída(s) em {files}.",
         Msg::SearchReplaceFailed => "Falha ao substituir: {error}",
         Msg::SearchReplaceAllInFile => "Substituir tudo em {file}",
@@ -1970,22 +2114,32 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::SettingsNoResults => "Nenhuma configuração corresponde a \"{query}\".",
         Msg::SettingsSectionsAria => "Seções de configurações",
         Msg::SettingsLanguageTitle => "Idioma",
-        Msg::SettingsLanguageDesc => "Idioma da interface do aplicativo. \"Sistema\" segue o idioma do seu sistema operacional.",
+        Msg::SettingsLanguageDesc => {
+            "Idioma da interface do aplicativo. \"Sistema\" segue o idioma do seu sistema operacional."
+        }
         Msg::SettingsLanguageLabel => "Idioma",
         Msg::SettingsLanguageSystem => "Sistema",
         Msg::SettingsThemeTitle => "Tema",
-        Msg::SettingsThemeDesc => "Um tema é uma escolha de cores, independente do modo claro/escuro. Cada paleta pode ter uma variante clara e/ou escura.",
+        Msg::SettingsThemeDesc => {
+            "Um tema é uma escolha de cores, independente do modo claro/escuro. Cada paleta pode ter uma variante clara e/ou escura."
+        }
         Msg::SettingsThemePalette => "Paleta",
         Msg::SettingsThemePaletteCustom => "Personalizada",
         Msg::SettingsThemeMode => "Modo",
         Msg::SettingsThemeModeSystem => "Sistema",
         Msg::SettingsThemeModeLight => "Claro",
         Msg::SettingsThemeModeDark => "Escuro",
-        Msg::SettingsThemeDraculaHint => "Dracula só tem paleta escura, então o modo fica fixo em escuro.",
+        Msg::SettingsThemeDraculaHint => {
+            "Dracula só tem paleta escura, então o modo fica fixo em escuro."
+        }
         Msg::SettingsThemeCustomCss => "Variáveis CSS personalizadas",
         Msg::SettingsThemeCustomCssHintPrefix => "As declarações são injetadas como estão na regra",
-        Msg::SettingsThemeCustomCssHintSuffix => "do tema. A pré-visualização atualiza enquanto você digita; clique em Aplicar para usar no aplicativo inteiro.",
-        Msg::SettingsThemeAutocompleteHint => "Digite -- para autocompletar as variáveis de tema do app.",
+        Msg::SettingsThemeCustomCssHintSuffix => {
+            "do tema. A pré-visualização atualiza enquanto você digita; clique em Aplicar para usar no aplicativo inteiro."
+        }
+        Msg::SettingsThemeAutocompleteHint => {
+            "Digite -- para autocompletar as variáveis de tema do app."
+        }
         Msg::SettingsThemeNewTheme => "Novo tema",
         Msg::SettingsThemeNewThemeName => "Meu tema",
         Msg::SettingsThemeImportTheme => "Importar…",
@@ -2026,7 +2180,9 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::SettingsPreviewSecondary => "Secundário",
         Msg::SettingsPreviewPangram => "Um pequeno jabuti xereta viu dez cegonhas felizes.",
         Msg::SettingsFontTitle => "Fonte",
-        Msg::SettingsFontDesc => "Escolha fontes instaladas nesta máquina para a interface do aplicativo e para o editor.",
+        Msg::SettingsFontDesc => {
+            "Escolha fontes instaladas nesta máquina para a interface do aplicativo e para o editor."
+        }
         Msg::SettingsFontUiFont => "Fonte da interface",
         Msg::SettingsFontEditorFont => "Fonte do editor",
         Msg::SettingsFontLoading => "Carregando as fontes do sistema…",
@@ -2034,10 +2190,16 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::SettingsFontEditorFontSize => "Tamanho da fonte do editor",
         Msg::SettingsFontEditorFontSizeHint => "Também Cmd/Ctrl +, − e 0 para redefinir.",
         Msg::SettingsFontUiZoom => "Zoom da interface",
-        Msg::SettingsFontUiZoomHint => "Em porcentagem. Também Cmd/Ctrl Shift +, − e 0 para redefinir.",
+        Msg::SettingsFontUiZoomHint => {
+            "Em porcentagem. Também Cmd/Ctrl Shift +, − e 0 para redefinir."
+        }
         Msg::SettingsKeybindingsTitle => "Mapeamento de teclas",
-        Msg::SettingsKeybindingsDesc => "Escolha como o editor interpreta as teclas. Vale imediatamente em qualquer arquivo aberto.",
-        Msg::SettingsKeybindingsHelixDesc => "Edição modal, comandos no estilo Helix (seleção primeiro).",
+        Msg::SettingsKeybindingsDesc => {
+            "Escolha como o editor interpreta as teclas. Vale imediatamente em qualquer arquivo aberto."
+        }
+        Msg::SettingsKeybindingsHelixDesc => {
+            "Edição modal, comandos no estilo Helix (seleção primeiro)."
+        }
         Msg::SettingsKeybindingsVimDesc => "Edição modal, atalhos do Vim.",
         Msg::SettingsKeybindingsNormalLabel => "Normal",
         Msg::SettingsKeybindingsNormalDesc => "Atalhos padrão de editor de texto, sem modos.",
@@ -2047,14 +2209,24 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::SettingsBehaviorAbsolute => "Absolutos",
         Msg::SettingsBehaviorAbsoluteTitle => "Cada linha mostra seu número absoluto.",
         Msg::SettingsBehaviorRelative => "Relativos",
-        Msg::SettingsBehaviorRelativeTitle => "A linha atual mostra seu número absoluto; as demais mostram a distância até o cursor.",
-        Msg::SettingsBehaviorRelativeHint => "No estilo Helix/Vim: útil para saltar N linhas com comandos de movimento.",
+        Msg::SettingsBehaviorRelativeTitle => {
+            "A linha atual mostra seu número absoluto; as demais mostram a distância até o cursor."
+        }
+        Msg::SettingsBehaviorRelativeHint => {
+            "No estilo Helix/Vim: útil para saltar N linhas com comandos de movimento."
+        }
         Msg::SettingsBehaviorTabSize => "Tamanho da tabulação",
-        Msg::SettingsBehaviorTabSizeHint => "Espaços por nível de indentação e por parada de tabulação.",
+        Msg::SettingsBehaviorTabSizeHint => {
+            "Espaços por nível de indentação e por parada de tabulação."
+        }
         Msg::SettingsBehaviorRulers => "Réguas verticais",
-        Msg::SettingsBehaviorRulersHint => "Colunas separadas por vírgula onde uma linha-guia é desenhada (ex.: 80, 120). Vazio = nenhuma.",
+        Msg::SettingsBehaviorRulersHint => {
+            "Colunas separadas por vírgula onde uma linha-guia é desenhada (ex.: 80, 120). Vazio = nenhuma."
+        }
         Msg::SettingsFoldingTitle => "Regiões dobráveis",
-        Msg::SettingsFoldingDesc => "Coloque linhas entre um marcador de início e um de fim para torná-las dobráveis — é uma convenção do aplicativo, não faz parte do Markdown. O resto da linha do marcador de início vira o nome da região.",
+        Msg::SettingsFoldingDesc => {
+            "Coloque linhas entre um marcador de início e um de fim para torná-las dobráveis — é uma convenção do aplicativo, não faz parte do Markdown. O resto da linha do marcador de início vira o nome da região."
+        }
         Msg::SettingsFoldingStartMarker => "Marcador de início",
         Msg::SettingsFoldingEndMarker => "Marcador de fim",
         Msg::SettingsFoldingEg => "ex.:",
@@ -2063,7 +2235,9 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::SettingsFoldingCollapsed => "Recolhida",
         Msg::SettingsFoldingLinesExample => "3 linhas",
         Msg::SettingsVaultTitle => "Pastas do cofre",
-        Msg::SettingsVaultDescPrefix => "Relativas ao cofre aberto. \"Abrir a nota diária de hoje\" e \"Nova nota a partir do modelo\" ficam na paleta de comandos (Cmd/Ctrl-Shift-P); os modelos podem usar",
+        Msg::SettingsVaultDescPrefix => {
+            "Relativas ao cofre aberto. \"Abrir a nota diária de hoje\" e \"Nova nota a partir do modelo\" ficam na paleta de comandos (Cmd/Ctrl-Shift-P); os modelos podem usar"
+        }
         Msg::SettingsVaultAnd => "e",
         Msg::SettingsVaultDescImages => ". Imagens coladas vão para",
         Msg::SettingsVaultDailyNotesFolder => "Pasta de notas diárias",
@@ -2071,13 +2245,21 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::SettingsVaultTemplatesHintPrefix => "Um arquivo",
         Msg::SettingsVaultTemplatesHintSuffix => "aqui serve de base para novas notas diárias.",
         Msg::SettingsVaultExternalTool => "Ferramenta externa",
-        Msg::SettingsVaultExternalToolPlaceholder => "ex.: \"Visual Studio Code\" (vazio = padrão do sistema)",
-        Msg::SettingsVaultExternalToolHint => "Usada por \"Abrir com…\" no menu de contexto do explorador de arquivos.",
+        Msg::SettingsVaultExternalToolPlaceholder => {
+            "ex.: \"Visual Studio Code\" (vazio = padrão do sistema)"
+        }
+        Msg::SettingsVaultExternalToolHint => {
+            "Usada por \"Abrir com…\" no menu de contexto do explorador de arquivos."
+        }
         Msg::SettingsAboutTitle => "Sobre",
-        Msg::SettingsAboutDesc => "Fuchico {version} — um aplicativo de notas Markdown focado no teclado, com edição Helix, tarefas e agenda.",
+        Msg::SettingsAboutDesc => {
+            "Fuchico {version} — um aplicativo de notas Markdown focado no teclado, com edição Helix, tarefas e agenda."
+        }
         Msg::SettingsAboutGithub => "Código-fonte e issues no GitHub",
         Msg::ShortcutsTitle => "Atalhos de teclado",
-        Msg::ShortcutsDesc => "Tudo o que o teclado pode fazer, em um só lugar. As ações do editor são reconfiguráveis: clique em um atalho e pressione a nova combinação de teclas.",
+        Msg::ShortcutsDesc => {
+            "Tudo o que o teclado pode fazer, em um só lugar. As ações do editor são reconfiguráveis: clique em um atalho e pressione a nova combinação de teclas."
+        }
         Msg::ShortcutsSearchPlaceholder => "Buscar atalhos…",
         Msg::ShortcutsEditorRebindable => "Editor (reconfigurável)",
         Msg::ShortcutsPressKeys => "Pressione as teclas…",
@@ -2087,36 +2269,50 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ShortcutsGroupExplorer => "Explorador de arquivos",
         Msg::ShortcutsGroupTabs => "Abas",
         Msg::ShortcutsFixedCommandPaletteLabel => "Paleta de comandos",
-        Msg::ShortcutsFixedCommandPaletteDesc => "Execute qualquer comando do aplicativo pelo nome.",
+        Msg::ShortcutsFixedCommandPaletteDesc => {
+            "Execute qualquer comando do aplicativo pelo nome."
+        }
         Msg::ShortcutsFixedQuickOpenLabel => "Abertura rápida de arquivo",
         Msg::ShortcutsFixedQuickOpenDesc => "Encontre uma nota no cofre por busca aproximada.",
         Msg::ShortcutsFixedEditorFontSizeLabel => "Tamanho da fonte do editor",
-        Msg::ShortcutsFixedEditorFontSizeDesc => "Aumentar / diminuir / redefinir o texto do editor.",
+        Msg::ShortcutsFixedEditorFontSizeDesc => {
+            "Aumentar / diminuir / redefinir o texto do editor."
+        }
         Msg::ShortcutsFixedUiZoomLabel => "Zoom da interface",
         Msg::ShortcutsFixedUiZoomDesc => "Ampliar / reduzir / redefinir o aplicativo inteiro.",
         Msg::ShortcutsFixedHelixPaletteLabel => "Paleta de comandos pelo Helix",
-        Msg::ShortcutsFixedHelixPaletteDesc => "No modo normal do Helix, : abre a paleta de comandos; :q, :w, :wq e :<linha> funcionam como apelidos.",
+        Msg::ShortcutsFixedHelixPaletteDesc => {
+            "No modo normal do Helix, : abre a paleta de comandos; :q, :w, :wq e :<linha> funcionam como apelidos."
+        }
         Msg::ShortcutsFixedSaveLabel => "Salvar",
         Msg::ShortcutsFixedSaveDesc => "Grava o arquivo atual no disco.",
         Msg::ShortcutsFixedFindReplaceLabel => "Localizar / substituir",
         Msg::ShortcutsFixedFindReplaceDesc => "Busca dentro do arquivo atual.",
         Msg::ShortcutsFixedTaskAutocompleteLabel => "Autocompletar data / repetição de tarefa",
-        Msg::ShortcutsFixedTaskAutocompleteDesc => "Digite @due, @today, @repeat (ou 📅 / 🔁) em uma linha de tarefa para escolher uma data ou regra.",
+        Msg::ShortcutsFixedTaskAutocompleteDesc => {
+            "Digite @due, @today, @repeat (ou 📅 / 🔁) em uma linha de tarefa para escolher uma data ou regra."
+        }
         Msg::ShortcutsFixedPasteImageLabel => "Colar imagem",
-        Msg::ShortcutsFixedPasteImageDesc => "Cole ou arraste uma imagem para salvá-la em attachments/ e criar o link.",
+        Msg::ShortcutsFixedPasteImageDesc => {
+            "Cole ou arraste uma imagem para salvá-la em attachments/ e criar o link."
+        }
         Msg::ShortcutsFixedFollowLinkLabel => "Seguir link",
         Msg::ShortcutsFixedFollowLinkDesc => "Abre o [[wikilink]] ou link Markdown sob o cursor.",
         Msg::ShortcutsFixedFollowLinkKeys => "Clique",
         Msg::ShortcutsFixedExplorerNavigateLabel => "Navegar",
         Msg::ShortcutsFixedExplorerNavigateDesc => "Move a seleção, expande/recolhe pastas.",
         Msg::ShortcutsFixedExplorerOpenLabel => "Abrir / alternar pasta",
-        Msg::ShortcutsFixedExplorerOpenDesc => "Abre o arquivo selecionado ou expande/recolhe a pasta.",
+        Msg::ShortcutsFixedExplorerOpenDesc => {
+            "Abre o arquivo selecionado ou expande/recolhe a pasta."
+        }
         Msg::ShortcutsFixedExplorerRenameLabel => "Renomear",
         Msg::ShortcutsFixedExplorerRenameDesc => "Renomeia o item selecionado.",
         Msg::ShortcutsFixedExplorerDeleteLabel => "Excluir",
         Msg::ShortcutsFixedExplorerDeleteDesc => "Exclui o item selecionado (pede confirmação).",
         Msg::ShortcutsFixedExplorerTypeAheadLabel => "Busca por prefixo",
-        Msg::ShortcutsFixedExplorerTypeAheadDesc => "Digite o início de um nome para pular até o item correspondente.",
+        Msg::ShortcutsFixedExplorerTypeAheadDesc => {
+            "Digite o início de um nome para pular até o item correspondente."
+        }
         Msg::ShortcutsFixedExplorerMenuLabel => "Menu de contexto",
         Msg::ShortcutsFixedExplorerMenuDesc => "Novo arquivo/pasta, renomear, excluir.",
         Msg::ShortcutsFixedExplorerMenuKeys => "Clique direito",
@@ -2124,32 +2320,50 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ShortcutsFixedTabMenuDesc => "Fechar, fechar outras, fechar todas.",
         Msg::ShortcutsFixedTabMenuKeys => "Clique direito",
         Msg::ShortcutActionOpenOutlineLabel => "Ir para o cabeçalho",
-        Msg::ShortcutActionOpenOutlineDesc => "Abre o sumário do documento (lista de cabeçalhos com busca aproximada).",
+        Msg::ShortcutActionOpenOutlineDesc => {
+            "Abre o sumário do documento (lista de cabeçalhos com busca aproximada)."
+        }
         Msg::ShortcutActionToggleCheckboxAtCursorLabel => "Alternar checkbox",
-        Msg::ShortcutActionToggleCheckboxAtCursorDesc => "Marca/desmarca o checkbox na linha do cursor.",
+        Msg::ShortcutActionToggleCheckboxAtCursorDesc => {
+            "Marca/desmarca o checkbox na linha do cursor."
+        }
         Msg::ShortcutActionInsertDateLabel => "Inserir data",
         Msg::ShortcutActionInsertDateDesc => "Insere a data de hoje no cursor.",
         Msg::ShortcutActionInsertDateTimeLabel => "Inserir data e hora",
         Msg::ShortcutActionInsertDateTimeDesc => "Insere a data e a hora atuais no cursor.",
         Msg::ShortcutActionInsertRegionLabel => "Inserir região dobrável",
-        Msg::ShortcutActionInsertRegionDesc => "Envolve as linhas selecionadas em uma região dobrável (ou insere uma vazia no cursor).",
+        Msg::ShortcutActionInsertRegionDesc => {
+            "Envolve as linhas selecionadas em uma região dobrável (ou insere uma vazia no cursor)."
+        }
         Msg::ShortcutActionInsertTableLabel => "Inserir tabela",
-        Msg::ShortcutActionInsertTableDesc => "Insere uma tabela Markdown 2x2 no cursor e começa a editar o cabeçalho.",
+        Msg::ShortcutActionInsertTableDesc => {
+            "Insere uma tabela Markdown 2x2 no cursor e começa a editar o cabeçalho."
+        }
         Msg::ShortcutActionToggleTaskLineLabel => "Alternar tarefa",
-        Msg::ShortcutActionToggleTaskLineDesc => "Transforma a linha atual em uma tarefa `- [ ]` (ou de volta em texto simples).",
+        Msg::ShortcutActionToggleTaskLineDesc => {
+            "Transforma a linha atual em uma tarefa `- [ ]` (ou de volta em texto simples)."
+        }
         Msg::ShortcutActionPickDueDateLabel => "Definir prazo…",
-        Msg::ShortcutActionPickDueDateDesc => "Adiciona ou altera a data 📅 de prazo na linha atual por uma lista de escolha rápida.",
+        Msg::ShortcutActionPickDueDateDesc => {
+            "Adiciona ou altera a data 📅 de prazo na linha atual por uma lista de escolha rápida."
+        }
         Msg::ShortcutActionPickRecurrenceLabel => "Definir recorrência…",
-        Msg::ShortcutActionPickRecurrenceDesc => "Adiciona ou altera a regra 🔁 de repetição na linha atual por uma lista de escolha rápida.",
+        Msg::ShortcutActionPickRecurrenceDesc => {
+            "Adiciona ou altera a regra 🔁 de repetição na linha atual por uma lista de escolha rápida."
+        }
         Msg::CaldavTitle => "Sincronização CalDAV",
-        Msg::CaldavDesc => "Vincule pastas a um calendário CalDAV (ex.: Lembretes do iCloud) para que as tarefas com checkbox das suas notas sincronizem com o celular e vice-versa.",
+        Msg::CaldavDesc => {
+            "Vincule pastas a um calendário CalDAV (ex.: Lembretes do iCloud) para que as tarefas com checkbox das suas notas sincronizem com o celular e vice-versa."
+        }
         Msg::CaldavAccounts => "Contas",
         Msg::CaldavRemoveAccount => "Remover conta",
         Msg::CaldavServerUrl => "URL do servidor",
         Msg::CaldavUsername => "Usuário",
         Msg::CaldavUsernamePlaceholder => "voce@icloud.com",
         Msg::CaldavPassword => "Senha",
-        Msg::CaldavIcloudHint => "O iCloud exige uma senha específica de app, não a senha do seu Apple ID.",
+        Msg::CaldavIcloudHint => {
+            "O iCloud exige uma senha específica de app, não a senha do seu Apple ID."
+        }
         Msg::CaldavIcloudLink => "Gere uma em appleid.apple.com",
         Msg::CaldavTestConnection => "Testar conexão",
         Msg::CaldavTesting => "Testando…",
@@ -2176,7 +2390,9 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::CaldavSync => "Sincronização",
         Msg::CaldavSyncNow => "Sincronizar agora",
         Msg::CaldavSyncing => "Sincronizando…",
-        Msg::CaldavReportSummary => "+{new} novas, {pushed} enviadas, {pulled} recebidas, {fromServer} do servidor",
+        Msg::CaldavReportSummary => {
+            "+{new} novas, {pushed} enviadas, {pulled} recebidas, {fromServer} do servidor"
+        }
         Msg::CaldavReportErrors => ", {n} erro(s)",
         Msg::ShortcutsReset => "Restaurar",
         Msg::ShortcutsResetTitle => "Restaurar o atalho padrão ({binding})",
@@ -2197,11 +2413,27 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ExportPrintFailed => "Não foi possível abrir o PDF para impressão: {message}",
         Msg::ExplorerOpenWithFailed => "Não foi possível abrir com {app}: {error}",
         Msg::ExplorerTheDefaultApp => "o app padrão",
-        Msg::EditorConflict => "Este arquivo foi modificado em outro lugar enquanto você tem alterações não salvas.",
+        Msg::EditorConflict => {
+            "Este arquivo foi modificado em outro lugar enquanto você tem alterações não salvas."
+        }
         Msg::EditorReloadFromDisk => "Recarregar do disco",
         Msg::EditorKeepMine => "Manter minha versão",
         Msg::EditorBinaryFile => "Arquivo binário · {size}",
         Msg::EditorTooLarge => "Arquivo grande demais · {size}",
         Msg::EditorSaveFailed => "Não foi possível salvar {name}: {error}",
+        Msg::EditorFind => "Localizar",
+        Msg::EditorReplace => "Substituir",
+        Msg::EditorFindNext => "próximo",
+        Msg::EditorFindPrevious => "anterior",
+        Msg::EditorFindAll => "todos",
+        Msg::EditorMatchCase => "diferenciar maiúsculas",
+        Msg::EditorRegexp => "regexp",
+        Msg::EditorByWord => "por palavra",
+        Msg::EditorReplaceOne => "substituir",
+        Msg::EditorReplaceAll => "substituir tudo",
+        Msg::EditorGoToLine => "Ir para a linha",
+        Msg::EditorGo => "ir",
+        Msg::EditorGoToHeader => "Ir para o cabeçalho…",
+        Msg::EditorNoHeaders => "Nenhum cabeçalho encontrado",
     }
 }

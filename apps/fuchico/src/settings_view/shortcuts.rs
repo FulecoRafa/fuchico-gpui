@@ -9,8 +9,14 @@ use super::SettingsView;
 use super::widgets::Section;
 
 impl SettingsView {
-    pub(super) fn shortcuts_section(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> Section {
-        let list = div().debug_selector(|| "settings-shortcuts-slot".into()).child(self.shortcuts.clone());
+    pub(super) fn shortcuts_section(
+        &mut self,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Section {
+        let list = div()
+            .debug_selector(|| "settings-shortcuts-slot".into())
+            .child(self.shortcuts.clone());
         Section::new(crate::t!(ShortcutsTitle), crate::t!(ShortcutsDesc)).other(list)
     }
 }

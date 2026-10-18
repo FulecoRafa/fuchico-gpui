@@ -18,7 +18,11 @@ pub fn walk_vault(root: &str) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
-fn walk_entries(dir: &str, entries: Vec<fuchico_core::fs::tree::DirEntry>, files: &mut Vec<String>) {
+fn walk_entries(
+    dir: &str,
+    entries: Vec<fuchico_core::fs::tree::DirEntry>,
+    files: &mut Vec<String>,
+) {
     let mut subdirs = Vec::new();
     for e in entries {
         let full = join(dir, &e.name);
@@ -37,7 +41,11 @@ fn walk_entries(dir: &str, entries: Vec<fuchico_core::fs::tree::DirEntry>, files
 
 /// `joinPath(dir, name)`.
 fn join(dir: &str, name: &str) -> String {
-    if dir.ends_with('/') { format!("{dir}{name}") } else { format!("{dir}/{name}") }
+    if dir.ends_with('/') {
+        format!("{dir}{name}")
+    } else {
+        format!("{dir}/{name}")
+    }
 }
 
 /// `relativeTo(root, path)`.
@@ -45,7 +53,11 @@ pub fn relative_to(root: &str, path: &str) -> String {
     if path == root {
         return path.rsplit('/').next().unwrap_or(path).to_string();
     }
-    let prefix = if root.ends_with('/') { root.to_string() } else { format!("{root}/") };
+    let prefix = if root.ends_with('/') {
+        root.to_string()
+    } else {
+        format!("{root}/")
+    };
     path.strip_prefix(&prefix).unwrap_or(path).to_string()
 }
 
@@ -65,13 +77,23 @@ pub fn rank_files(root: &str, files: &[String], query: &str) -> Vec<FileRow> {
     if q.is_empty() {
         return entries
             .take(MAX_RESULTS)
-            .map(|(p, rel)| FileRow { path: p.clone(), rel, indices: vec![], score: 0. })
+            .map(|(p, rel)| FileRow {
+                path: p.clone(),
+                rel,
+                indices: vec![],
+                score: 0.,
+            })
             .collect();
     }
     let mut ranked: Vec<FileRow> = entries
         .filter_map(|(p, rel)| {
             let m = fuzzy_match(q, &rel);
-            m.matched.then(|| FileRow { path: p.clone(), rel, indices: m.indices, score: m.score })
+            m.matched.then(|| FileRow {
+                path: p.clone(),
+                rel,
+                indices: m.indices,
+                score: m.score,
+            })
         })
         .collect();
     ranked.sort_by(|a, b| b.score.total_cmp(&a.score));
@@ -93,9 +115,14 @@ mod tests {
 
     #[test]
     fn ranking() {
-        let files: Vec<String> = ["/v/notes/zeta.md", "/v/alpha.md", "/v/project-launch.md"].map(String::from).into();
+        let files: Vec<String> = ["/v/notes/zeta.md", "/v/alpha.md", "/v/project-launch.md"]
+            .map(String::from)
+            .into();
         let r = rank_files("/v", &files, "");
-        assert_eq!(r.iter().map(|r| r.rel.as_str()).collect::<Vec<_>>(), ["notes/zeta.md", "alpha.md", "project-launch.md"]);
+        assert_eq!(
+            r.iter().map(|r| r.rel.as_str()).collect::<Vec<_>>(),
+            ["notes/zeta.md", "alpha.md", "project-launch.md"]
+        );
         let r = rank_files("/v", &files, "pl");
         assert_eq!(r[0].rel, "project-launch.md");
         assert_eq!(r[0].indices, vec![0, 8]);
@@ -112,12 +139,26 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("sub/deeper")).unwrap();
         std::fs::create_dir_all(dir.join(".hidden")).unwrap();
-        for f in ["b.md", "a.excalidraw", "sub/c.png", "sub/deeper/d.md", ".hidden/e.md", ".dot.md"] {
+        for f in [
+            "b.md",
+            "a.excalidraw",
+            "sub/c.png",
+            "sub/deeper/d.md",
+            ".hidden/e.md",
+            ".dot.md",
+        ] {
             std::fs::write(dir.join(f), "x").unwrap();
         }
         let root = dir.to_string_lossy().to_string();
-        let rel: Vec<String> = walk_vault(&root).unwrap().iter().map(|p| relative_to(&root, p)).collect();
-        assert_eq!(rel, ["a.excalidraw", "b.md", "sub/c.png", "sub/deeper/d.md"]);
+        let rel: Vec<String> = walk_vault(&root)
+            .unwrap()
+            .iter()
+            .map(|p| relative_to(&root, p))
+            .collect();
+        assert_eq!(
+            rel,
+            ["a.excalidraw", "b.md", "sub/c.png", "sub/deeper/d.md"]
+        );
         assert!(walk_vault(&format!("{root}/missing")).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
     }

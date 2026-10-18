@@ -18,7 +18,12 @@ pub struct Color {
 }
 
 impl Color {
-    pub const TRANSPARENT: Color = Color { r: 0., g: 0., b: 0., a: 0. };
+    pub const TRANSPARENT: Color = Color {
+        r: 0.,
+        g: 0.,
+        b: 0.,
+        a: 0.,
+    };
 
     pub fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
         Color { r, g, b, a }
@@ -29,7 +34,13 @@ impl Color {
     }
 
     pub fn to_hsla(self) -> Hsla {
-        Rgba { r: self.r, g: self.g, b: self.b, a: self.a }.into()
+        Rgba {
+            r: self.r,
+            g: self.g,
+            b: self.b,
+            a: self.a,
+        }
+        .into()
     }
 
     /// `#rrggbb` / `#rrggbbaa` (for snapshots / debugging).
@@ -38,7 +49,13 @@ impl Color {
         if self.a >= 1.0 {
             format!("#{:02x}{:02x}{:02x}", c(self.r), c(self.g), c(self.b))
         } else {
-            format!("#{:02x}{:02x}{:02x}{:02x}", c(self.r), c(self.g), c(self.b), c(self.a))
+            format!(
+                "#{:02x}{:02x}{:02x}{:02x}",
+                c(self.r),
+                c(self.g),
+                c(self.b),
+                c(self.a)
+            )
         }
     }
 
@@ -90,11 +107,19 @@ impl Color {
 }
 
 fn gamma(x: f32) -> f32 {
-    if x >= 0.003_130_8 { 1.055 * x.powf(1. / 2.4) - 0.055 } else { 12.92 * x }
+    if x >= 0.003_130_8 {
+        1.055 * x.powf(1. / 2.4) - 0.055
+    } else {
+        12.92 * x
+    }
 }
 
 fn linear(x: f32) -> f32 {
-    if x >= 0.040_45 { ((x + 0.055) / 1.055).powf(2.4) } else { x / 12.92 }
+    if x >= 0.040_45 {
+        ((x + 0.055) / 1.055).powf(2.4)
+    } else {
+        x / 12.92
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -208,7 +233,13 @@ pub fn parse_color(input: &str, resolve_var: &dyn Fn(&str) -> Option<Color>) -> 
             let h = hue(&c[0])? / 360.;
             let sat = number_or_pct(&c[1], 100.)? / 100.;
             let l = number_or_pct(&c[2], 100.)? / 100.;
-            let rgba: Rgba = Hsla { h: h.rem_euclid(1.), s: sat, l, a }.into();
+            let rgba: Rgba = Hsla {
+                h: h.rem_euclid(1.),
+                s: sat,
+                l,
+                a,
+            }
+            .into();
             Some(Color::rgba(rgba.r, rgba.g, rgba.b, rgba.a))
         }
         "color-mix" => parse_color_mix(args, resolve_var),
@@ -244,9 +275,16 @@ fn parse_color_mix(args: &str, resolve_var: &dyn Fn(&str) -> Option<Color>) -> O
     Some(mix(space, ca, cb, pa / sum, alpha_mult))
 }
 
-fn color_and_pct(part: &str, resolve_var: &dyn Fn(&str) -> Option<Color>) -> Option<(Color, Option<f32>)> {
+fn color_and_pct(
+    part: &str,
+    resolve_var: &dyn Fn(&str) -> Option<Color>,
+) -> Option<(Color, Option<f32>)> {
     let tokens = split_top(part.trim(), ' ');
-    let tokens: Vec<&str> = tokens.into_iter().map(str::trim).filter(|t| !t.is_empty()).collect();
+    let tokens: Vec<&str> = tokens
+        .into_iter()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .collect();
     let mut pct = None;
     let mut color_tokens = Vec::new();
     for t in tokens {
@@ -268,7 +306,11 @@ fn parse_hex(hex: &str) -> Option<Color> {
     }
     let digit = |i: usize, n: usize| -> Option<f32> {
         let v = u8::from_str_radix(&hex[i..i + n], 16).ok()?;
-        Some(if n == 1 { (v * 17) as f32 / 255. } else { v as f32 / 255. })
+        Some(if n == 1 {
+            (v * 17) as f32 / 255.
+        } else {
+            v as f32 / 255.
+        })
     };
     match hex.len() {
         3 | 4 => Some(Color::rgba(
@@ -405,7 +447,10 @@ mod tests {
 
     #[test]
     fn color_mix_two_colors() {
-        assert_eq!(p("color-mix(in oklch, white 50%, white)").to_hex(), "#ffffff");
+        assert_eq!(
+            p("color-mix(in oklch, white 50%, white)").to_hex(),
+            "#ffffff"
+        );
         let mid = p("color-mix(in srgb, black, white)");
         assert_eq!(mid.to_hex(), "#808080");
         // Default weights mix halfway in oklch lightness.
@@ -416,15 +461,32 @@ mod tests {
     #[test]
     fn var_references() {
         let resolver = |name: &str| (name == "--primary").then(|| Color::rgba(1., 0., 0., 1.));
-        let c = parse_color("color-mix(in oklch, var(--primary) 50%, transparent)", &resolver).unwrap();
+        let c = parse_color(
+            "color-mix(in oklch, var(--primary) 50%, transparent)",
+            &resolver,
+        )
+        .unwrap();
         assert_eq!(c.to_hex(), "#ff000080");
-        assert_eq!(parse_color("var(--nope, #000)", &resolver).unwrap().to_hex(), "#000000");
+        assert_eq!(
+            parse_color("var(--nope, #000)", &resolver)
+                .unwrap()
+                .to_hex(),
+            "#000000"
+        );
         assert!(parse_color("var(--nope)", &resolver).is_none());
     }
 
     #[test]
     fn rejects_garbage() {
-        for s in ["", "#12", "#ggg", "oklch(1 0)", "rgb(1,2)", "color-mix(in hsl, red, blue)", "foo(1)"] {
+        for s in [
+            "",
+            "#12",
+            "#ggg",
+            "oklch(1 0)",
+            "rgb(1,2)",
+            "color-mix(in hsl, red, blue)",
+            "foo(1)",
+        ] {
             assert!(parse_color(s, &|_| None).is_none(), "{s} should not parse");
         }
     }

@@ -20,7 +20,10 @@ pub const TAB_MAX_WIDTH: f32 = 200.;
 impl Workspace {
     /// The tab's focus handle, created on first render.
     fn tab_focus_handle(&mut self, path: &str, cx: &mut Context<Self>) -> gpui_kit::FocusHandle {
-        self.tab_focus.entry(path.to_string()).or_insert_with(|| cx.focus_handle().tab_stop(true)).clone()
+        self.tab_focus
+            .entry(path.to_string())
+            .or_insert_with(|| cx.focus_handle().tab_stop(true))
+            .clone()
     }
 
     pub(super) fn render_tab_bar(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -41,8 +44,14 @@ impl Workspace {
                 let is_active = active.as_deref() == Some(path.as_str());
                 let name: SharedString = basename(&path).to_string().into();
                 let tip: SharedString = path.clone().into();
-                let (e_click, e_close, e_menu, e_key) = (entity.clone(), entity.clone(), entity.clone(), entity.clone());
-                let (p_click, p_close, p_menu, p_key) = (path.clone(), path.clone(), path.clone(), path.clone());
+                let (e_click, e_close, e_menu, e_key) = (
+                    entity.clone(),
+                    entity.clone(),
+                    entity.clone(),
+                    entity.clone(),
+                );
+                let (p_click, p_close, p_menu, p_key) =
+                    (path.clone(), path.clone(), path.clone(), path.clone());
                 let focus_tint = th.fg_alpha(0.08);
                 div()
                     .id(("tab", i))
@@ -59,12 +68,18 @@ impl Workspace {
                             // The original: Enter / Space select the tab.
                             "enter" | "space" if !m.shift => {
                                 cx.stop_propagation();
-                                e_key.update(cx, |this, cx| this.activate_tab(&p_key, w, cx)).ok();
+                                e_key
+                                    .update(cx, |this, cx| this.activate_tab(&p_key, w, cx))
+                                    .ok();
                             }
                             // Browser tab order between tab stops.
                             "tab" => {
                                 cx.stop_propagation();
-                                if m.shift { w.focus_prev(cx) } else { w.focus_next(cx) }
+                                if m.shift {
+                                    w.focus_prev(cx)
+                                } else {
+                                    w.focus_next(cx)
+                                }
                             }
                             _ => {}
                         }
@@ -88,23 +103,57 @@ impl Workspace {
                             .border_b_2()
                             .border_color(th.colors.ring)
                     })
-                    .when(!is_active, |d| d.text_color(th.colors.muted_foreground).hover(|s| s.bg(th.fg_alpha(0.05))))
+                    .when(!is_active, |d| {
+                        d.text_color(th.colors.muted_foreground)
+                            .hover(|s| s.bg(th.fg_alpha(0.05)))
+                    })
                     .tooltip(move |w, cx| Tooltip::new(tip.clone()).build(w, cx))
                     .on_click(move |_, w, cx| {
-                        e_click.update(cx, |this, cx| this.activate_tab(&p_click, w, cx)).ok();
+                        e_click
+                            .update(cx, |this, cx| this.activate_tab(&p_click, w, cx))
+                            .ok();
                     })
                     .when(tab.dirty, |d| {
-                        d.child(div().flex_none().size(u(6.)).rounded_full().bg(th.colors.syntax_function))
+                        d.child(
+                            div()
+                                .flex_none()
+                                .size(u(6.))
+                                .rounded_full()
+                                .bg(th.colors.syntax_function),
+                        )
                     })
-                    .child(div().flex_1().min_w_0().overflow_hidden().text_ellipsis().whitespace_nowrap().child(name))
-                    .child(icon_button(("tab-close", i), AppIcon::X, 18., 12., crate::t!(TabsClose), false, cx, {
-                        move |_, w, cx| {
-                            cx.stop_propagation();
-                            e_close.update(cx, |this, cx| this.close_tab(&p_close, w, cx)).ok();
-                        }
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .whitespace_nowrap()
+                            .child(name),
+                    )
+                    .child(
+                        icon_button(
+                            ("tab-close", i),
+                            AppIcon::X,
+                            18.,
+                            12.,
+                            crate::t!(TabsClose),
+                            false,
+                            cx,
+                            {
+                                move |_, w, cx| {
+                                    cx.stop_propagation();
+                                    e_close
+                                        .update(cx, |this, cx| this.close_tab(&p_close, w, cx))
+                                        .ok();
+                                }
+                            },
+                        )
+                        .debug_selector(move || format!("tab-close-{i}")),
+                    )
+                    .context_menu(move |menu, _, _| {
+                        tab_menu(menu, e_menu.clone(), p_menu.clone(), count)
                     })
-                    .debug_selector(move || format!("tab-close-{i}")))
-                    .context_menu(move |menu, _, _| tab_menu(menu, e_menu.clone(), p_menu.clone(), count))
             })
             .collect();
         div()
@@ -127,17 +176,28 @@ fn tab_menu(
     path: String,
     count: usize,
 ) -> gpui_kit::component::menu::PopupMenu {
-    let item = |label: String, f: fn(&mut Workspace, &str, &mut gpui_kit::Window, &mut Context<Workspace>)| {
-        let (ws, path) = (ws.clone(), path.clone());
-        PopupMenuItem::new(label).on_click(move |_, w, cx| {
-            ws.update(cx, |this, cx| f(this, &path, w, cx)).ok();
+    let item =
+        |label: String,
+         f: fn(&mut Workspace, &str, &mut gpui_kit::Window, &mut Context<Workspace>)| {
+            let (ws, path) = (ws.clone(), path.clone());
+            PopupMenuItem::new(label).on_click(move |_, w, cx| {
+                ws.update(cx, |this, cx| f(this, &path, w, cx)).ok();
+            })
+        };
+    menu.item(item(crate::t!(TabsClose), |t, p, w, cx| {
+        t.close_tab(p, w, cx)
+    }))
+    .item(
+        item(crate::t!(TabsCloseOthers), |t, p, w, cx| {
+            t.close_other_tabs(p, w, cx)
         })
-    };
-    menu.item(item(crate::t!(TabsClose), |t, p, w, cx| t.close_tab(p, w, cx)))
-        .item(item(crate::t!(TabsCloseOthers), |t, p, w, cx| t.close_other_tabs(p, w, cx)).disabled(count < 2))
-        .item(item(crate::t!(TabsCloseAll), |t, _, w, cx| t.close_all_tabs(w, cx)))
-        .separator()
-        .item(item(crate::t!(TabsOpenInNewWindow), |t, p, _, cx| {
-            crate::windows::open_editor_window(p.to_string(), t.root().map(str::to_string), cx)
-        }))
+        .disabled(count < 2),
+    )
+    .item(item(crate::t!(TabsCloseAll), |t, _, w, cx| {
+        t.close_all_tabs(w, cx)
+    }))
+    .separator()
+    .item(item(crate::t!(TabsOpenInNewWindow), |t, p, _, cx| {
+        crate::windows::open_editor_window(p.to_string(), t.root().map(str::to_string), cx)
+    }))
 }

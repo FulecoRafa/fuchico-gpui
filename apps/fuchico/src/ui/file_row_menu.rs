@@ -19,11 +19,18 @@ pub fn file_row_menu(
     items.extend(extra);
     items.push(MenuEntry::Separator);
     let p = path.to_string();
-    items.push(MenuEntry::item(crate::t!(CommonRevealInFileManager), move |_, _| reveal_in_file_manager(&p)).icon(IconName::Eye));
+    items.push(
+        MenuEntry::item(crate::t!(CommonRevealInFileManager), move |_, _| {
+            reveal_in_file_manager(&p)
+        })
+        .icon(IconName::Eye),
+    );
     let p = path.to_string();
     items.push(
-        MenuEntry::item(crate::t!(CommonCopyPath), move |_, cx| cx.write_to_clipboard(ClipboardItem::new_string(p.clone())))
-            .icon(IconName::Copy),
+        MenuEntry::item(crate::t!(CommonCopyPath), move |_, cx| {
+            cx.write_to_clipboard(ClipboardItem::new_string(p.clone()))
+        })
+        .icon(IconName::Copy),
     );
     items
 }
@@ -36,19 +43,33 @@ pub fn with_context_menu(
     row: impl IntoElement,
     menu: impl Fn(PopupMenu, &mut Window, &mut Context<PopupMenu>) -> PopupMenu + 'static,
 ) -> AnyElement {
-    div().id(id).w_full().child(row).context_menu(menu).into_any_element()
+    div()
+        .id(id)
+        .w_full()
+        .child(row)
+        .context_menu(menu)
+        .into_any_element()
 }
 
 /// `revealInFileManager(path)` — selects the file in Finder / Explorer, or
 /// opens its folder elsewhere. Spawned, never blocks the UI thread.
 pub fn reveal_in_file_manager(path: &str) {
     #[cfg(target_os = "macos")]
-    let r = std::process::Command::new("open").arg("-R").arg(path).spawn();
+    let r = std::process::Command::new("open")
+        .arg("-R")
+        .arg(path)
+        .spawn();
     #[cfg(target_os = "windows")]
-    let r = std::process::Command::new("explorer").arg(format!("/select,{path}")).spawn();
+    let r = std::process::Command::new("explorer")
+        .arg(format!("/select,{path}"))
+        .spawn();
     #[cfg(all(unix, not(target_os = "macos")))]
     let r = std::process::Command::new("xdg-open")
-        .arg(std::path::Path::new(path).parent().unwrap_or(std::path::Path::new("/")))
+        .arg(
+            std::path::Path::new(path)
+                .parent()
+                .unwrap_or(std::path::Path::new("/")),
+        )
         .spawn();
     if let Err(e) = r {
         log::warn!("reveal failed: {e}");

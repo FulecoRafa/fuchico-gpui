@@ -16,7 +16,11 @@ pub const ACTIVITY_BAR_WIDTH: f32 = 40.;
 /// Buttons in order: (view, icon, tooltip).
 pub const ITEMS: [(MainViewKind, AppIcon, Msg); 5] = [
     (MainViewKind::Editor, AppIcon::Files, Msg::AppFiles),
-    (MainViewKind::Agenda, AppIcon::CalendarClock, Msg::AppTasksCalendar),
+    (
+        MainViewKind::Agenda,
+        AppIcon::CalendarClock,
+        Msg::AppTasksCalendar,
+    ),
     (MainViewKind::Search, AppIcon::Search, Msg::AppSearch),
     (MainViewKind::Tags, AppIcon::Hash, Msg::AppTags),
     (MainViewKind::Settings, AppIcon::Settings, Msg::AppSettings),
@@ -40,12 +44,28 @@ impl Workspace {
             .bg(bg)
             .border_r_1()
             .border_color(border)
-            .children(ITEMS.into_iter().enumerate().map(|(i, (view, icon, label))| {
-                let entity = entity.clone();
-                icon_button(("activity", i), icon, 30., 17., tr(label, &[]), view == current, cx, move |_, w, cx| {
-                    entity.update(cx, |this, cx| this.set_view(view, w, cx)).ok();
-                })
-                .debug_selector(move || format!("activity:{i}"))
-            }))
+            .children(
+                ITEMS
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (view, icon, label))| {
+                        let entity = entity.clone();
+                        icon_button(
+                            ("activity", i),
+                            icon,
+                            30.,
+                            17.,
+                            tr(label, &[]),
+                            view == current,
+                            cx,
+                            move |_, w, cx| {
+                                entity
+                                    .update(cx, |this, cx| this.set_view(view, w, cx))
+                                    .ok();
+                            },
+                        )
+                        .debug_selector(move || format!("activity:{i}"))
+                    }),
+            )
     }
 }

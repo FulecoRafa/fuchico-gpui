@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use crate::frontmatter::{parse_frontmatter, Value};
+use crate::frontmatter::{Value, parse_frontmatter};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InlineTagMatch {
@@ -76,7 +76,10 @@ pub fn match_inline_tags_in_line(line: &str) -> Vec<InlineTagMatch> {
     for m in INLINE_TAG_RE.captures_iter(&masked) {
         let whole = m.get(0).unwrap();
         let from = whole.start();
-        let ok = masked[..from].chars().next_back().is_none_or(|c| c.is_whitespace());
+        let ok = masked[..from]
+            .chars()
+            .next_back()
+            .is_none_or(|c| c.is_whitespace());
         if !ok {
             continue;
         }
@@ -84,7 +87,11 @@ pub fn match_inline_tags_in_line(line: &str) -> Vec<InlineTagMatch> {
         if tag.is_empty() {
             continue;
         }
-        matches.push(InlineTagMatch { tag: tag.to_string(), from, to: from + 1 + tag.len() });
+        matches.push(InlineTagMatch {
+            tag: tag.to_string(),
+            from,
+            to: from + 1 + tag.len(),
+        });
     }
     matches
 }
@@ -111,7 +118,11 @@ pub fn parse_inline_tags(content: &str) -> Vec<InlineTagMatch> {
         }
         if !in_fence {
             for m in match_inline_tags_in_line(line) {
-                results.push(InlineTagMatch { tag: m.tag, from: offset + m.from, to: offset + m.to });
+                results.push(InlineTagMatch {
+                    tag: m.tag,
+                    from: offset + m.from,
+                    to: offset + m.to,
+                });
             }
         }
         offset += line.len() + 1;
@@ -126,14 +137,22 @@ fn value_to_string(v: &Value) -> String {
         Value::Int(n) => n.to_string(),
         Value::Float(f) => f.to_string(),
         Value::Str(s) => s.clone(),
-        Value::List(items) => items.iter().map(value_to_string).collect::<Vec<_>>().join(","),
+        Value::List(items) => items
+            .iter()
+            .map(value_to_string)
+            .collect::<Vec<_>>()
+            .join(","),
     }
 }
 
 /// Reads `tags:` from a note's frontmatter (list or scalar forms).
 pub fn frontmatter_tags(content: &str) -> Vec<String> {
-    let Some(fm) = parse_frontmatter(content) else { return vec![] };
-    let Some(raw) = fm.data.get("tags") else { return vec![] };
+    let Some(fm) = parse_frontmatter(content) else {
+        return vec![];
+    };
+    let Some(raw) = fm.data.get("tags") else {
+        return vec![];
+    };
     let mut tags = Vec::new();
     match raw {
         Value::Null => {}
@@ -147,7 +166,11 @@ pub fn frontmatter_tags(content: &str) -> Vec<String> {
             }
         }
         Value::Str(s) => {
-            tags.extend(s.split(|c: char| c.is_whitespace() || c == ',').filter(|p| !p.is_empty()).map(String::from));
+            tags.extend(
+                s.split(|c: char| c.is_whitespace() || c == ',')
+                    .filter(|p| !p.is_empty())
+                    .map(String::from),
+            );
         }
         other => {
             let t = value_to_string(other);
@@ -192,7 +215,10 @@ mod tests {
     use super::*;
 
     fn tags(line: &str) -> Vec<String> {
-        match_inline_tags_in_line(line).into_iter().map(|m| m.tag).collect()
+        match_inline_tags_in_line(line)
+            .into_iter()
+            .map(|m| m.tag)
+            .collect()
     }
 
     #[test]
@@ -268,7 +294,10 @@ mod tests {
     #[test]
     fn skips_tags_inside_fenced_code_blocks() {
         let content = ["before #real", "```", "#fake in code", "```", "after"].join("\n");
-        let got: Vec<_> = parse_inline_tags(&content).into_iter().map(|m| m.tag).collect();
+        let got: Vec<_> = parse_inline_tags(&content)
+            .into_iter()
+            .map(|m| m.tag)
+            .collect();
         assert_eq!(got, ["real"]);
     }
 
@@ -282,7 +311,10 @@ mod tests {
     #[test]
     fn handles_tilde_fences_too() {
         let content = ["~~~", "#fake", "~~~", "#real"].join("\n");
-        let got: Vec<_> = parse_inline_tags(&content).into_iter().map(|m| m.tag).collect();
+        let got: Vec<_> = parse_inline_tags(&content)
+            .into_iter()
+            .map(|m| m.tag)
+            .collect();
         assert_eq!(got, ["real"]);
     }
 
@@ -318,9 +350,18 @@ mod tests {
 
     #[test]
     fn all_tags_merges_and_dedupes() {
-        let c = ["---", "tags: [shared, fm-only]", "---", "body with #shared and #inline-only"].join("\n");
+        let c = [
+            "---",
+            "tags: [shared, fm-only]",
+            "---",
+            "body with #shared and #inline-only",
+        ]
+        .join("\n");
         let got: HashSet<_> = all_tags(&c).into_iter().collect();
-        let want: HashSet<_> = ["shared", "fm-only", "inline-only"].into_iter().map(String::from).collect();
+        let want: HashSet<_> = ["shared", "fm-only", "inline-only"]
+            .into_iter()
+            .map(String::from)
+            .collect();
         assert_eq!(got, want);
     }
 

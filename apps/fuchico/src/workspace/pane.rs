@@ -8,8 +8,8 @@
 //! the constructors in `crate::editor` / `crate::excalidraw`.
 
 use gpui_kit::{
-    AnyView, App, AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, Render, Subscription,
-    Window,
+    AnyView, App, AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, Render,
+    Subscription, Window,
 };
 
 /// Events a pane raises toward its host (workspace tab or editor window).
@@ -22,7 +22,10 @@ pub enum PaneEvent {
     /// Tag click → tags view with that tag selected.
     OpenTag(String),
     /// `onOpenMermaid({blockKey, text})` → mermaid dock.
-    OpenMermaid { block_key: String, initial_text: String },
+    OpenMermaid {
+        block_key: String,
+        initial_text: String,
+    },
     /// `onOpenCommandPalette(query)`.
     OpenCommandPalette(String),
     /// `onClose` (e.g. Helix `:q`): close the tab / window.
@@ -59,7 +62,13 @@ pub trait PaneItem: Render + Focusable + EventEmitter<PaneEvent> + Sized + 'stat
     }
     /// Explorer paths dropped onto the pane (`PATH_DRAG_TYPE`): the editor
     /// inserts links via `attachments::drop_insert_text`. Default: ignored.
-    fn insert_dropped_paths(&mut self, _paths: &[String], _window: &mut Window, _cx: &mut Context<Self>) {}
+    fn insert_dropped_paths(
+        &mut self,
+        _paths: &[String],
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) {
+    }
 }
 
 trait ErasedPane {
@@ -114,8 +123,13 @@ impl PaneHandle {
         cx: &mut Context<V>,
         mut on_event: impl FnMut(&mut V, &PaneEvent, &mut Window, &mut Context<V>) + 'static,
     ) -> PaneHandle {
-        let sub = cx.subscribe_in(&pane, window, move |host, _, ev, window, cx| on_event(host, ev, window, cx));
-        PaneHandle { inner: Box::new(pane), _events: sub }
+        let sub = cx.subscribe_in(&pane, window, move |host, _, ev, window, cx| {
+            on_event(host, ev, window, cx)
+        });
+        PaneHandle {
+            inner: Box::new(pane),
+            _events: sub,
+        }
     }
 
     pub fn view(&self) -> AnyView {

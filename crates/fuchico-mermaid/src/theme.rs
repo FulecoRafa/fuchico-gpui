@@ -48,7 +48,8 @@ pub struct MermaidTheme {
     pub dark: bool,
 }
 
-const FONT_SANS: &str = "Inter Variable, Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+const FONT_SANS: &str =
+    "Inter Variable, Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
 const FONT_MONO: &str = "JetBrains Mono, ui-monospace, SFMono-Regular, monospace";
 
 impl MermaidTheme {
@@ -245,9 +246,19 @@ mod tests {
         let l = MermaidTheme::light().to_renderer_theme();
         let d = MermaidTheme::dark().to_renderer_theme();
         assert_ne!(l.text_color, d.text_color);
-        assert_eq!(d.primary_color, MermaidTheme::dark().resolve(&MermaidTheme::dark().card).css());
+        assert_eq!(
+            d.primary_color,
+            MermaidTheme::dark()
+                .resolve(&MermaidTheme::dark().card)
+                .css()
+        );
         assert_eq!(l.pie_colors[8], l.pie_colors[0]);
-        assert_eq!(l.line_color, MermaidTheme::light().resolve("oklch(0.56 0.021 213.5)").css());
+        assert_eq!(
+            l.line_color,
+            MermaidTheme::light()
+                .resolve("oklch(0.56 0.021 213.5)")
+                .css()
+        );
     }
 
     #[test]

@@ -111,9 +111,10 @@ fn walk_markdown_files(dir: &Path, out: &mut Vec<PathBuf>) {
             walk_markdown_files(&path, out);
         } else if ft.is_file()
             && let Some(ext) = path.extension().and_then(|e| e.to_str())
-                && (ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")) {
-                    out.push(path);
-                }
+            && (ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"))
+        {
+            out.push(path);
+        }
     }
 }
 
@@ -187,7 +188,13 @@ mod read_dir_tests {
         let entries = fs_read_dir(root.clone(), false).unwrap();
         assert_eq!(
             names(&entries),
-            vec![("Alpha", "dir"), ("zeta", "dir"), ("A.md", "file"), ("b.md", "file"), ("c.txt", "file")]
+            vec![
+                ("Alpha", "dir"),
+                ("zeta", "dir"),
+                ("A.md", "file"),
+                ("b.md", "file"),
+                ("c.txt", "file")
+            ]
         );
         // Non-recursive; sizes and mtimes come from metadata.
         let b = entries.iter().find(|e| e.name == "b.md").unwrap();
@@ -227,14 +234,29 @@ mod read_dir_tests {
         let entries = fs_read_dir(p.to_string_lossy().into_owned(), false).unwrap();
         assert_eq!(
             names(&entries),
-            vec![("dirlink", "dir"), ("real", "dir"), ("broken", "symlink"), ("file.md", "file"), ("filelink", "file")]
+            vec![
+                ("dirlink", "dir"),
+                ("real", "dir"),
+                ("broken", "symlink"),
+                ("file.md", "file"),
+                ("filelink", "file")
+            ]
         );
-        assert_eq!(entries.iter().find(|e| e.name == "filelink").unwrap().size, 3);
+        assert_eq!(
+            entries.iter().find(|e| e.name == "filelink").unwrap().size,
+            3
+        );
     }
 
     #[test]
     fn missing_dir_is_an_error() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(fs_read_dir(dir.path().join("nope").to_string_lossy().into_owned(), false).is_err());
+        assert!(
+            fs_read_dir(
+                dir.path().join("nope").to_string_lossy().into_owned(),
+                false
+            )
+            .is_err()
+        );
     }
 }

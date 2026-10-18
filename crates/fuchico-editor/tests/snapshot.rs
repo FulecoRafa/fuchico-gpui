@@ -144,3 +144,34 @@ fn snapshot_inline_images() {
     let _ = std::fs::remove_dir_all(vault);
     assert!(p.exists());
 }
+
+#[test]
+fn snapshot_find_panel_goto_and_outline() {
+    // Search panel (top) with a query, its matches and the goto dialog.
+    let p = snapshot(
+        "editor-find-ayu-dark",
+        EditorStyle::ayu_dark(),
+        note(),
+        |v, cx| {
+            v.set_selection(2, 5, cx);
+            v.open_find(cx);
+            v.open_goto(cx);
+        },
+    );
+    let mut text = String::from("# Outline\n\n");
+    for i in 1..=20 {
+        text.push_str(&format!(
+            "{} Heading number {i}\nbody\n",
+            "#".repeat(1 + i % 3)
+        ));
+    }
+    let q = snapshot(
+        "editor-outline-ayu-light",
+        EditorStyle::ayu_light(),
+        text,
+        |v, cx| {
+            v.open_outline(cx);
+        },
+    );
+    assert!(p.exists() && q.exists());
+}

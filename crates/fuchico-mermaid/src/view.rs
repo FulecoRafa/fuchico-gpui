@@ -8,8 +8,8 @@ use crate::raster::{self, Raster};
 use crate::render::render_svg;
 use crate::theme::MermaidTheme;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -95,11 +95,22 @@ pub struct MermaidView {
 impl EventEmitter<MermaidEvent> for MermaidView {}
 
 fn hsla(c: Srgb, alpha: f32) -> Hsla {
-    gpui_kit::Rgba { r: c.r as f32 / 255.0, g: c.g as f32 / 255.0, b: c.b as f32 / 255.0, a: c.a * alpha }.into()
+    gpui_kit::Rgba {
+        r: c.r as f32 / 255.0,
+        g: c.g as f32 / 255.0,
+        b: c.b as f32 / 255.0,
+        a: c.a * alpha,
+    }
+    .into()
 }
 
 impl MermaidView {
-    pub fn new(label: impl Into<SharedString>, chrome: Chrome, theme: MermaidTheme, _cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        label: impl Into<SharedString>,
+        chrome: Chrome,
+        theme: MermaidTheme,
+        _cx: &mut Context<Self>,
+    ) -> Self {
         Self {
             label: label.into(),
             strings: MermaidStrings::default(),
@@ -155,7 +166,9 @@ impl MermaidView {
             return;
         };
         self.status = BlockStatus::Ready;
-        if self.source.as_deref() == Some(text.as_str()) && (self.svg.is_some() || self.error.is_some()) {
+        if self.source.as_deref() == Some(text.as_str())
+            && (self.svg.is_some() || self.error.is_some())
+        {
             return;
         }
         self.render_text(&text);
@@ -190,9 +203,10 @@ impl MermaidView {
         if let Some(src) = self.svg_source.clone() {
             self.render_text(&src);
             if let Some(cur) = self.source.clone()
-                && cur != src {
-                    self.render_text(&cur);
-                }
+                && cur != src
+            {
+                self.render_text(&cur);
+            }
         }
         cx.notify();
     }
@@ -257,13 +271,17 @@ impl MermaidView {
     pub fn fit(&mut self, cx: &mut Context<Self>) {
         if let Some((w, h)) = self.content_size() {
             let s = self.canvas_bounds.size;
-            self.pz.fit(f32::from(s.width), f32::from(s.height), w, h, 24.0);
+            self.pz
+                .fit(f32::from(s.width), f32::from(s.height), w, h, 24.0);
             cx.notify();
         }
     }
 
     fn local(&self, p: Point<Pixels>) -> (f32, f32) {
-        (f32::from(p.x - self.canvas_bounds.origin.x), f32::from(p.y - self.canvas_bounds.origin.y))
+        (
+            f32::from(p.x - self.canvas_bounds.origin.x),
+            f32::from(p.y - self.canvas_bounds.origin.y),
+        )
     }
 
     fn on_wheel(&mut self, e: &ScrollWheelEvent, cx: &mut Context<Self>) {
@@ -284,18 +302,26 @@ impl MermaidView {
     }
 
     fn ensure_raster(&mut self, dpr: f32) {
-        let (Some(svg), Some(src)) = (&self.svg, &self.svg_source) else { return };
+        let (Some(svg), Some(src)) = (&self.svg, &self.svg_source) else {
+            return;
+        };
         let want = dpr * self.pz.scale;
         if let Some(r) = &self.raster
-            && r.scale >= want * 0.8 && r.scale <= want * 3.0 {
-                return;
-            }
+            && r.scale >= want * 0.8
+            && r.scale <= want * 3.0
+        {
+            return;
+        }
         let scale = raster::quantize_scale(want);
         self.raster = raster::rasterize_cached(src, &self.theme, Some(svg), scale).ok();
     }
 
     fn icon(&mut self, icon: Icon, color: Srgb, px: f32, dpr: f32) -> Option<Arc<RenderImage>> {
-        let key = (icon, (color.r as u32) << 16 | (color.g as u32) << 8 | color.b as u32, (px * 10.0) as u32);
+        let key = (
+            icon,
+            (color.r as u32) << 16 | (color.g as u32) << 8 | color.b as u32,
+            (px * 10.0) as u32,
+        );
         if let Some(i) = self.icon_cache.get(&key) {
             return Some(i.clone());
         }
@@ -321,14 +347,19 @@ fn paint_canvas(
         let mut x = 0.0;
         while x < w {
             let o = bounds.origin + point(px(x + step / 2.0 - 1.0), px(y + step / 2.0 - 1.0));
-            window.paint_quad(fill(Bounds::new(o, size(px(2.0), px(2.0))), dot).corner_radii(px(1.0)));
+            window.paint_quad(
+                fill(Bounds::new(o, size(px(2.0), px(2.0))), dot).corner_radii(px(1.0)),
+            );
             x += step;
         }
         y += step;
     }
     if let Some(r) = raster {
         let origin = bounds.origin + point(px(pz.x), px(pz.y));
-        let image_bounds = Bounds::new(origin, size(px(r.width * pz.scale), px(r.height * pz.scale)));
+        let image_bounds = Bounds::new(
+            origin,
+            size(px(r.width * pz.scale), px(r.height * pz.scale)),
+        );
         let _ = window.paint_image(bounds, image_bounds, Corners::default(), r.image, 0, false);
     }
     // Pointer capture: keep panning when the cursor leaves the canvas.
@@ -379,7 +410,11 @@ impl Render for MermaidView {
         let entity = cx.entity();
         let strings = self.strings.clone();
 
-        let make_btn = |this: &mut Self, id: &'static str, icon: Icon, tip: SharedString, on: fn(&mut Self, &mut Context<Self>)| {
+        let make_btn = |this: &mut Self,
+                        id: &'static str,
+                        icon: Icon,
+                        tip: SharedString,
+                        on: fn(&mut Self, &mut Context<Self>)| {
             let img = this.icon(icon, muted, 14.0, dpr);
             div()
                 .id(id)
@@ -391,7 +426,9 @@ impl Render for MermaidView {
                 .cursor_pointer()
                 .hover(move |s| s.bg(hsla(accent, 0.14)))
                 .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
-                .when_some(img, |d, img| d.child(gpui_kit::img(ImageSource::Render(img)).size(px(14.0))))
+                .when_some(img, |d, img| {
+                    d.child(gpui_kit::img(ImageSource::Render(img)).size(px(14.0)))
+                })
                 .on_click(cx.listener(move |this, _, _, cx| on(this, cx)))
         };
 
@@ -406,9 +443,27 @@ impl Render for MermaidView {
             .border_color(hsla(border, 0.6))
             .rounded(radius_md)
             .bg(hsla(card, 0.85))
-            .child(make_btn(self, "mm-zoom-out", Icon::ZoomOut, strings.zoom_out.clone(), |t, cx| t.zoom_out(cx)))
-            .child(make_btn(self, "mm-zoom-in", Icon::ZoomIn, strings.zoom_in.clone(), |t, cx| t.zoom_in(cx)))
-            .child(make_btn(self, "mm-reset", Icon::Reset, strings.reset_view.clone(), |t, cx| t.reset(cx)));
+            .child(make_btn(
+                self,
+                "mm-zoom-out",
+                Icon::ZoomOut,
+                strings.zoom_out.clone(),
+                |t, cx| t.zoom_out(cx),
+            ))
+            .child(make_btn(
+                self,
+                "mm-zoom-in",
+                Icon::ZoomIn,
+                strings.zoom_in.clone(),
+                |t, cx| t.zoom_in(cx),
+            ))
+            .child(make_btn(
+                self,
+                "mm-reset",
+                Icon::Reset,
+                strings.reset_view.clone(),
+                |t, cx| t.reset(cx),
+            ));
 
         let banner = |text: String, color: Srgb, border_c: Srgb, alpha: f32| {
             div()
@@ -470,7 +525,10 @@ impl Render for MermaidView {
                 if chrome == Chrome::Pane {
                     let pop = self.icon(Icon::ExternalLink, muted, 14.0, dpr);
                     let close = self.icon(Icon::Close, muted, 14.0, dpr);
-                    let (tip_pop, tip_close) = (strings.open_in_window.clone(), strings.close_preview.clone());
+                    let (tip_pop, tip_close) = (
+                        strings.open_in_window.clone(),
+                        strings.close_preview.clone(),
+                    );
                     row = row
                         .child(
                             div()
@@ -482,14 +540,22 @@ impl Render for MermaidView {
                         )
                         .child(
                             btn_base("mm-popout")
-                                .tooltip(move |window, cx| Tooltip::new(tip_pop.clone()).build(window, cx))
-                                .when_some(pop, |d, i| d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0))))
+                                .tooltip(move |window, cx| {
+                                    Tooltip::new(tip_pop.clone()).build(window, cx)
+                                })
+                                .when_some(pop, |d, i| {
+                                    d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0)))
+                                })
                                 .on_click(cx.listener(|_, _, _, cx| cx.emit(MermaidEvent::PopOut))),
                         )
                         .child(
                             btn_base("mm-close")
-                                .tooltip(move |window, cx| Tooltip::new(tip_close.clone()).build(window, cx))
-                                .when_some(close, |d, i| d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0))))
+                                .tooltip(move |window, cx| {
+                                    Tooltip::new(tip_close.clone()).build(window, cx)
+                                })
+                                .when_some(close, |d, i| {
+                                    d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0)))
+                                })
                                 .on_click(cx.listener(|_, _, _, cx| cx.emit(MermaidEvent::Close))),
                         );
                 } else {
@@ -497,8 +563,12 @@ impl Render for MermaidView {
                     let tip_dock = strings.dock_tooltip.clone();
                     row = row.child(
                         btn_base("mm-dock")
-                            .tooltip(move |window, cx| Tooltip::new(tip_dock.clone()).build(window, cx))
-                            .when_some(dock, |d, i| d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0))))
+                            .tooltip(move |window, cx| {
+                                Tooltip::new(tip_dock.clone()).build(window, cx)
+                            })
+                            .when_some(dock, |d, i| {
+                                d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0)))
+                            })
                             .child(strings.dock.clone())
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(MermaidEvent::Dock))),
                     );
@@ -519,7 +589,11 @@ impl Render for MermaidView {
             .absolute()
             .inset_0()
             .overflow_hidden()
-            .cursor(if grabbing { CursorStyle::ClosedHand } else { CursorStyle::OpenHand })
+            .cursor(if grabbing {
+                CursorStyle::ClosedHand
+            } else {
+                CursorStyle::OpenHand
+            })
             .on_scroll_wheel(cx.listener(|this, e: &ScrollWheelEvent, _, cx| {
                 this.on_wheel(e, cx);
                 cx.stop_propagation();
@@ -534,7 +608,9 @@ impl Render for MermaidView {
                         ent_pre.update(cx, |v, _| v.canvas_bounds = bounds);
                         bounds
                     },
-                    move |_, bounds, window, _| paint_canvas(ent_paint, bounds, raster, pz, dot, window),
+                    move |_, bounds, window, _| {
+                        paint_canvas(ent_paint, bounds, raster, pz, dot, window)
+                    },
                 )
                 .size_full(),
             );
@@ -542,10 +618,14 @@ impl Render for MermaidView {
         let canvas_el = [MouseButton::Left, MouseButton::Right, MouseButton::Middle]
             .into_iter()
             .fold(canvas_el, |el, button| {
-                el.on_mouse_down(button, cx.listener(|this, e: &MouseDownEvent, _, cx| {
-                    this.drag.begin(&this.pz, f32::from(e.position.x), f32::from(e.position.y));
-                    cx.notify();
-                }))
+                el.on_mouse_down(
+                    button,
+                    cx.listener(|this, e: &MouseDownEvent, _, cx| {
+                        this.drag
+                            .begin(&this.pz, f32::from(e.position.x), f32::from(e.position.y));
+                        cx.notify();
+                    }),
+                )
             });
 
         div()

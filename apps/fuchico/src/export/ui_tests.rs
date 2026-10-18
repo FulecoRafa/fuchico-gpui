@@ -27,7 +27,9 @@ async fn html_and_pdf_export_dialogs(cx: &mut TestAppContext) {
     let note = dir.join("Trip.md");
     std::fs::write(&note, NOTE).unwrap();
     let note_s = note.to_string_lossy().to_string();
-    let rec = test_ui::record(cx, |e| matches!(e, AppEvent::Core(CoreEvent::FileWritten { .. })));
+    let rec = test_ui::record(cx, |e| {
+        matches!(e, AppEvent::Core(CoreEvent::FileWritten { .. }))
+    });
     let (mut ui, _blank) = test_ui::open(cx, (800., 600.), |_, _| Blank);
 
     // ---- HTML: dialog defaults to the note's folder ----------------------
@@ -50,10 +52,14 @@ async fn html_and_pdf_export_dialogs(cx: &mut TestAppContext) {
     let (msg, _) = ui.cx.pending_prompt().expect("outcome dialog");
     assert_eq!(msg, crate::t!(ExportSaved, path = out.display()));
     ui.cx.simulate_prompt_answer("OK");
-    assert!(ui.cx.read(|cx| rec.read(cx).seen.contains(&AppEvent::Core(CoreEvent::FileWritten {
-        path: out.to_string_lossy().into_owned(),
-        source: Some("export".into()),
-    }))));
+    assert!(ui.cx.read(|cx| {
+        rec.read(cx)
+            .seen
+            .contains(&AppEvent::Core(CoreEvent::FileWritten {
+                path: out.to_string_lossy().into_owned(),
+                source: Some("export".into()),
+            }))
+    }));
 
     // ---- cancel: nothing written, no dialog -------------------------------
     std::fs::remove_file(&out).unwrap();
@@ -69,7 +75,8 @@ async fn html_and_pdf_export_dialogs(cx: &mut TestAppContext) {
     let n = note_s.clone();
     ui.cx.update(|window, cx| export_html(&n, window, cx));
     ui.cx.run_until_parked();
-    ui.cx.simulate_new_path_selection(|shown| Some(shown.join("missing-dir").join("x.html")));
+    ui.cx
+        .simulate_new_path_selection(|shown| Some(shown.join("missing-dir").join("x.html")));
     ui.cx.run_until_parked();
     let (msg, _) = ui.cx.pending_prompt().expect("failure dialog");
     let prefix = crate::t!(ExportFailed, message = "");
@@ -79,11 +86,14 @@ async fn html_and_pdf_export_dialogs(cx: &mut TestAppContext) {
     // ---- the live (unsaved) buffer wins over the file --------------------
     let n = note_s.clone();
     ui.cx.update(|window, cx| {
-        set_buffer_provider(cx, move |p, _| (p == n).then(|| "# Unsaved heading\n".to_string()));
+        set_buffer_provider(cx, move |p, _| {
+            (p == n).then(|| "# Unsaved heading\n".to_string())
+        });
         export_html(&note_s, window, cx)
     });
     ui.cx.run_until_parked();
-    ui.cx.simulate_new_path_selection(|shown| Some(shown.join("live.html")));
+    ui.cx
+        .simulate_new_path_selection(|shown| Some(shown.join("live.html")));
     ui.cx.run_until_parked();
     let live = std::fs::read_to_string(dir.join("live.html")).unwrap();
     assert!(live.contains("Unsaved heading") && !live.contains("Trip plan"));
@@ -94,7 +104,8 @@ async fn html_and_pdf_export_dialogs(cx: &mut TestAppContext) {
     let n = note.to_string_lossy().to_string();
     ui.cx.update(|window, cx| export_pdf(&n, window, cx));
     ui.cx.run_until_parked();
-    ui.cx.simulate_new_path_selection(|shown| Some(shown.join("Trip")));
+    ui.cx
+        .simulate_new_path_selection(|shown| Some(shown.join("Trip")));
     ui.cx.run_until_parked();
     let pdf = std::fs::read(dir.join("Trip.pdf")).expect("pdf written");
     assert!(pdf.starts_with(b"%PDF-"));

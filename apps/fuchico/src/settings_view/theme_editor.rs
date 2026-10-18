@@ -11,8 +11,8 @@ use std::rc::Rc;
 use gpui_kit::component::input::{CompletionProvider, EditorState, Rope, RopeExt};
 use gpui_kit::{App, Context, Task, Window};
 use lsp_types::{
-    CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, CompletionTextEdit, Documentation,
-    TextEdit,
+    CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, CompletionTextEdit,
+    Documentation, TextEdit,
 };
 
 use crate::i18n::{Msg, tr};
@@ -27,7 +27,11 @@ pub const THEME_VARIABLES: [(&str, bool, Msg); 25] = [
     ("--primary", true, Msg::ThemeVarPrimary),
     ("--primary-foreground", true, Msg::ThemeVarPrimaryForeground),
     ("--secondary", true, Msg::ThemeVarSecondary),
-    ("--secondary-foreground", true, Msg::ThemeVarSecondaryForeground),
+    (
+        "--secondary-foreground",
+        true,
+        Msg::ThemeVarSecondaryForeground,
+    ),
     ("--muted", true, Msg::ThemeVarMuted),
     ("--muted-foreground", true, Msg::ThemeVarMutedForeground),
     ("--accent", true, Msg::ThemeVarAccent),
@@ -70,7 +74,11 @@ pub fn completion_context(line_before: &str) -> Option<(usize, bool)> {
 
 /// The text a completion inserts.
 pub fn completion_text(name: &str, in_var: bool) -> String {
-    if in_var { name.to_string() } else { format!("{name}: ") }
+    if in_var {
+        name.to_string()
+    } else {
+        format!("{name}: ")
+    }
 }
 
 /// What lang-css's `cssCompletionSource` would offer at the cursor.
@@ -99,7 +107,10 @@ pub fn css_slot(text_before: &str) -> Option<(usize, CssSlot)> {
     if before.ends_with('@') {
         return Some((start - 1, CssSlot::AtRule));
     }
-    if word.is_empty() || word.starts_with("--") || word.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+    if word.is_empty()
+        || word.starts_with("--")
+        || word.chars().next().is_some_and(|c| c.is_ascii_digit())
+    {
         return None;
     }
     // Brace depth and the current statement, comments stripped.
@@ -125,9 +136,14 @@ pub fn css_slot(text_before: &str) -> Option<(usize, CssSlot)> {
     }
     let prev = before.chars().next_back();
     match prev {
-        None | Some(' ' | '\t' | '\n' | ',' | '>' | '+' | '~' | '(' | '}' | '{' | ';') => {
-            Some((start, if depth > 0 { CssSlot::Property } else { CssSlot::Tag }))
-        }
+        None | Some(' ' | '\t' | '\n' | ',' | '>' | '+' | '~' | '(' | '}' | '{' | ';') => Some((
+            start,
+            if depth > 0 {
+                CssSlot::Property
+            } else {
+                CssSlot::Tag
+            },
+        )),
         _ => None,
     }
 }
@@ -155,7 +171,10 @@ fn strip_comments(s: &str) -> String {
 /// `(label, kind, text inserted)` for a slot, filtered by `prefix`.
 pub fn css_options(slot: CssSlot, prefix: &str) -> Vec<(String, CompletionItemKind, String)> {
     use super::css_data as d;
-    let pick = |list: &[&str], kind: CompletionItemKind, suffix: &str| -> Vec<(String, CompletionItemKind, String)> {
+    let pick = |list: &[&str],
+                kind: CompletionItemKind,
+                suffix: &str|
+     -> Vec<(String, CompletionItemKind, String)> {
         list.iter()
             .filter(|s| s.starts_with(prefix))
             .map(|s| (s.to_string(), kind, format!("{s}{suffix}")))
@@ -181,7 +200,10 @@ pub fn declared_variables(text: &str) -> Vec<String> {
     let mut rest = text;
     while let Some(i) = rest.find("--") {
         let tail = &rest[i..];
-        let len = tail.char_indices().find(|(_, c)| !(c.is_alphanumeric() || *c == '_' || *c == '-')).map_or(tail.len(), |(j, _)| j);
+        let len = tail
+            .char_indices()
+            .find(|(_, c)| !(c.is_alphanumeric() || *c == '_' || *c == '-'))
+            .map_or(tail.len(), |(j, _)| j);
         let name = &tail[..len];
         if len > 2
             && tail[len..].trim_start().starts_with(':')
@@ -235,7 +257,10 @@ impl CompletionProvider for ThemeVarCompletions {
         let line_before = rope.slice(line_start..offset).to_string();
         let edit = |start: usize, new_text: String| {
             Some(CompletionTextEdit::Edit(TextEdit {
-                range: lsp_types::Range { start: rope.offset_to_position(start), end: pos },
+                range: lsp_types::Range {
+                    start: rope.offset_to_position(start),
+                    end: pos,
+                },
                 new_text,
             }))
         };
@@ -252,42 +277,56 @@ impl CompletionProvider for ThemeVarCompletions {
                         CompletionItem {
                             label: name.to_string(),
                             filter_text: Some(name.to_string()),
-                            kind: Some(if *is_color { CompletionItemKind::COLOR } else { CompletionItemKind::VARIABLE }),
+                            kind: Some(if *is_color {
+                                CompletionItemKind::COLOR
+                            } else {
+                                CompletionItemKind::VARIABLE
+                            }),
                             detail: Some(tr(*msg, &[])),
-                            documentation: (!info.is_empty()).then_some(Documentation::String(info)),
+                            documentation: (!info.is_empty())
+                                .then_some(Documentation::String(info)),
                             text_edit: edit(line_start + start, completion_text(name, in_var)),
                             ..Default::default()
                         }
                     }),
             );
             let text = rope.to_string();
-            items.extend(declared_variables(&text).into_iter().filter(|n| n.starts_with(prefix.as_str()) || prefix == "-").map(
-                |name| CompletionItem {
-                    label: name.clone(),
-                    filter_text: Some(name.clone()),
-                    kind: Some(CompletionItemKind::VARIABLE),
-                    text_edit: edit(line_start + start, completion_text(&name, in_var)),
-                    ..Default::default()
-                },
-            ));
+            items.extend(
+                declared_variables(&text)
+                    .into_iter()
+                    .filter(|n| n.starts_with(prefix.as_str()) || prefix == "-")
+                    .map(|name| CompletionItem {
+                        label: name.clone(),
+                        filter_text: Some(name.clone()),
+                        kind: Some(CompletionItemKind::VARIABLE),
+                        text_edit: edit(line_start + start, completion_text(&name, in_var)),
+                        ..Default::default()
+                    }),
+            );
         } else {
             let text_before = rope.slice(0..offset).to_string();
             if let Some((start, slot)) = css_slot(&text_before) {
                 let prefix = &text_before[start..];
-                items.extend(css_options(slot, prefix).into_iter().map(|(label, kind, insert)| CompletionItem {
-                    filter_text: Some(label.clone()),
-                    label,
-                    kind: Some(kind),
-                    text_edit: edit(start, insert),
-                    ..Default::default()
-                }));
+                items.extend(
+                    css_options(slot, prefix)
+                        .into_iter()
+                        .map(|(label, kind, insert)| CompletionItem {
+                            filter_text: Some(label.clone()),
+                            label,
+                            kind: Some(kind),
+                            text_edit: edit(start, insert),
+                            ..Default::default()
+                        }),
+                );
             }
         }
         Task::ready(Ok(CompletionResponse::Array(items)))
     }
 
     fn is_completion_trigger(&self, _: usize, new_text: &str, _: &mut App) -> bool {
-        new_text.chars().all(|c| c == '-' || c == '@' || c.is_alphanumeric())
+        new_text
+            .chars()
+            .all(|c| c == '-' || c == '@' || c.is_alphanumeric())
     }
 }
 
@@ -305,8 +344,11 @@ pub fn editor_height(lines: usize) -> f32 {
 
 /// The CSS editor state: line numbers, no folding, soft wrap, completions.
 pub fn new_css_editor(window: &mut Window, cx: &mut Context<EditorState>) -> EditorState {
-    let mut state =
-        EditorState::new(window, cx).language("css").line_number(true).folding(false).soft_wrap(true);
+    let mut state = EditorState::new(window, cx)
+        .language("css")
+        .line_number(true)
+        .folding(false)
+        .soft_wrap(true);
     state.lsp_mut().completion_provider = Some(Rc::new(ThemeVarCompletions));
     state
 }
@@ -364,7 +406,11 @@ mod tests {
         assert_eq!(slot("a {} p > sp"), Some(CssSlot::Tag));
         assert_eq!(slot("@med"), Some(CssSlot::AtRule));
         assert_eq!(css_slot("@med").unwrap().0, 0);
-        assert_eq!(slot("/* { */ di"), Some(CssSlot::Tag), "comments don't open blocks");
+        assert_eq!(
+            slot("/* { */ di"),
+            Some(CssSlot::Tag),
+            "comments don't open blocks"
+        );
         assert_eq!(slot("a { color: red; "), None, "empty word");
         assert_eq!(slot("a { --pri"), None, "variables are the theme source's");
         assert_eq!(slot(".cls"), None);
@@ -373,9 +419,18 @@ mod tests {
 
     #[test]
     fn css_option_lists() {
-        let labels = |slot, p| css_options(slot, p).into_iter().map(|o| o.0).collect::<Vec<_>>();
+        let labels = |slot, p| {
+            css_options(slot, p)
+                .into_iter()
+                .map(|o| o.0)
+                .collect::<Vec<_>>()
+        };
         let props = css_options(CssSlot::Property, "backgr");
-        assert!(props.iter().any(|o| o.0 == "background-color" && o.2 == "background-color: "));
+        assert!(
+            props
+                .iter()
+                .any(|o| o.0 == "background-color" && o.2 == "background-color: ")
+        );
         assert!(labels(CssSlot::Value, "transp").contains(&"transparent".to_string()));
         assert!(labels(CssSlot::Value, "rebecca").contains(&"rebeccapurple".to_string()));
         assert!(labels(CssSlot::PseudoClass, "focus-v").contains(&"focus-visible".to_string()));
@@ -387,7 +442,10 @@ mod tests {
     fn sheet_variables_and_swatch() {
         let css = "[data-palette=\"custom\"] { --primary: #fff; --my-gap: 4px; --my-gap: 5px; } a { x: var(--my-gap) }";
         assert_eq!(declared_variables(css), ["--my-gap"]);
-        assert_eq!(variable_info("#112233", true), "<mark color=\"#112233\">\u{2003}\u{2003}</mark> #112233");
+        assert_eq!(
+            variable_info("#112233", true),
+            "<mark color=\"#112233\">\u{2003}\u{2003}</mark> #112233"
+        );
         assert_eq!(variable_info("6px", false), "6px");
     }
 

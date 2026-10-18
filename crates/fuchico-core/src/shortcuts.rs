@@ -4,7 +4,8 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-static MOD_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(Mod|Meta|Ctrl|Alt|Shift)-(.+)$").unwrap());
+static MOD_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(Mod|Meta|Ctrl|Alt|Shift)-(.+)$").unwrap());
 
 fn mac_mod(m: &str) -> &'static str {
     match m {
@@ -34,9 +35,16 @@ fn format_chunk(chunk: &str, is_mac: bool) -> String {
     if mods.is_empty() {
         return chunk.to_string();
     }
-    let key = if rest.chars().count() == 1 { rest.to_uppercase() } else { rest.to_string() };
+    let key = if rest.chars().count() == 1 {
+        rest.to_uppercase()
+    } else {
+        rest.to_string()
+    };
     if is_mac {
-        format!("{}{key}", mods.iter().map(|m| mac_mod(m)).collect::<String>())
+        format!(
+            "{}{key}",
+            mods.iter().map(|m| mac_mod(m)).collect::<String>()
+        )
     } else {
         let mut parts: Vec<String> = mods.iter().map(|m| other_mod(m).to_string()).collect();
         parts.push(key);
@@ -47,7 +55,11 @@ fn format_chunk(chunk: &str, is_mac: bool) -> String {
 /// Renders "Mod-Shift-p" as "⌘⇧P" (macOS) or "Ctrl+Shift+P"; " / " separates
 /// alternatives.
 pub fn format_binding(binding: &str, is_mac: bool) -> String {
-    binding.split(" / ").map(|c| format_chunk(c, is_mac)).collect::<Vec<_>>().join(" / ")
+    binding
+        .split(" / ")
+        .map(|c| format_chunk(c, is_mac))
+        .collect::<Vec<_>>()
+        .join(" / ")
 }
 
 #[cfg(test)]
@@ -78,6 +90,9 @@ mod tests {
     fn passes_plain_keys_and_alternatives() {
         assert_eq!(format_binding("F2", true), "F2");
         assert_eq!(format_binding("Right-click", true), "Right-click");
-        assert_eq!(format_binding("Mod-= / Mod-- / Mod-0", false), "Ctrl+= / Ctrl+- / Ctrl+0");
+        assert_eq!(
+            format_binding("Mod-= / Mod-- / Mod-0", false),
+            "Ctrl+= / Ctrl+- / Ctrl+0"
+        );
     }
 }

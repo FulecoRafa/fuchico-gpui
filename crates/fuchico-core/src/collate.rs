@@ -43,9 +43,15 @@ mod tests {
         assert_eq!(sorted(vec!["B", "a", "A", "b"]), vec!["a", "A", "b", "B"]);
         // Accents are secondary: "éa" < "eb" (a plain lowercase compare
         // puts U+00E9 after every ASCII letter).
-        assert_eq!(sorted(vec!["eb", "éa", "f", "e"]), vec!["e", "éa", "eb", "f"]);
+        assert_eq!(
+            sorted(vec!["eb", "éa", "f", "e"]),
+            vec!["e", "éa", "eb", "f"]
+        );
         // Space < punctuation < symbols < digits < letters.
-        assert_eq!(sorted(vec!["a", "9", "~", "_", " "]), vec![" ", "_", "~", "9", "a"]);
+        assert_eq!(
+            sorted(vec!["a", "9", "~", "_", " "]),
+            vec![" ", "_", "~", "9", "a"]
+        );
         // No numeric collation.
         assert_eq!(locale_compare("10", "9"), Ordering::Less);
         assert_eq!(locale_compare("same", "same"), Ordering::Equal);

@@ -36,24 +36,71 @@ pub struct MonthCursor {
 
 impl MonthCursor {
     pub fn of(date: NaiveDate) -> Self {
-        MonthCursor { year: date.year(), month: date.month0() }
+        MonthCursor {
+            year: date.year(),
+            month: date.month0(),
+        }
     }
 
     /// ChevronLeft: previous month, wrapping the year.
     pub fn prev(self) -> Self {
-        if self.month == 0 { MonthCursor { year: self.year - 1, month: 11 } } else { MonthCursor { month: self.month - 1, ..self } }
+        if self.month == 0 {
+            MonthCursor {
+                year: self.year - 1,
+                month: 11,
+            }
+        } else {
+            MonthCursor {
+                month: self.month - 1,
+                ..self
+            }
+        }
     }
 
     /// ChevronRight: next month, wrapping the year.
     pub fn next(self) -> Self {
-        if self.month == 11 { MonthCursor { year: self.year + 1, month: 0 } } else { MonthCursor { month: self.month + 1, ..self } }
+        if self.month == 11 {
+            MonthCursor {
+                year: self.year + 1,
+                month: 0,
+            }
+        } else {
+            MonthCursor {
+                month: self.month + 1,
+                ..self
+            }
+        }
     }
 }
 
-const MONTHS_EN: [&str; 12] =
-    ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const MONTHS_PT: [&str; 12] =
-    ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const MONTHS_EN: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+const MONTHS_PT: [&str; 12] = [
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+];
 
 /// `Intl.DateTimeFormat(locale, {month: "long", year: "numeric"})`:
 /// "July 2026" / "julho de 2026".
@@ -75,12 +122,16 @@ pub fn recurrence_label(recurrence: &str, recur_time: Option<&str>) -> String {
 
 /// Last path segment (either separator), like the TS `basename`.
 pub fn basename(path: &str) -> &str {
-    path.split(['/', '\\']).rfind(|s| !s.is_empty()).unwrap_or(path)
+    path.split(['/', '\\'])
+        .rfind(|s| !s.is_empty())
+        .unwrap_or(path)
 }
 
 /// Day number of a `YYYY-MM-DD` cell (`Number(iso.slice(-2))`).
 pub fn day_of(iso: &str) -> u32 {
-    iso.get(iso.len().saturating_sub(2)..).and_then(|d| d.parse().ok()).unwrap_or(0)
+    iso.get(iso.len().saturating_sub(2)..)
+        .and_then(|d| d.parse().ok())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -89,24 +140,61 @@ mod tests {
 
     #[test]
     fn cursor_wraps_years() {
-        let jan = MonthCursor { year: 2026, month: 0 };
-        assert_eq!(jan.prev(), MonthCursor { year: 2025, month: 11 });
+        let jan = MonthCursor {
+            year: 2026,
+            month: 0,
+        };
+        assert_eq!(
+            jan.prev(),
+            MonthCursor {
+                year: 2025,
+                month: 11
+            }
+        );
         assert_eq!(jan.prev().next(), jan);
-        let dec = MonthCursor { year: 2026, month: 11 };
-        assert_eq!(dec.next(), MonthCursor { year: 2027, month: 0 });
-        assert_eq!(MonthCursor { year: 2026, month: 6 }.next(), MonthCursor { year: 2026, month: 7 });
+        let dec = MonthCursor {
+            year: 2026,
+            month: 11,
+        };
+        assert_eq!(
+            dec.next(),
+            MonthCursor {
+                year: 2027,
+                month: 0
+            }
+        );
+        assert_eq!(
+            MonthCursor {
+                year: 2026,
+                month: 6
+            }
+            .next(),
+            MonthCursor {
+                year: 2026,
+                month: 7
+            }
+        );
     }
 
     #[test]
     fn cursor_of_date_is_zero_based() {
         let d = NaiveDate::from_ymd_opt(2026, 7, 20).unwrap();
-        assert_eq!(MonthCursor::of(d), MonthCursor { year: 2026, month: 6 });
+        assert_eq!(
+            MonthCursor::of(d),
+            MonthCursor {
+                year: 2026,
+                month: 6
+            }
+        );
         assert_eq!(iso(d), "2026-07-20");
     }
 
     #[test]
     fn month_titles_follow_intl() {
-        let c = MonthCursor { year: 2026, month: 9 };
+        let c = MonthCursor {
+            year: 2026,
+            month: 9,
+        };
         assert_eq!(month_title(Locale::En, c), "October 2026");
         assert_eq!(month_title(Locale::PtBr, c), "outubro de 2026");
     }
@@ -124,6 +212,9 @@ mod tests {
 
     #[test]
     fn local_today_matches_chrono_local() {
-        assert_eq!(iso(local_today()), Local::now().format("%Y-%m-%d").to_string());
+        assert_eq!(
+            iso(local_today()),
+            Local::now().format("%Y-%m-%d").to_string()
+        );
     }
 }

@@ -198,11 +198,21 @@ impl Host for ViewHost {
     }
     fn syntax_parent(&mut self, doc: &Text, from: usize, to: usize) -> Option<(usize, usize)> {
         let t = self.tree(doc)?;
-        t.tree.select_parent(t.byte(from), t.byte(to)).map(|r| t.chars(r))
+        t.tree
+            .select_parent(t.byte(from), t.byte(to))
+            .map(|r| t.chars(r))
     }
-    fn syntax_sibling(&mut self, doc: &Text, from: usize, to: usize, forward: bool) -> Option<(usize, usize)> {
+    fn syntax_sibling(
+        &mut self,
+        doc: &Text,
+        from: usize,
+        to: usize,
+        forward: bool,
+    ) -> Option<(usize, usize)> {
         let t = self.tree(doc)?;
-        t.tree.sibling(t.byte(from), t.byte(to), forward).map(|r| t.chars(r))
+        t.tree
+            .sibling(t.byte(from), t.byte(to), forward)
+            .map(|r| t.chars(r))
     }
 }
 

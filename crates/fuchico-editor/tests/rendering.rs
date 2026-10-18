@@ -323,7 +323,10 @@ async fn table_block_has_no_line_numbers(cx: &mut TestAppContext) {
 
 #[gpui_kit::test]
 async fn code_files_use_file_highlighting_not_markdown(cx: &mut TestAppContext) {
-    let options = EditorOptions { path: Some("src/main.py".into()), ..EditorOptions::default() };
+    let options = EditorOptions {
+        path: Some("src/main.py".into()),
+        ..EditorOptions::default()
+    };
     let mut ui = open(cx, "# not a heading\nx = 1\n", options);
     ui.frame();
     assert!(!ui.read(|v, _| v.model().is_markdown()));

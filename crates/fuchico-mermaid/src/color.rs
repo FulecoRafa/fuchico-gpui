@@ -71,12 +71,19 @@ fn num(s: &str) -> Option<f32> {
 pub fn parse(input: &str) -> Option<Rgba> {
     let s = input.trim();
     if let Some(hex) = s.strip_prefix('#') {
-        let d = |i: usize| u8::from_str_radix(hex.get(i..i + 1)?, 16).ok().map(|v| v * 17);
+        let d = |i: usize| {
+            u8::from_str_radix(hex.get(i..i + 1)?, 16)
+                .ok()
+                .map(|v| v * 17)
+        };
         let p = |i: usize| u8::from_str_radix(hex.get(i..i + 2)?, 16).ok();
         return match hex.len() {
             3 => Some(Rgba::rgb(d(0)?, d(1)?, d(2)?)),
             6 => Some(Rgba::rgb(p(0)?, p(2)?, p(4)?)),
-            8 => Some(Rgba { a: p(6)? as f32 / 255.0, ..Rgba::rgb(p(0)?, p(2)?, p(4)?) }),
+            8 => Some(Rgba {
+                a: p(6)? as f32 / 255.0,
+                ..Rgba::rgb(p(0)?, p(2)?, p(4)?)
+            }),
             _ => None,
         };
     }

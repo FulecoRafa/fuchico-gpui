@@ -4,9 +4,10 @@
 
 use std::collections::HashSet;
 
-use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::*;
 
+use crate::actions::{PALETTE, PALETTE_KEYS, PickerTarget};
 use crate::color::{self, Rgba};
 use crate::geom;
 use crate::model::{Element, Num, Roundness};
@@ -14,7 +15,6 @@ use crate::render::{self, Camera, Palette};
 use crate::style::ExcalidrawStyle;
 use crate::text;
 use crate::view::{Drag, ExcalidrawView, Handle, Tool};
-use crate::actions::{PickerTarget, PALETTE, PALETTE_KEYS};
 
 fn hsla_rgba(h: Hsla) -> Rgba {
     let c = gpui_kit::Rgba::from(h);
@@ -59,25 +59,67 @@ fn icon_parts(i: Icon) -> Vec<Part> {
     match i {
         Icon::Lock => vec![
             RoundRect([5.0, 11.0, 19.0, 21.0], 2.0),
-            Poly(&[[8.0, 11.0], [8.0, 7.5], [10.0, 4.5], [14.0, 4.5], [16.0, 7.5], [16.0, 11.0]], false),
+            Poly(
+                &[
+                    [8.0, 11.0],
+                    [8.0, 7.5],
+                    [10.0, 4.5],
+                    [14.0, 4.5],
+                    [16.0, 7.5],
+                    [16.0, 11.0],
+                ],
+                false,
+            ),
         ],
         Icon::Unlock => vec![
             RoundRect([5.0, 11.0, 19.0, 21.0], 2.0),
-            Poly(&[[8.0, 11.0], [8.0, 7.5], [10.0, 4.5], [14.0, 4.5], [16.0, 7.0]], false),
+            Poly(
+                &[
+                    [8.0, 11.0],
+                    [8.0, 7.5],
+                    [10.0, 4.5],
+                    [14.0, 4.5],
+                    [16.0, 7.0],
+                ],
+                false,
+            ),
         ],
         Icon::Hand => vec![
             Poly(&[[8.0, 13.0], [8.0, 6.5]], false),
             Poly(&[[11.0, 11.5], [11.0, 4.5]], false),
             Poly(&[[14.0, 11.5], [14.0, 5.5]], false),
             Poly(&[[17.0, 12.5], [17.0, 8.5]], false),
-            Poly(&[[17.0, 12.5], [17.0, 16.0], [15.0, 20.0], [10.5, 20.0], [7.0, 16.5], [4.5, 12.5], [6.0, 11.5], [8.0, 13.0]], false),
+            Poly(
+                &[
+                    [17.0, 12.5],
+                    [17.0, 16.0],
+                    [15.0, 20.0],
+                    [10.5, 20.0],
+                    [7.0, 16.5],
+                    [4.5, 12.5],
+                    [6.0, 11.5],
+                    [8.0, 13.0],
+                ],
+                false,
+            ),
         ],
         Icon::Selection => vec![Poly(
-            &[[6.0, 4.0], [6.0, 19.0], [10.0, 15.5], [12.5, 21.0], [15.0, 20.0], [12.5, 14.5], [18.0, 14.5]],
+            &[
+                [6.0, 4.0],
+                [6.0, 19.0],
+                [10.0, 15.5],
+                [12.5, 21.0],
+                [15.0, 20.0],
+                [12.5, 14.5],
+                [18.0, 14.5],
+            ],
             true,
         )],
         Icon::Rectangle => vec![RoundRect([4.0, 4.0, 20.0, 20.0], 3.0)],
-        Icon::Diamond => vec![Poly(&[[12.0, 3.0], [21.0, 12.0], [12.0, 21.0], [3.0, 12.0]], true)],
+        Icon::Diamond => vec![Poly(
+            &[[12.0, 3.0], [21.0, 12.0], [12.0, 21.0], [3.0, 12.0]],
+            true,
+        )],
         Icon::Ellipse => vec![Circle([12.0, 12.0], 8.5)],
         Icon::Arrow => vec![
             Poly(&[[5.0, 19.0], [19.0, 5.0]], false),
@@ -85,7 +127,16 @@ fn icon_parts(i: Icon) -> Vec<Part> {
         ],
         Icon::Line => vec![Poly(&[[4.0, 12.0], [20.0, 12.0]], false)],
         Icon::Pencil => vec![
-            Poly(&[[4.0, 20.0], [5.0, 15.0], [15.5, 4.5], [19.5, 8.5], [9.0, 19.0]], true),
+            Poly(
+                &[
+                    [4.0, 20.0],
+                    [5.0, 15.0],
+                    [15.5, 4.5],
+                    [19.5, 8.5],
+                    [9.0, 19.0],
+                ],
+                true,
+            ),
             Poly(&[[13.5, 6.5], [17.5, 10.5]], false),
         ],
         Icon::Text => vec![
@@ -96,10 +147,29 @@ fn icon_parts(i: Icon) -> Vec<Part> {
         Icon::Image => vec![
             RoundRect([4.0, 5.0, 20.0, 19.0], 2.0),
             Dot([9.0, 10.0], 1.5),
-            Poly(&[[4.0, 17.0], [9.5, 12.0], [13.5, 15.5], [16.0, 13.0], [20.0, 16.5]], false),
+            Poly(
+                &[
+                    [4.0, 17.0],
+                    [9.5, 12.0],
+                    [13.5, 15.5],
+                    [16.0, 13.0],
+                    [20.0, 16.5],
+                ],
+                false,
+            ),
         ],
         Icon::Eraser => vec![
-            Poly(&[[19.0, 20.0], [9.0, 20.0], [4.0, 15.0], [14.0, 5.0], [20.0, 11.0], [11.0, 20.0]], false),
+            Poly(
+                &[
+                    [19.0, 20.0],
+                    [9.0, 20.0],
+                    [4.0, 15.0],
+                    [14.0, 5.0],
+                    [20.0, 11.0],
+                    [11.0, 20.0],
+                ],
+                false,
+            ),
             Poly(&[[18.0, 13.0], [11.5, 6.5]], false),
         ],
         Icon::Frame => vec![
@@ -115,14 +185,39 @@ fn icon_parts(i: Icon) -> Vec<Part> {
         ],
         Icon::Undo => vec![
             Poly(&[[9.0, 14.0], [4.0, 9.0], [9.0, 4.0]], false),
-            Poly(&[[4.0, 9.0], [14.5, 9.0], [18.0, 10.5], [20.0, 14.0], [18.0, 17.5], [14.5, 19.0], [11.0, 19.0]], false),
+            Poly(
+                &[
+                    [4.0, 9.0],
+                    [14.5, 9.0],
+                    [18.0, 10.5],
+                    [20.0, 14.0],
+                    [18.0, 17.5],
+                    [14.5, 19.0],
+                    [11.0, 19.0],
+                ],
+                false,
+            ),
         ],
         Icon::Redo => vec![
             Poly(&[[15.0, 14.0], [20.0, 9.0], [15.0, 4.0]], false),
-            Poly(&[[20.0, 9.0], [9.5, 9.0], [6.0, 10.5], [4.0, 14.0], [6.0, 17.5], [9.5, 19.0], [13.0, 19.0]], false),
+            Poly(
+                &[
+                    [20.0, 9.0],
+                    [9.5, 9.0],
+                    [6.0, 10.5],
+                    [4.0, 14.0],
+                    [6.0, 17.5],
+                    [9.5, 19.0],
+                    [13.0, 19.0],
+                ],
+                false,
+            ),
         ],
         Icon::Minus => vec![Poly(&[[6.0, 12.0], [18.0, 12.0]], false)],
-        Icon::Plus => vec![Poly(&[[6.0, 12.0], [18.0, 12.0]], false), Poly(&[[12.0, 6.0], [12.0, 18.0]], false)],
+        Icon::Plus => vec![
+            Poly(&[[6.0, 12.0], [18.0, 12.0]], false),
+            Poly(&[[12.0, 6.0], [12.0, 18.0]], false),
+        ],
     }
 }
 
@@ -166,7 +261,11 @@ fn icon(i: Icon, size: f32, color: Hsla) -> impl IntoElement {
                     Part::Dot(c, r) => (circle_pts(c, r), true, true),
                     Part::RoundRect(r, rad) => (round_rect_pts(r, rad), true, false),
                 };
-                let mut pb = if filled { PathBuilder::fill() } else { PathBuilder::stroke(px(width)) };
+                let mut pb = if filled {
+                    PathBuilder::fill()
+                } else {
+                    PathBuilder::stroke(px(width))
+                };
                 pb.move_to(at(pts[0]));
                 for q in &pts[1..] {
                     pb.line_to(at(*q));
@@ -189,14 +288,25 @@ struct Snapshot {
     view: Entity<ExcalidrawView>,
 }
 
-fn rect_screen(cam: Camera, origin: Point<Pixels>, el: &Element, r: [f64; 4]) -> Vec<Point<Pixels>> {
+fn rect_screen(
+    cam: Camera,
+    origin: Point<Pixels>,
+    el: &Element,
+    r: [f64; 4],
+) -> Vec<Point<Pixels>> {
     [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]]
         .iter()
         .map(|q| cam.to_screen(origin, geom::to_world(el, *q)))
         .collect()
 }
 
-fn paint_canvas(bounds: Bounds<Pixels>, hitbox: Hitbox, snap: Snapshot, window: &mut Window, cx: &mut App) {
+fn paint_canvas(
+    bounds: Bounds<Pixels>,
+    hitbox: Hitbox,
+    snap: Snapshot,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let entity = snap.view.clone();
     let (editing, focus) = {
         let v = entity.read(cx);
@@ -221,7 +331,11 @@ fn paint_canvas(bounds: Bounds<Pixels>, hitbox: Hitbox, snap: Snapshot, window: 
             if v.scene.grid_enabled() {
                 paint_grid(&v.scene, cam, bounds, pal.dark, window);
             }
-            let frames: Vec<&Element> = v.scene.elements().filter(|e| e.kind == "frame" || e.kind == "magicframe").collect();
+            let frames: Vec<&Element> = v
+                .scene
+                .elements()
+                .filter(|e| e.kind == "frame" || e.kind == "magicframe")
+                .collect();
             let frame_ids: HashSet<&str> = frames.iter().map(|f| f.id.as_str()).collect();
             let editing = v.editing.as_ref().map(|e| e.id.as_str());
             for el in v.scene.elements() {
@@ -230,15 +344,36 @@ fn paint_canvas(bounds: Bounds<Pixels>, hitbox: Hitbox, snap: Snapshot, window: 
                 let tl = cam.to_screen(origin, [bb[0], bb[1]]);
                 let br = cam.to_screen(origin, [bb[2], bb[3]]);
                 let pad = px(40.0);
-                if br.x < bounds.left() - pad || tl.x > bounds.right() + pad || br.y < bounds.top() - pad || tl.y > bounds.bottom() + pad {
+                if br.x < bounds.left() - pad
+                    || tl.x > bounds.right() + pad
+                    || br.y < bounds.top() - pad
+                    || tl.y > bounds.bottom() + pad
+                {
                     continue;
                 }
-                let alpha = if v.erasing.contains(&el.id) || el.container_id().map(|c| v.erasing.contains(c)).unwrap_or(false) { 0.2 } else { 1.0 };
-                let frame = el.f.frame_id.get().filter(|f| frame_ids.contains(f.as_str()));
+                let alpha = if v.erasing.contains(&el.id)
+                    || el
+                        .container_id()
+                        .map(|c| v.erasing.contains(c))
+                        .unwrap_or(false)
+                {
+                    0.2
+                } else {
+                    1.0
+                };
+                let frame =
+                    el.f.frame_id
+                        .get()
+                        .filter(|f| frame_ids.contains(f.as_str()));
                 let paint = |window: &mut Window, caches: &mut render::Caches| {
                     // Arrow labels sit on a canvas-coloured backing that hides the line.
                     if crate::export::is_arrow_label(el, &v.scene) && !el.text().is_empty() {
-                        let q = rect_screen(cam, origin, el, [-4.0, -4.0, el.width() + 4.0, el.height() + 4.0]);
+                        let q = rect_screen(
+                            cam,
+                            origin,
+                            el,
+                            [-4.0, -4.0, el.width() + 4.0, el.height() + 4.0],
+                        );
                         let mut pb = PathBuilder::fill();
                         pb.move_to(q[0]);
                         for p in &q[1..] {
@@ -282,7 +417,11 @@ fn paint_canvas(bounds: Bounds<Pixels>, hitbox: Hitbox, snap: Snapshot, window: 
                 } else if let Some(h) = v.hit_handle(wp) {
                     let a = v.single().map(|e| e.angle()).unwrap_or(0.0);
                     handle_cursor(h, a)
-                } else if v.point_handles().iter().any(|(_, q, _)| geom::dist(wp, *q) <= 8.0 / cam.zoom) {
+                } else if v
+                    .point_handles()
+                    .iter()
+                    .any(|(_, q, _)| geom::dist(wp, *q) <= 8.0 / cam.zoom)
+                {
                     CursorStyle::PointingHand
                 } else {
                     CursorStyle::Arrow
@@ -350,67 +489,129 @@ fn handle_cursor(h: Handle, angle: f64) -> CursorStyle {
 
 /// Excalidraw's grid: a line every `gridSize`, a stronger one every
 /// `gridStep` lines; hidden when lines would be closer than 6px.
-fn paint_grid(scene: &crate::scene::Scene, cam: Camera, bounds: Bounds<Pixels>, dark: bool, window: &mut Window) {
+fn paint_grid(
+    scene: &crate::scene::Scene,
+    cam: Camera,
+    bounds: Bounds<Pixels>,
+    dark: bool,
+    window: &mut Window,
+) {
     let gs = scene.grid_size();
     let step = scene.grid_step().max(1) as i64;
     let sp = gs * cam.zoom;
     if sp < 6.0 {
         return;
     }
-    let base = if dark { gpui_kit::white() } else { gpui_kit::black() };
+    let base = if dark {
+        gpui_kit::white()
+    } else {
+        gpui_kit::black()
+    };
     let (minor, major) = (base.opacity(0.05), base.opacity(0.11));
     let tl = cam.to_world(bounds.origin, bounds.origin);
     let br = cam.to_world(bounds.origin, bounds.bottom_right());
     let mut i = (tl[0] / gs).floor() as i64;
     while (i as f64) * gs <= br[0] {
         let x = cam.to_screen(bounds.origin, [i as f64 * gs, 0.0]).x;
-        let c = if i.rem_euclid(step) == 0 { major } else { minor };
-        window.paint_quad(fill(Bounds::new(point(x, bounds.top()), size(px(1.0), bounds.size.height)), c));
+        let c = if i.rem_euclid(step) == 0 {
+            major
+        } else {
+            minor
+        };
+        window.paint_quad(fill(
+            Bounds::new(point(x, bounds.top()), size(px(1.0), bounds.size.height)),
+            c,
+        ));
         i += 1;
     }
     let mut j = (tl[1] / gs).floor() as i64;
     while (j as f64) * gs <= br[1] {
         let y = cam.to_screen(bounds.origin, [0.0, j as f64 * gs]).y;
-        let c = if j.rem_euclid(step) == 0 { major } else { minor };
-        window.paint_quad(fill(Bounds::new(point(bounds.left(), y), size(bounds.size.width, px(1.0))), c));
+        let c = if j.rem_euclid(step) == 0 {
+            major
+        } else {
+            minor
+        };
+        window.paint_quad(fill(
+            Bounds::new(point(bounds.left(), y), size(bounds.size.width, px(1.0))),
+            c,
+        ));
         j += 1;
     }
 }
 
-fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, origin: Point<Pixels>, window: &mut Window) {
+fn paint_overlay(
+    v: &ExcalidrawView,
+    style: &ExcalidrawStyle,
+    pal: Palette,
+    origin: Point<Pixels>,
+    window: &mut Window,
+) {
     let cam = v.cam;
     let sel = hsla_rgba(style.selection);
-    let white = if pal.dark { Rgba::new(0.07, 0.07, 0.07, 1.0) } else { Rgba::new(1.0, 1.0, 1.0, 1.0) };
+    let white = if pal.dark {
+        Rgba::new(0.07, 0.07, 0.07, 1.0)
+    } else {
+        Rgba::new(1.0, 1.0, 1.0, 1.0)
+    };
     let pad = 4.0 / cam.zoom;
 
     // Object-snapping guides.
     for g in &v.guides {
         let a = cam.to_screen(origin, g[0]);
         let b = cam.to_screen(origin, g[1]);
-        render::stroke_screen(&[a, b], false, 1.0, None, Rgba::new(1.0, 0.42, 0.42, 1.0), window);
+        render::stroke_screen(
+            &[a, b],
+            false,
+            1.0,
+            None,
+            Rgba::new(1.0, 0.42, 0.42, 1.0),
+            window,
+        );
     }
 
     // Bind hint: highlight the target shape.
     if let Some(id) = &v.bind_hint
-        && let Some(t) = v.scene.get(id) {
-            let b = geom::local_bounds(t);
-            let r = [b[0] - 3.0, b[1] - 3.0, b[2] + 3.0, b[3] + 3.0];
-            render::stroke_screen(&rect_screen(cam, origin, t, r), true, 4.0, None, sel.with_alpha(0.35), window);
-        }
+        && let Some(t) = v.scene.get(id)
+    {
+        let b = geom::local_bounds(t);
+        let r = [b[0] - 3.0, b[1] - 3.0, b[2] + 3.0, b[3] + 3.0];
+        render::stroke_screen(
+            &rect_screen(cam, origin, t, r),
+            true,
+            4.0,
+            None,
+            sel.with_alpha(0.35),
+            window,
+        );
+    }
 
     // Text caret.
     if let Some(ed) = &v.editing
-        && let Some(el) = v.scene.get(&ed.id) {
-            if let Some((x, y, lh)) = v.caret_local() {
-                let a = cam.to_screen(origin, geom::to_world(el, [x, y]));
-                let b = cam.to_screen(origin, geom::to_world(el, [x, y + lh]));
-                let c = pal.resolve(el.stroke_color());
-                render::stroke_screen(&[a, b], false, 1.5, None, c, window);
-            }
-            // Editing box.
-            let r = [-pad, -pad, el.width() + pad, el.height().max(el.font_size() * el.line_height()) + pad];
-            render::stroke_screen(&rect_screen(cam, origin, el, r), true, 1.0, None, sel.with_alpha(0.5), window);
+        && let Some(el) = v.scene.get(&ed.id)
+    {
+        if let Some((x, y, lh)) = v.caret_local() {
+            let a = cam.to_screen(origin, geom::to_world(el, [x, y]));
+            let b = cam.to_screen(origin, geom::to_world(el, [x, y + lh]));
+            let c = pal.resolve(el.stroke_color());
+            render::stroke_screen(&[a, b], false, 1.5, None, c, window);
         }
+        // Editing box.
+        let r = [
+            -pad,
+            -pad,
+            el.width() + pad,
+            el.height().max(el.font_size() * el.line_height()) + pad,
+        ];
+        render::stroke_screen(
+            &rect_screen(cam, origin, el, r),
+            true,
+            1.0,
+            None,
+            sel.with_alpha(0.5),
+            window,
+        );
+    }
 
     // Selection outlines.
     let list = v.selection_list();
@@ -424,27 +625,59 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
                 // Linear: outline the points' bbox lightly.
                 let b = geom::local_bounds(el);
                 let r = [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad];
-                render::stroke_screen(&rect_screen(cam, origin, el, r), true, 1.0, Some([4.0, 4.0]), sel.with_alpha(0.6), window);
+                render::stroke_screen(
+                    &rect_screen(cam, origin, el, r),
+                    true,
+                    1.0,
+                    Some([4.0, 4.0]),
+                    sel.with_alpha(0.6),
+                    window,
+                );
                 continue;
             }
             let b = geom::local_bounds(el);
             let r = [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad];
-            render::stroke_screen(&rect_screen(cam, origin, el, r), true, 1.0, if groupish { Some([4.0, 4.0]) } else { None }, sel, window);
+            render::stroke_screen(
+                &rect_screen(cam, origin, el, r),
+                true,
+                1.0,
+                if groupish { Some([4.0, 4.0]) } else { None },
+                sel,
+                window,
+            );
         }
-        if groupish
-            && let Some(b) = v.selection_bbox() {
-                let pts = [[b[0] - pad, b[1] - pad], [b[2] + pad, b[1] - pad], [b[2] + pad, b[3] + pad], [b[0] - pad, b[3] + pad]]
-                    .map(|q| cam.to_screen(origin, q));
-                render::stroke_screen(&pts, true, 1.0, None, sel, window);
-            }
+        if groupish && let Some(b) = v.selection_bbox() {
+            let pts = [
+                [b[0] - pad, b[1] - pad],
+                [b[2] + pad, b[1] - pad],
+                [b[2] + pad, b[3] + pad],
+                [b[0] - pad, b[3] + pad],
+            ]
+            .map(|q| cam.to_screen(origin, q));
+            render::stroke_screen(&pts, true, 1.0, None, sel, window);
+        }
         for (h, q) in v.handles() {
             let at = cam.to_screen(origin, q);
-            render::handle(at, if h == Handle::Rotate { 4.5 } else { 4.0 }, h == Handle::Rotate, white, sel, window);
+            render::handle(
+                at,
+                if h == Handle::Rotate { 4.5 } else { 4.0 },
+                h == Handle::Rotate,
+                white,
+                sel,
+                window,
+            );
         }
         for (_, q, mid) in v.point_handles() {
             let at = cam.to_screen(origin, q);
             if mid {
-                render::handle(at, 3.5, true, sel.with_alpha(0.25), sel.with_alpha(0.6), window);
+                render::handle(
+                    at,
+                    3.5,
+                    true,
+                    sel.with_alpha(0.25),
+                    sel.with_alpha(0.6),
+                    window,
+                );
             } else {
                 render::handle(at, 5.0, true, white, sel, window);
             }
@@ -453,18 +686,29 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
 
     // Multi-point preview: show committed points.
     if let Some(id) = &v.multi
-        && let Some(el) = v.scene.get(id) {
-            let pts = el.points();
-            for p in &pts[..pts.len().saturating_sub(1)] {
-                render::handle(cam.to_screen(origin, geom::to_world(el, *p)), 4.0, true, white, sel, window);
-            }
+        && let Some(el) = v.scene.get(id)
+    {
+        let pts = el.points();
+        for p in &pts[..pts.len().saturating_sub(1)] {
+            render::handle(
+                cam.to_screen(origin, geom::to_world(el, *p)),
+                4.0,
+                true,
+                white,
+                sel,
+                window,
+            );
         }
+    }
 
     // Marquee.
     if let Some(Drag::Marquee { start, current }) = &v.drag {
         let a = cam.to_screen(origin, *start);
         let b = cam.to_screen(origin, *current);
-        let r = Bounds::from_corners(point(a.x.min(b.x), a.y.min(b.y)), point(a.x.max(b.x), a.y.max(b.y)));
+        let r = Bounds::from_corners(
+            point(a.x.min(b.x), a.y.min(b.y)),
+            point(a.x.max(b.x), a.y.max(b.y)),
+        );
         window.paint_quad(fill(r, sel.with_alpha(0.08).to_hsla()));
         let pts = [r.origin, r.top_right(), r.bottom_right(), r.bottom_left()];
         render::stroke_screen(&pts, true, 1.0, None, sel, window);
@@ -472,16 +716,21 @@ fn paint_overlay(v: &ExcalidrawView, style: &ExcalidrawStyle, pal: Palette, orig
 
     // Eraser trail cursor.
     if v.tool == Tool::Eraser
-        && let Some(p) = v.pointer {
-            let pts: Vec<Point<Pixels>> = (0..20)
-                .map(|k| {
-                    let a = k as f32 / 20.0 * std::f32::consts::TAU;
-                    point(p.x + px(5.0 * a.cos()), p.y + px(5.0 * a.sin()))
-                })
-                .collect();
-            let c = if pal.dark { Rgba::new(0.8, 0.8, 0.8, 0.8) } else { Rgba::new(0.2, 0.2, 0.2, 0.6) };
-            render::stroke_screen(&pts, true, 1.0, None, c, window);
-        }
+        && let Some(p) = v.pointer
+    {
+        let pts: Vec<Point<Pixels>> = (0..20)
+            .map(|k| {
+                let a = k as f32 / 20.0 * std::f32::consts::TAU;
+                point(p.x + px(5.0 * a.cos()), p.y + px(5.0 * a.sin()))
+            })
+            .collect();
+        let c = if pal.dark {
+            Rgba::new(0.8, 0.8, 0.8, 0.8)
+        } else {
+            Rgba::new(0.2, 0.2, 0.2, 0.6)
+        };
+        render::stroke_screen(&pts, true, 1.0, None, c, window);
+    }
 }
 
 // ---------------------------------------------------------------- chrome helpers
@@ -562,7 +811,10 @@ fn text_button(
         .text_size(px(12.0))
         .text_color(if active { style.active_fg } else { style.fg })
         .when(active, |d| d.bg(style.active_bg))
-        .when(!active, |d| d.bg(style.hover_bg.opacity(0.5)).hover(|s| s.bg(style.hover_bg)))
+        .when(!active, |d| {
+            d.bg(style.hover_bg.opacity(0.5))
+                .hover(|s| s.bg(style.hover_bg))
+        })
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
             on(this, window, cx);
@@ -581,7 +833,11 @@ fn swatch(
     cx: &mut Context<ExcalidrawView>,
 ) -> Stateful<Div> {
     let transparent = color::is_transparent(css);
-    let c = if transparent { style.island_bg } else { pal.resolve(css).to_hsla() };
+    let c = if transparent {
+        style.island_bg
+    } else {
+        pal.resolve(css).to_hsla()
+    };
     let sel = id.to_string();
     div()
         .id(id)
@@ -590,11 +846,22 @@ fn swatch(
         .rounded(px(4.0))
         .bg(c)
         .border_1()
-        .border_color(if active { style.selection } else { style.island_border })
+        .border_color(if active {
+            style.selection
+        } else {
+            style.island_border
+        })
         .when(active, |d| d.border_2())
         .when(transparent, |d| {
             d.child(
-                div().size_full().flex().items_center().justify_center().text_size(px(10.0)).text_color(style.muted).child("∅"),
+                div()
+                    .size_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_size(px(10.0))
+                    .text_color(style.muted)
+                    .child("∅"),
             )
         })
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -605,24 +872,33 @@ fn swatch(
 }
 
 fn section(title: &'static str, style: &ExcalidrawStyle) -> Div {
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(4.0))
-        .child(div().text_size(px(11.0)).text_color(style.muted).child(title))
+    div().flex().flex_col().gap(px(4.0)).child(
+        div()
+            .text_size(px(11.0))
+            .text_color(style.muted)
+            .child(title),
+    )
 }
 
 /// Excalidraw's opacity slider (0-100, steps of 10 while dragging).
-fn opacity_slider(op: f64, track: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>, style: &ExcalidrawStyle, cx: &mut Context<ExcalidrawView>) -> impl IntoElement {
+fn opacity_slider(
+    op: f64,
+    track: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
+    style: &ExcalidrawStyle,
+    cx: &mut Context<ExcalidrawView>,
+) -> impl IntoElement {
     let set = move |v: &mut ExcalidrawView, x: Pixels, cx: &mut Context<ExcalidrawView>| {
         let b = v.opacity_track.get();
         let w = f32::from(b.size.width).max(1.0);
         let t = (f32::from(x - b.origin.x) / w).clamp(0.0, 1.0) as f64;
         let o = (t * 100.0).round();
-        v.apply(move |e, d| {
-            e.f.opacity.set(Num(o));
-            d.opacity = o;
-        }, cx);
+        v.apply(
+            move |e, d| {
+                e.f.opacity.set(Num(o));
+                d.opacity = o;
+            },
+            cx,
+        );
     };
     let frac = (op / 100.0).clamp(0.0, 1.0) as f32;
     div()
@@ -633,24 +909,43 @@ fn opacity_slider(op: f64, track: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>, 
         .h(px(20.0))
         .flex()
         .items_center()
-        .on_mouse_down(MouseButton::Left, cx.listener(move |v, ev: &MouseDownEvent, _, cx| {
-            cx.stop_propagation();
-            v.slider_drag = true;
-            set(v, ev.position.x, cx);
-        }))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |v, ev: &MouseDownEvent, _, cx| {
+                cx.stop_propagation();
+                v.slider_drag = true;
+                set(v, ev.position.x, cx);
+            }),
+        )
         .on_mouse_move(cx.listener(move |v, ev: &MouseMoveEvent, _, cx| {
             if v.slider_drag && ev.pressed_button == Some(MouseButton::Left) {
                 set(v, ev.position.x, cx);
             }
         }))
-        .on_mouse_up(MouseButton::Left, cx.listener(|v, _, _, _| v.slider_drag = false))
+        .on_mouse_up(
+            MouseButton::Left,
+            cx.listener(|v, _, _, _| v.slider_drag = false),
+        )
         .child(
             canvas(move |b, _, _| track.set(b), |_, _, _, _| {})
                 .absolute()
                 .size_full(),
         )
-        .child(div().w_full().h(px(4.0)).rounded(px(2.0)).bg(style.island_border))
-        .child(div().absolute().left(px(100.0 * frac - 6.0)).size(px(12.0)).rounded(px(6.0)).bg(style.selection))
+        .child(
+            div()
+                .w_full()
+                .h(px(4.0))
+                .rounded(px(2.0))
+                .bg(style.island_border),
+        )
+        .child(
+            div()
+                .absolute()
+                .left(px(100.0 * frac - 6.0))
+                .size(px(12.0))
+                .rounded(px(6.0))
+                .bg(style.selection),
+        )
 }
 
 fn row() -> Div {
@@ -670,23 +965,34 @@ impl Render for ExcalidrawView {
         let panel_h = (window.viewport_size().height - px(88.0)).max(px(200.0));
         let entity = cx.entity();
 
-        let root = div()
-            .id("excalidraw")
-            .relative()
-            .size_full()
-            .overflow_hidden()
-            .bg(pal.canvas.to_hsla())
-            .track_focus(&self.focus)
-            .key_context("Excalidraw")
-            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| this.on_key_down(ev, window, cx)))
-            .on_key_up(cx.listener(|this, ev: &KeyUpEvent, window, cx| this.on_key_up(ev, window, cx)))
-            .on_scroll_wheel(cx.listener(|this, ev: &ScrollWheelEvent, window, cx| this.on_scroll(ev, window, cx)))
-            .on_pinch(cx.listener(|this, ev: &PinchEvent, window, cx| this.on_pinch(ev, window, cx)))
-            .on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| this.on_drop_paths(paths, window, cx)))
-            .on_drop(cx.listener(|this, d: &LibraryDrag, window, cx| {
-                let at = this.world(window.mouse_position());
-                this.insert_library_item(&d.id, Some(at), cx);
-            }));
+        let root =
+            div()
+                .id("excalidraw")
+                .relative()
+                .size_full()
+                .overflow_hidden()
+                .bg(pal.canvas.to_hsla())
+                .track_focus(&self.focus)
+                .key_context("Excalidraw")
+                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                    this.on_key_down(ev, window, cx)
+                }))
+                .on_key_up(
+                    cx.listener(|this, ev: &KeyUpEvent, window, cx| this.on_key_up(ev, window, cx)),
+                )
+                .on_scroll_wheel(cx.listener(|this, ev: &ScrollWheelEvent, window, cx| {
+                    this.on_scroll(ev, window, cx)
+                }))
+                .on_pinch(
+                    cx.listener(|this, ev: &PinchEvent, window, cx| this.on_pinch(ev, window, cx)),
+                )
+                .on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| {
+                    this.on_drop_paths(paths, window, cx)
+                }))
+                .on_drop(cx.listener(|this, d: &LibraryDrag, window, cx| {
+                    let at = this.world(window.mouse_position());
+                    this.insert_library_item(&d.id, Some(at), cx);
+                }));
 
         if let Some(err) = self.error.clone() {
             return root.child(
@@ -704,19 +1010,33 @@ impl Render for ExcalidrawView {
         root.child(
             canvas(
                 |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
-                move |bounds, hitbox, window, cx| paint_canvas(bounds, hitbox, Snapshot { view: entity }, window, cx),
+                move |bounds, hitbox, window, cx| {
+                    paint_canvas(bounds, hitbox, Snapshot { view: entity }, window, cx)
+                },
             )
-                .absolute()
-                .size_full(),
+            .absolute()
+            .size_full(),
         )
         .child(self.render_top(&style, cx))
-        .when(self.show_properties(), |d| d.child(self.render_properties(&style, pal, panel_h, cx)))
+        .when(self.show_properties(), |d| {
+            d.child(self.render_properties(&style, pal, panel_h, cx))
+        })
         .child(self.render_bottom(&style, cx))
-        .when(self.menu_open, |d| d.child(self.render_menu(&style, pal, cx)))
-        .when(self.library_open, |d| d.child(self.render_library(&style, cx)))
-        .when_some(self.picker, |d, t| d.child(self.render_picker(t, &style, pal, cx)))
-        .when(self.context_menu.is_some(), |d| d.child(self.render_context_menu(&style, cx)))
-        .when_some(self.dialog, |d, dlg| d.child(self.render_dialog(dlg, &style, cx)))
+        .when(self.menu_open, |d| {
+            d.child(self.render_menu(&style, pal, cx))
+        })
+        .when(self.library_open, |d| {
+            d.child(self.render_library(&style, cx))
+        })
+        .when_some(self.picker, |d, t| {
+            d.child(self.render_picker(t, &style, pal, cx))
+        })
+        .when(self.context_menu.is_some(), |d| {
+            d.child(self.render_context_menu(&style, cx))
+        })
+        .when_some(self.dialog, |d, dlg| {
+            d.child(self.render_dialog(dlg, &style, cx))
+        })
         .when_some(self.toast.clone(), |d, t| d.child(render_toast(t, &style)))
     }
 }
@@ -726,7 +1046,13 @@ impl ExcalidrawView {
         (!self.selected.is_empty() && self.editing.is_none() || self.editing.is_some())
             || matches!(
                 self.tool,
-                Tool::Rectangle | Tool::Diamond | Tool::Ellipse | Tool::Arrow | Tool::Line | Tool::Freedraw | Tool::Text
+                Tool::Rectangle
+                    | Tool::Diamond
+                    | Tool::Ellipse
+                    | Tool::Arrow
+                    | Tool::Line
+                    | Tool::Freedraw
+                    | Tool::Text
             )
     }
 
@@ -745,10 +1071,20 @@ impl ExcalidrawView {
             ("t-img", Icon::Image, Some("9"), Tool::Image),
             ("t-eras", Icon::Eraser, Some("0"), Tool::Eraser),
         ];
-        let sep = || div().w(px(1.0)).h(px(24.0)).mx(px(4.0)).bg(style.island_border);
+        let sep = || {
+            div()
+                .w(px(1.0))
+                .h(px(24.0))
+                .mx(px(4.0))
+                .bg(style.island_border)
+        };
         let mut bar = island(style).child(tool_button(
             "t-lock",
-            if self.tool_locked { Icon::Lock } else { Icon::Unlock },
+            if self.tool_locked {
+                Icon::Lock
+            } else {
+                Icon::Unlock
+            },
             None,
             self.tool_locked,
             style,
@@ -757,7 +1093,15 @@ impl ExcalidrawView {
         ));
         bar = bar.child(sep());
         for (id, ic, hint, tool) in tools {
-            bar = bar.child(tool_button(id, ic, hint, t == tool, style, move |v, w, cx| v.set_tool(tool, w, cx), cx));
+            bar = bar.child(tool_button(
+                id,
+                ic,
+                hint,
+                t == tool,
+                style,
+                move |v, w, cx| v.set_tool(tool, w, cx),
+                cx,
+            ));
         }
         bar = bar.child(sep()).child(tool_button(
             "t-frame",
@@ -769,17 +1113,20 @@ impl ExcalidrawView {
             cx,
         ));
 
-        let menu = div().absolute().top(px(16.0)).left(px(16.0)).child(
-            island(style).p(px(0.0)).child(tool_button(
-                "menu",
-                Icon::Menu,
-                None,
-                self.menu_open,
-                style,
-                |v, _, _| v.menu_open = !v.menu_open,
-                cx,
-            )),
-        );
+        let menu =
+            div()
+                .absolute()
+                .top(px(16.0))
+                .left(px(16.0))
+                .child(island(style).p(px(0.0)).child(tool_button(
+                    "menu",
+                    Icon::Menu,
+                    None,
+                    self.menu_open,
+                    style,
+                    |v, _, _| v.menu_open = !v.menu_open,
+                    cx,
+                )));
 
         div()
             .absolute()
@@ -790,8 +1137,22 @@ impl ExcalidrawView {
             .child(
                 div().absolute().top(px(16.0)).right(px(16.0)).child(
                     island(style)
-                        .child(text_button("lib-toggle".into(), "Library", self.library_open, style, |v, _, _| v.library_open = !v.library_open, cx))
-                        .child(text_button("help".into(), "?", self.dialog == Some(crate::actions::Dialog::Help), style, |v, _, _| v.open_dialog(crate::actions::Dialog::Help), cx)),
+                        .child(text_button(
+                            "lib-toggle".into(),
+                            "Library",
+                            self.library_open,
+                            style,
+                            |v, _, _| v.library_open = !v.library_open,
+                            cx,
+                        ))
+                        .child(text_button(
+                            "help".into(),
+                            "?",
+                            self.dialog == Some(crate::actions::Dialog::Help),
+                            style,
+                            |v, _, _| v.open_dialog(crate::actions::Dialog::Help),
+                            cx,
+                        )),
                 ),
             )
             .child(
@@ -810,9 +1171,21 @@ impl ExcalidrawView {
 
     fn render_bottom(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
         let zoom = format!("{}%", (self.cam.zoom * 100.0).round());
-        let undo_c = if self.can_undo() { style.fg } else { style.muted.opacity(0.5) };
-        let redo_c = if self.can_redo() { style.fg } else { style.muted.opacity(0.5) };
-        let plain = |id: &'static str, ic: Icon, c: Hsla, on: fn(&mut ExcalidrawView, &mut Context<ExcalidrawView>), cx: &mut Context<Self>| {
+        let undo_c = if self.can_undo() {
+            style.fg
+        } else {
+            style.muted.opacity(0.5)
+        };
+        let redo_c = if self.can_redo() {
+            style.fg
+        } else {
+            style.muted.opacity(0.5)
+        };
+        let plain = |id: &'static str,
+                     ic: Icon,
+                     c: Hsla,
+                     on: fn(&mut ExcalidrawView, &mut Context<ExcalidrawView>),
+                     cx: &mut Context<Self>| {
             div()
                 .id(id)
                 .size(px(32.0))
@@ -836,7 +1209,13 @@ impl ExcalidrawView {
             .gap(px(8.0))
             .child(
                 island(style)
-                    .child(plain("z-out", Icon::Minus, style.fg, |v, _| v.zoom_step(1.0 / 1.1, None), cx))
+                    .child(plain(
+                        "z-out",
+                        Icon::Minus,
+                        style.fg,
+                        |v, _| v.zoom_step(1.0 / 1.1, None),
+                        cx,
+                    ))
                     .child(
                         div()
                             .id("z-reset")
@@ -853,7 +1232,13 @@ impl ExcalidrawView {
                             }))
                             .child(zoom),
                     )
-                    .child(plain("z-in", Icon::Plus, style.fg, |v, _| v.zoom_step(1.1, None), cx)),
+                    .child(plain(
+                        "z-in",
+                        Icon::Plus,
+                        style.fg,
+                        |v, _| v.zoom_step(1.1, None),
+                        cx,
+                    )),
             )
             .child(
                 island(style)
@@ -862,9 +1247,17 @@ impl ExcalidrawView {
             )
     }
 
-    fn render_menu(&self, style: &ExcalidrawStyle, pal: Palette, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_menu(
+        &self,
+        style: &ExcalidrawStyle,
+        pal: Palette,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let bg = self.scene.view_background();
-        let item = |id: &'static str, label: &'static str, on: fn(&mut ExcalidrawView, &mut Context<ExcalidrawView>), cx: &mut Context<Self>| {
+        let item = |id: &'static str,
+                    label: &'static str,
+                    on: fn(&mut ExcalidrawView, &mut Context<ExcalidrawView>),
+                    cx: &mut Context<Self>| {
             div()
                 .id(id)
                 .debug_selector(move || id.to_string())
@@ -885,9 +1278,25 @@ impl ExcalidrawView {
         let mut swatches = row();
         for c in CANVAS_BG {
             let active = bg.eq_ignore_ascii_case(c);
-            swatches = swatches.child(swatch(format!("cbg-{c}").into(), c, active, pal, style, move |v, _, cx| v.set_background(c, cx), cx));
+            swatches = swatches.child(swatch(
+                format!("cbg-{c}").into(),
+                c,
+                active,
+                pal,
+                style,
+                move |v, _, cx| v.set_background(c, cx),
+                cx,
+            ));
         }
-        swatches = swatches.child(swatch("cbg-picker".into(), &bg, self.picker == Some(PickerTarget::Canvas), pal, style, |v, _, _| v.toggle_picker(PickerTarget::Canvas), cx));
+        swatches = swatches.child(swatch(
+            "cbg-picker".into(),
+            &bg,
+            self.picker == Some(PickerTarget::Canvas),
+            pal,
+            style,
+            |v, _, _| v.toggle_picker(PickerTarget::Canvas),
+            cx,
+        ));
         div().absolute().top(px(64.0)).left(px(16.0)).child(
             island(style)
                 .flex_col()
@@ -895,20 +1304,40 @@ impl ExcalidrawView {
                 .w(px(220.0))
                 .p(px(8.0))
                 .gap(px(4.0))
-                .child(item("m-fit", "Zoom to fit all elements", |v, _| v.zoom_to_fit(), cx))
-                .child(item("m-reset", "Reset the canvas", |v, cx| v.reset_canvas(cx), cx))
+                .child(item(
+                    "m-fit",
+                    "Zoom to fit all elements",
+                    |v, _| v.zoom_to_fit(),
+                    cx,
+                ))
+                .child(item(
+                    "m-reset",
+                    "Reset the canvas",
+                    |v, cx| v.reset_canvas(cx),
+                    cx,
+                ))
                 .child(div().h(px(1.0)).w_full().bg(style.island_border))
                 .child(section("Canvas background", style).child(swatches)),
         )
     }
 
-    fn render_properties(&self, style: &ExcalidrawStyle, pal: Palette, max_h: Pixels, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_properties(
+        &self,
+        style: &ExcalidrawStyle,
+        pal: Palette,
+        max_h: Pixels,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let list = self.selection_list();
         let d = &self.defaults;
         let first = list.first().copied();
         // What's being styled: the selection, or the active tool's kind.
         let kinds: HashSet<String> = if list.is_empty() {
-            self.tool.element_kind().map(|k| k.to_string()).into_iter().collect()
+            self.tool
+                .element_kind()
+                .map(|k| k.to_string())
+                .into_iter()
+                .collect()
         } else {
             let mut k: HashSet<String> = list.iter().map(|e| e.kind.clone()).collect();
             // A container with bound text gets the text section too.
@@ -920,28 +1349,44 @@ impl ExcalidrawView {
             k
         };
         let has = |k: &[&str]| kinds.iter().any(|x| k.contains(&x.as_str()));
-        let stroke = first.map(|e| e.stroke_color().to_string()).unwrap_or(d.stroke_color.clone());
-        let bgc = first.map(|e| e.background_color().to_string()).unwrap_or(d.background_color.clone());
-        let fill_s = first.map(|e| e.fill_style().to_string()).unwrap_or(d.fill_style.clone());
+        let stroke = first
+            .map(|e| e.stroke_color().to_string())
+            .unwrap_or(d.stroke_color.clone());
+        let bgc = first
+            .map(|e| e.background_color().to_string())
+            .unwrap_or(d.background_color.clone());
+        let fill_s = first
+            .map(|e| e.fill_style().to_string())
+            .unwrap_or(d.fill_style.clone());
         let sw = first.map(|e| e.stroke_width()).unwrap_or(d.stroke_width);
-        let ss = first.map(|e| e.stroke_style().to_string()).unwrap_or(d.stroke_style.clone());
+        let ss = first
+            .map(|e| e.stroke_style().to_string())
+            .unwrap_or(d.stroke_style.clone());
         let rough = first.map(|e| e.roughness()).unwrap_or(d.roughness);
         let op = first.map(|e| e.opacity()).unwrap_or(d.opacity);
-        let round = first.map(|e| e.f.roundness.get().is_some()).unwrap_or(d.round);
-        let text_el = list
-            .iter()
-            .find(|e| e.kind == "text")
-            .copied()
-            .or_else(|| {
-                list.iter()
-                    .find_map(|e| e.bound_elements().iter().find(|b| b.kind == "text").and_then(|b| self.scene.get(&b.id)))
-            });
+        let round = first
+            .map(|e| e.f.roundness.get().is_some())
+            .unwrap_or(d.round);
+        let text_el = list.iter().find(|e| e.kind == "text").copied().or_else(|| {
+            list.iter().find_map(|e| {
+                e.bound_elements()
+                    .iter()
+                    .find(|b| b.kind == "text")
+                    .and_then(|b| self.scene.get(&b.id))
+            })
+        });
         let fs = text_el.map(|e| e.font_size()).unwrap_or(d.font_size);
         let ff = text_el.map(|e| e.font_family()).unwrap_or(d.font_family);
-        let ta = text_el.map(|e| e.text_align().to_string()).unwrap_or(d.text_align.clone());
+        let ta = text_el
+            .map(|e| e.text_align().to_string())
+            .unwrap_or(d.text_align.clone());
         let arrow = list.iter().find(|e| e.kind == "arrow").copied();
-        let sa = arrow.map(|e| e.f.start_arrowhead.get().cloned()).unwrap_or(d.start_arrowhead.clone());
-        let ea = arrow.map(|e| e.f.end_arrowhead.get().cloned()).unwrap_or(d.end_arrowhead.clone());
+        let sa = arrow
+            .map(|e| e.f.start_arrowhead.get().cloned())
+            .unwrap_or(d.start_arrowhead.clone());
+        let ea = arrow
+            .map(|e| e.f.end_arrowhead.get().cloned())
+            .unwrap_or(d.end_arrowhead.clone());
 
         let mut panel = island(style)
             .id("props")
@@ -953,62 +1398,179 @@ impl ExcalidrawView {
             .max_h(max_h)
             .overflow_y_scroll();
 
-        let shape_like = has(&["rectangle", "diamond", "ellipse", "arrow", "line", "freedraw", "text", "frame"]) || kinds.is_empty();
+        let shape_like = has(&[
+            "rectangle",
+            "diamond",
+            "ellipse",
+            "arrow",
+            "line",
+            "freedraw",
+            "text",
+            "frame",
+        ]) || kinds.is_empty();
         if shape_like {
             let mut r = row();
             for c in STROKES {
                 let active = stroke.eq_ignore_ascii_case(c);
-                r = r.child(swatch(format!("s-{c}").into(), c, active, pal, style, move |v, _, cx| {
-                    v.apply(|e, d| { e.f.stroke_color.set(c.into()); d.stroke_color = c.into(); }, cx)
-                }, cx));
+                r = r.child(swatch(
+                    format!("s-{c}").into(),
+                    c,
+                    active,
+                    pal,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                e.f.stroke_color.set(c.into());
+                                d.stroke_color = c.into();
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             r = r.child(div().w(px(1.0)).h(px(22.0)).bg(style.island_border));
-            r = r.child(swatch("s-picker".into(), &stroke, self.picker == Some(PickerTarget::Stroke), pal, style, |v, _, _| v.toggle_picker(PickerTarget::Stroke), cx));
+            r = r.child(swatch(
+                "s-picker".into(),
+                &stroke,
+                self.picker == Some(PickerTarget::Stroke),
+                pal,
+                style,
+                |v, _, _| v.toggle_picker(PickerTarget::Stroke),
+                cx,
+            ));
             panel = panel.child(section("Stroke", style).child(r));
         }
         if has(&["rectangle", "diamond", "ellipse", "line", "freedraw"]) {
             let mut r = row();
             for c in BACKGROUNDS {
                 let active = bgc.eq_ignore_ascii_case(c);
-                r = r.child(swatch(format!("b-{c}").into(), c, active, pal, style, move |v, _, cx| {
-                    v.apply(|e, d| { e.f.background_color.set(c.into()); d.background_color = c.into(); }, cx)
-                }, cx));
+                r = r.child(swatch(
+                    format!("b-{c}").into(),
+                    c,
+                    active,
+                    pal,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                e.f.background_color.set(c.into());
+                                d.background_color = c.into();
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             r = r.child(div().w(px(1.0)).h(px(22.0)).bg(style.island_border));
-            r = r.child(swatch("b-picker".into(), &bgc, self.picker == Some(PickerTarget::Background), pal, style, |v, _, _| v.toggle_picker(PickerTarget::Background), cx));
+            r = r.child(swatch(
+                "b-picker".into(),
+                &bgc,
+                self.picker == Some(PickerTarget::Background),
+                pal,
+                style,
+                |v, _, _| v.toggle_picker(PickerTarget::Background),
+                cx,
+            ));
             panel = panel.child(section("Background", style).child(r));
             if !color::is_transparent(&bgc) {
                 let mut r = row();
-                for (k, label) in [("hachure", "Hachure"), ("cross-hatch", "Cross"), ("solid", "Solid")] {
-                    r = r.child(text_button(format!("fill-{k}").into(), label, fill_s == k, style, move |v, _, cx| {
-                        v.apply(|e, d| { e.f.fill_style.set(k.into()); d.fill_style = k.into(); }, cx)
-                    }, cx));
+                for (k, label) in [
+                    ("hachure", "Hachure"),
+                    ("cross-hatch", "Cross"),
+                    ("solid", "Solid"),
+                ] {
+                    r = r.child(text_button(
+                        format!("fill-{k}").into(),
+                        label,
+                        fill_s == k,
+                        style,
+                        move |v, _, cx| {
+                            v.apply(
+                                |e, d| {
+                                    e.f.fill_style.set(k.into());
+                                    d.fill_style = k.into();
+                                },
+                                cx,
+                            )
+                        },
+                        cx,
+                    ));
                 }
                 panel = panel.child(section("Fill", style).child(r));
             }
         }
-        if has(&["rectangle", "diamond", "ellipse", "arrow", "line", "freedraw"]) {
+        if has(&[
+            "rectangle",
+            "diamond",
+            "ellipse",
+            "arrow",
+            "line",
+            "freedraw",
+        ]) {
             let mut r = row();
             for (w, label) in [(1.0, "Thin"), (2.0, "Bold"), (4.0, "Extra")] {
-                r = r.child(text_button(format!("sw-{w}").into(), label, (sw - w).abs() < 0.01, style, move |v, _, cx| {
-                    v.apply(|e, d| { e.f.stroke_width.set(Num(w)); d.stroke_width = w; }, cx)
-                }, cx));
+                r = r.child(text_button(
+                    format!("sw-{w}").into(),
+                    label,
+                    (sw - w).abs() < 0.01,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                e.f.stroke_width.set(Num(w));
+                                d.stroke_width = w;
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             panel = panel.child(section("Stroke width", style).child(r));
         }
         if has(&["rectangle", "diamond", "ellipse", "arrow", "line"]) {
             let mut r = row();
-            for (k, label) in [("solid", "───"), ("dashed", "- - -"), ("dotted", "· · ·")] {
-                r = r.child(text_button(format!("ss-{k}").into(), label, ss == k, style, move |v, _, cx| {
-                    v.apply(|e, d| { e.f.stroke_style.set(k.into()); d.stroke_style = k.into(); }, cx)
-                }, cx));
+            for (k, label) in [("solid", "───"), ("dashed", "- - -"), ("dotted", "· · ·")]
+            {
+                r = r.child(text_button(
+                    format!("ss-{k}").into(),
+                    label,
+                    ss == k,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                e.f.stroke_style.set(k.into());
+                                d.stroke_style = k.into();
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             panel = panel.child(section("Stroke style", style).child(r));
             let mut r = row();
             for (k, label) in [(0.0, "Architect"), (1.0, "Artist"), (2.0, "Cartoonist")] {
-                r = r.child(text_button(format!("rg-{k}").into(), label, (rough - k).abs() < 0.01, style, move |v, _, cx| {
-                    v.apply(|e, d| { e.f.roughness.set(Num(k)); d.roughness = k; }, cx)
-                }, cx));
+                r = r.child(text_button(
+                    format!("rg-{k}").into(),
+                    label,
+                    (rough - k).abs() < 0.01,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                e.f.roughness.set(Num(k));
+                                d.roughness = k;
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             panel = panel.child(section("Sloppiness", style).child(r));
         }
@@ -1028,30 +1590,55 @@ impl ExcalidrawView {
                 .to_string();
             let mut r = row();
             for (k, label) in [("sharp", "Sharp"), ("round", "Curved"), ("elbow", "Elbow")] {
-                r = r.child(text_button(format!("at-{k}").into(), label, cur == k, style, move |v, _, cx| v.set_arrow_type(k, cx), cx));
+                r = r.child(text_button(
+                    format!("at-{k}").into(),
+                    label,
+                    cur == k,
+                    style,
+                    move |v, _, cx| v.set_arrow_type(k, cx),
+                    cx,
+                ));
             }
             panel = panel.child(section("Arrow type", style).child(r));
         }
         if has(&["rectangle", "diamond", "line"]) {
             let mut r = row();
             for (k, label) in [(false, "Sharp"), (true, "Round")] {
-                r = r.child(text_button(format!("edge-{k}").into(), label, round == k, style, move |v, _, cx| {
-                    v.apply(
-                        |e, d| {
-                            d.round = k;
-                            if e.kind.is_empty() {
-                                return;
-                            }
-                            if k {
-                                let kind = if matches!(e.kind.as_str(), "line" | "arrow" | "diamond") { 2.0 } else { 3.0 };
-                                e.f.roundness.set(Roundness { kind: Num(kind), value: Default::default(), extra: Default::default() });
-                            } else {
-                                e.f.roundness.set_null();
-                            }
-                        },
-                        cx,
-                    )
-                }, cx));
+                r = r.child(text_button(
+                    format!("edge-{k}").into(),
+                    label,
+                    round == k,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                d.round = k;
+                                if e.kind.is_empty() {
+                                    return;
+                                }
+                                if k {
+                                    let kind = if matches!(
+                                        e.kind.as_str(),
+                                        "line" | "arrow" | "diamond"
+                                    ) {
+                                        2.0
+                                    } else {
+                                        3.0
+                                    };
+                                    e.f.roundness.set(Roundness {
+                                        kind: Num(kind),
+                                        value: Default::default(),
+                                        extra: Default::default(),
+                                    });
+                                } else {
+                                    e.f.roundness.set_null();
+                                }
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             panel = panel.child(section("Edges", style).child(r));
         }
@@ -1075,21 +1662,36 @@ impl ExcalidrawView {
                 let mut r = row();
                 for (k, label) in heads {
                     let active = cur.as_deref() == k;
-                    r = r.child(text_button(format!("ah-{start}-{label}").into(), label, active, style, move |v, _, cx| {
-                        v.apply(
-                            |e, d| {
-                                let f = if start { &mut e.f.start_arrowhead } else { &mut e.f.end_arrowhead };
-                                if e.kind == "arrow" {
-                                    match k {
-                                        Some(k) => f.set(k.into()),
-                                        None => f.set_null(),
+                    r = r.child(text_button(
+                        format!("ah-{start}-{label}").into(),
+                        label,
+                        active,
+                        style,
+                        move |v, _, cx| {
+                            v.apply(
+                                |e, d| {
+                                    let f = if start {
+                                        &mut e.f.start_arrowhead
+                                    } else {
+                                        &mut e.f.end_arrowhead
+                                    };
+                                    if e.kind == "arrow" {
+                                        match k {
+                                            Some(k) => f.set(k.into()),
+                                            None => f.set_null(),
+                                        }
                                     }
-                                }
-                                if start { d.start_arrowhead = k.map(String::from) } else { d.end_arrowhead = k.map(String::from) }
-                            },
-                            cx,
-                        )
-                    }, cx));
+                                    if start {
+                                        d.start_arrowhead = k.map(String::from)
+                                    } else {
+                                        d.end_arrowhead = k.map(String::from)
+                                    }
+                                },
+                                cx,
+                            )
+                        },
+                        cx,
+                    ));
                 }
                 panel = panel.child(section(title, style).child(r));
             }
@@ -1097,45 +1699,104 @@ impl ExcalidrawView {
         if has(&["text"]) {
             let mut r = row();
             for (s, label) in [(16.0, "S"), (20.0, "M"), (28.0, "L"), (36.0, "XL")] {
-                r = r.child(text_button(format!("fs-{s}").into(), label, (fs - s).abs() < 0.01, style, move |v, _, cx| {
-                    v.apply(|e, d| { if e.kind == "text" { e.f.font_size.set(Num(s)); } d.font_size = s; }, cx)
-                }, cx));
+                r = r.child(text_button(
+                    format!("fs-{s}").into(),
+                    label,
+                    (fs - s).abs() < 0.01,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                if e.kind == "text" {
+                                    e.f.font_size.set(Num(s));
+                                }
+                                d.font_size = s;
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             panel = panel.child(section("Font size", style).child(r));
             let mut r = row();
-            for (f, label) in [(5u32, "Hand"), (6, "Normal"), (8, "Code"), (7, "Lilita"), (1, "Virgil"), (2, "Helvetica"), (3, "Cascadia"), (9, "Liberation")] {
-                r = r.child(text_button(format!("ff-{f}").into(), label, ff == f, style, move |v, _, cx| {
-                    v.apply(
-                        |e, d| {
-                            if e.kind == "text" {
-                                e.f.font_family.set(Num(f as f64));
-                                e.f.line_height.set(Num(text::default_line_height(f)));
-                            }
-                            d.font_family = f;
-                        },
-                        cx,
-                    )
-                }, cx));
+            for (f, label) in [
+                (5u32, "Hand"),
+                (6, "Normal"),
+                (8, "Code"),
+                (7, "Lilita"),
+                (1, "Virgil"),
+                (2, "Helvetica"),
+                (3, "Cascadia"),
+                (9, "Liberation"),
+            ] {
+                r = r.child(text_button(
+                    format!("ff-{f}").into(),
+                    label,
+                    ff == f,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                if e.kind == "text" {
+                                    e.f.font_family.set(Num(f as f64));
+                                    e.f.line_height.set(Num(text::default_line_height(f)));
+                                }
+                                d.font_family = f;
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             panel = panel.child(section("Font family", style).child(r));
             let mut r = row();
             for (k, label) in [("left", "Left"), ("center", "Center"), ("right", "Right")] {
-                r = r.child(text_button(format!("ta-{k}").into(), label, ta == k, style, move |v, _, cx| {
-                    v.apply(|e, d| { if e.kind == "text" { e.f.text_align.set(k.into()); } d.text_align = k.into(); }, cx)
-                }, cx));
+                r = r.child(text_button(
+                    format!("ta-{k}").into(),
+                    label,
+                    ta == k,
+                    style,
+                    move |v, _, cx| {
+                        v.apply(
+                            |e, d| {
+                                if e.kind == "text" {
+                                    e.f.text_align.set(k.into());
+                                }
+                                d.text_align = k.into();
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             }
             panel = panel.child(section("Text align", style).child(r));
-            let bound_text = self
-                .scene
-                .elements()
-                .find(|t| t.kind == "text" && t.container_id().is_some_and(|c| self.selected.contains(c)));
+            let bound_text = self.scene.elements().find(|t| {
+                t.kind == "text" && t.container_id().is_some_and(|c| self.selected.contains(c))
+            });
             if let Some(t) = bound_text {
                 let va = t.vertical_align().to_string();
                 let mut r = row();
                 for (k, label) in [("top", "Top"), ("middle", "Middle"), ("bottom", "Bottom")] {
-                    r = r.child(text_button(format!("va-{k}").into(), label, va == k, style, move |v, _, cx| {
-                        v.apply(|e, _| { if e.kind == "text" && e.container_id().is_some() { e.f.vertical_align.set(k.into()); } }, cx);
-                    }, cx));
+                    r = r.child(text_button(
+                        format!("va-{k}").into(),
+                        label,
+                        va == k,
+                        style,
+                        move |v, _, cx| {
+                            v.apply(
+                                |e, _| {
+                                    if e.kind == "text" && e.container_id().is_some() {
+                                        e.f.vertical_align.set(k.into());
+                                    }
+                                },
+                                cx,
+                            );
+                        },
+                        cx,
+                    ));
                 }
                 panel = panel.child(section("Vertical align", style).child(r));
             }
@@ -1144,26 +1805,72 @@ impl ExcalidrawView {
         {
             let r = row()
                 .items_center()
-                .child(text_button("op-".into(), "−", false, style, move |v, _, cx| {
-                    let o = (op - 10.0).max(0.0);
-                    v.apply(move |e, d| { e.f.opacity.set(Num(o)); d.opacity = o; }, cx)
-                }, cx))
+                .child(text_button(
+                    "op-".into(),
+                    "−",
+                    false,
+                    style,
+                    move |v, _, cx| {
+                        let o = (op - 10.0).max(0.0);
+                        v.apply(
+                            move |e, d| {
+                                e.f.opacity.set(Num(o));
+                                d.opacity = o;
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ))
                 .child(opacity_slider(op, self.opacity_track.clone(), style, cx))
-                .child(div().min_w(px(28.0)).flex().justify_center().text_size(px(12.0)).text_color(style.fg).child(format!("{}", op.round())))
-                .child(text_button("op+".into(), "+", false, style, move |v, _, cx| {
-                    let o = (op + 10.0).min(100.0);
-                    v.apply(move |e, d| { e.f.opacity.set(Num(o)); d.opacity = o; }, cx)
-                }, cx));
+                .child(
+                    div()
+                        .min_w(px(28.0))
+                        .flex()
+                        .justify_center()
+                        .text_size(px(12.0))
+                        .text_color(style.fg)
+                        .child(format!("{}", op.round())),
+                )
+                .child(text_button(
+                    "op+".into(),
+                    "+",
+                    false,
+                    style,
+                    move |v, _, cx| {
+                        let o = (op + 10.0).min(100.0);
+                        v.apply(
+                            move |e, d| {
+                                e.f.opacity.set(Num(o));
+                                d.opacity = o;
+                            },
+                            cx,
+                        )
+                    },
+                    cx,
+                ));
             panel = panel.child(section("Opacity", style).child(r));
         }
         if !list.is_empty() {
             let mut r = row();
-            for (k, label, fwd, end) in [("back", "⇊", false, true), ("bwd", "↓", false, false), ("fwd", "↑", true, false), ("front", "⇈", true, true)] {
-                r = r.child(text_button(format!("z-{k}").into(), label, false, style, move |v, _, cx| {
-                    let s = v.selected.clone();
-                    v.scene.reorder(&s, fwd, end);
-                    v.commit(cx);
-                }, cx));
+            for (k, label, fwd, end) in [
+                ("back", "⇊", false, true),
+                ("bwd", "↓", false, false),
+                ("fwd", "↑", true, false),
+                ("front", "⇈", true, true),
+            ] {
+                r = r.child(text_button(
+                    format!("z-{k}").into(),
+                    label,
+                    false,
+                    style,
+                    move |v, _, cx| {
+                        let s = v.selected.clone();
+                        v.scene.reorder(&s, fwd, end);
+                        v.commit(cx);
+                    },
+                    cx,
+                ));
             }
             panel = panel.child(section("Layers", style).child(r));
             if list.len() >= 2 {
@@ -1177,43 +1884,99 @@ impl ExcalidrawView {
                     ("cy", "↕", Align::CenterY),
                     ("bottom", "⤓", Align::Bottom),
                 ] {
-                    r = r.child(text_button(format!("al-{k}").into(), label, false, style, move |v, _, cx| v.align(a, cx), cx));
+                    r = r.child(text_button(
+                        format!("al-{k}").into(),
+                        label,
+                        false,
+                        style,
+                        move |v, _, cx| v.align(a, cx),
+                        cx,
+                    ));
                 }
-                r = r.child(text_button("dist-h".into(), "⇹", false, style, |v, _, cx| v.distribute(true, cx), cx));
-                r = r.child(text_button("dist-v".into(), "⇳", false, style, |v, _, cx| v.distribute(false, cx), cx));
+                r = r.child(text_button(
+                    "dist-h".into(),
+                    "⇹",
+                    false,
+                    style,
+                    |v, _, cx| v.distribute(true, cx),
+                    cx,
+                ));
+                r = r.child(text_button(
+                    "dist-v".into(),
+                    "⇳",
+                    false,
+                    style,
+                    |v, _, cx| v.distribute(false, cx),
+                    cx,
+                ));
                 panel = panel.child(section("Align", style).child(r));
             }
             let grouped = list.iter().any(|e| !e.group_ids().is_empty());
             let r = row()
-                .child(text_button("a-dup".into(), "Duplicate", false, style, |v, _, cx| {
-                    v.duplicate_selection(10.0, cx);
-                    v.commit(cx);
-                }, cx))
-                .child(text_button("a-del".into(), "Delete", false, style, |v, _, cx| v.delete_selection(cx), cx))
-                .when(list.len() > 1, |r| {
-                    r.child(text_button("a-grp".into(), "Group", false, style, |v, _, cx| {
-                        let s = v.selected.clone();
-                        v.scene.group(&s);
+                .child(text_button(
+                    "a-dup".into(),
+                    "Duplicate",
+                    false,
+                    style,
+                    |v, _, cx| {
+                        v.duplicate_selection(10.0, cx);
                         v.commit(cx);
-                    }, cx))
+                    },
+                    cx,
+                ))
+                .child(text_button(
+                    "a-del".into(),
+                    "Delete",
+                    false,
+                    style,
+                    |v, _, cx| v.delete_selection(cx),
+                    cx,
+                ))
+                .when(list.len() > 1, |r| {
+                    r.child(text_button(
+                        "a-grp".into(),
+                        "Group",
+                        false,
+                        style,
+                        |v, _, cx| {
+                            let s = v.selected.clone();
+                            v.scene.group(&s);
+                            v.commit(cx);
+                        },
+                        cx,
+                    ))
                 })
                 .when(grouped, |r| {
-                    r.child(text_button("a-ungrp".into(), "Ungroup", false, style, |v, _, cx| {
-                        let s = v.selected.clone();
-                        v.scene.ungroup(&s);
-                        v.commit(cx);
-                    }, cx))
+                    r.child(text_button(
+                        "a-ungrp".into(),
+                        "Ungroup",
+                        false,
+                        style,
+                        |v, _, cx| {
+                            let s = v.selected.clone();
+                            v.scene.ungroup(&s);
+                            v.commit(cx);
+                        },
+                        cx,
+                    ))
                 })
-                .child(text_button("a-lock".into(), "Lock", false, style, |v, _, cx| {
-                    let s = v.selected.clone();
-                    for id in &s {
-                        if let Some(e) = v.scene.get_mut(id) {
-                            e.f.locked.set(true);
+                .child(text_button(
+                    "a-lock".into(),
+                    "Lock",
+                    false,
+                    style,
+                    |v, _, cx| {
+                        let s = v.selected.clone();
+                        for id in &s {
+                            if let Some(e) = v.scene.get_mut(id) {
+                                e.f.locked.set(true);
+                            }
                         }
-                    }
-                    v.selected.clear();
-                    v.commit(cx);
-                }, cx));
+                        v.selected.clear();
+                        v.commit(cx);
+                    },
+                    cx,
+                ));
             panel = panel.child(section("Actions", style).child(r));
         }
         div().absolute().top(px(72.0)).left(px(16.0)).child(panel)
@@ -1221,16 +1984,23 @@ impl ExcalidrawView {
 }
 
 fn render_toast(msg: String, style: &ExcalidrawStyle) -> impl IntoElement {
-    div().absolute().bottom(px(64.0)).left_0().right_0().flex().justify_center().child(
-        island(style)
-            .id("toast")
-            .debug_selector(|| "toast".into())
-            .px(px(12.0))
-            .py(px(6.0))
-            .text_size(px(13.0))
-            .text_color(style.fg)
-            .child(msg),
-    )
+    div()
+        .absolute()
+        .bottom(px(64.0))
+        .left_0()
+        .right_0()
+        .flex()
+        .justify_center()
+        .child(
+            island(style)
+                .id("toast")
+                .debug_selector(|| "toast".into())
+                .px(px(12.0))
+                .py(px(6.0))
+                .text_size(px(13.0))
+                .text_color(style.fg)
+                .child(msg),
+        )
 }
 
 /// Excalidraw's keyboard shortcuts, grouped as in its help dialog.
@@ -1310,7 +2080,14 @@ impl Render for LibraryDrag {
 
 impl ExcalidrawView {
     fn render_library(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
-        let mut list = div().id("lib-list").flex().flex_col().gap(px(4.0)).w_full().max_h(px(420.0)).overflow_y_scroll();
+        let mut list = div()
+            .id("lib-list")
+            .flex()
+            .flex_col()
+            .gap(px(4.0))
+            .w_full()
+            .max_h(px(420.0))
+            .overflow_y_scroll();
         if self.library.items.is_empty() {
             list = list.child(
                 div()
@@ -1325,7 +2102,13 @@ impl ExcalidrawView {
             let name: SharedString = crate::library::item_name(item)
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| format!("Item {} ({n} element{})", i + 1, if n == 1 { "" } else { "s" }))
+                .unwrap_or_else(|| {
+                    format!(
+                        "Item {} ({n} element{})",
+                        i + 1,
+                        if n == 1 { "" } else { "s" }
+                    )
+                })
                 .into();
             let sel = format!("lib-item-{i}");
             let (id2, id3, name2) = (id.clone(), id.clone(), name.clone());
@@ -1349,11 +2132,26 @@ impl ExcalidrawView {
                             .text_size(px(12.0))
                             .text_color(style.fg)
                             .hover(|s| s.bg(style.hover_bg))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_library_item(&id2, None, cx)))
-                            .on_drag(LibraryDrag { id: id3, name: name2 }, |d, _, _, cx| cx.new(|_| d.clone()))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                this.insert_library_item(&id2, None, cx)
+                            }))
+                            .on_drag(
+                                LibraryDrag {
+                                    id: id3,
+                                    name: name2,
+                                },
+                                |d, _, _, cx| cx.new(|_| d.clone()),
+                            )
                             .child(name),
                     )
-                    .child(text_button(format!("lib-remove-{i}").into(), "×", false, style, move |v, _, _| v.library.remove(&id), cx)),
+                    .child(text_button(
+                        format!("lib-remove-{i}").into(),
+                        "×",
+                        false,
+                        style,
+                        move |v, _, _| v.library.remove(&id),
+                        cx,
+                    )),
             );
         }
         div().absolute().top(px(64.0)).right(px(16.0)).child(
@@ -1366,29 +2164,81 @@ impl ExcalidrawView {
                 .w(px(260.0))
                 .p(px(10.0))
                 .gap(px(8.0))
-                .child(div().text_size(px(14.0)).text_color(style.fg).child("Library"))
+                .child(
+                    div()
+                        .text_size(px(14.0))
+                        .text_color(style.fg)
+                        .child("Library"),
+                )
                 .child(
                     row()
-                        .child(text_button("lib-add".into(), "Add selection", false, style, |v, _, cx| v.add_selection_to_library(cx), cx))
-                        .child(text_button("lib-import".into(), "Import", false, style, |v, _, cx| v.import_library_prompt(cx), cx))
-                        .child(text_button("lib-export".into(), "Export", false, style, |v, _, cx| v.export_library_prompt(cx), cx)),
+                        .child(text_button(
+                            "lib-add".into(),
+                            "Add selection",
+                            false,
+                            style,
+                            |v, _, cx| v.add_selection_to_library(cx),
+                            cx,
+                        ))
+                        .child(text_button(
+                            "lib-import".into(),
+                            "Import",
+                            false,
+                            style,
+                            |v, _, cx| v.import_library_prompt(cx),
+                            cx,
+                        ))
+                        .child(text_button(
+                            "lib-export".into(),
+                            "Export",
+                            false,
+                            style,
+                            |v, _, cx| v.export_library_prompt(cx),
+                            cx,
+                        )),
                 )
                 .child(list),
         )
     }
 
-    fn render_picker(&self, t: PickerTarget, style: &ExcalidrawStyle, pal: Palette, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_picker(
+        &self,
+        t: PickerTarget,
+        style: &ExcalidrawStyle,
+        pal: Palette,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let cur = self.current_color(t);
         let pos = crate::actions::palette_pos(&cur);
-        let mut grid = div().flex().flex_wrap().gap(px(6.0)).w(px(5.0 * 28.0 + 4.0 * 6.0));
+        let mut grid = div()
+            .flex()
+            .flex_wrap()
+            .gap(px(6.0))
+            .w(px(5.0 * 28.0 + 4.0 * 6.0));
         for (i, (name, shades)) in PALETTE.iter().enumerate() {
             let c = shades[crate::actions::default_shade(t)];
             let active = pos.map(|p| p.0) == Some(i);
             grid = grid.child(
-                swatch(format!("pk-{name}").into(), c, active, pal, style, move |v, _, cx| v.set_color(t, c, cx), cx)
-                    .size(px(28.0))
-                    .relative()
-                    .child(div().absolute().bottom(px(0.0)).right(px(2.0)).text_size(px(9.0)).text_color(style.muted).child(PALETTE_KEYS[i])),
+                swatch(
+                    format!("pk-{name}").into(),
+                    c,
+                    active,
+                    pal,
+                    style,
+                    move |v, _, cx| v.set_color(t, c, cx),
+                    cx,
+                )
+                .size(px(28.0))
+                .relative()
+                .child(
+                    div()
+                        .absolute()
+                        .bottom(px(0.0))
+                        .right(px(2.0))
+                        .text_size(px(9.0))
+                        .text_color(style.muted)
+                        .child(PALETTE_KEYS[i]),
+                ),
             );
         }
         let mut shades_row = row().gap(px(6.0));
@@ -1396,8 +2246,16 @@ impl ExcalidrawView {
             for (n, c) in PALETTE[hue].1.iter().enumerate() {
                 let c: &'static str = c;
                 shades_row = shades_row.child(
-                    swatch(format!("pk-shade-{}", n + 1).into(), c, n == k, pal, style, move |v, _, cx| v.set_color(t, c, cx), cx)
-                        .size(px(28.0)),
+                    swatch(
+                        format!("pk-shade-{}", n + 1).into(),
+                        c,
+                        n == k,
+                        pal,
+                        style,
+                        move |v, _, cx| v.set_color(t, c, cx),
+                        cx,
+                    )
+                    .size(px(28.0)),
                 );
             }
         }
@@ -1415,7 +2273,11 @@ impl ExcalidrawView {
             .items_center()
             .rounded(px(6.0))
             .border_1()
-            .border_color(if self.hex.is_some() { style.selection } else { style.island_border })
+            .border_color(if self.hex.is_some() {
+                style.selection
+            } else {
+                style.island_border
+            })
             .text_size(px(13.0))
             .text_color(style.fg)
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -1424,9 +2286,20 @@ impl ExcalidrawView {
                 cx.notify();
             }))
             .child(hex_text);
-        let dropper = text_button("pk-eyedropper".into(), "Pick", self.eyedropper.is_some(), style, move |v, _, _| {
-            v.eyedropper = if v.eyedropper.is_some() { None } else { Some(t) };
-        }, cx);
+        let dropper = text_button(
+            "pk-eyedropper".into(),
+            "Pick",
+            self.eyedropper.is_some(),
+            style,
+            move |v, _, _| {
+                v.eyedropper = if v.eyedropper.is_some() {
+                    None
+                } else {
+                    Some(t)
+                };
+            },
+            cx,
+        );
         let title = match t {
             PickerTarget::Stroke => "Stroke",
             PickerTarget::Background => "Background",
@@ -1442,21 +2315,36 @@ impl ExcalidrawView {
                 .p(px(10.0))
                 .gap(px(8.0))
                 .child(section("Colors", style).child(grid))
-                .when(pos.is_some_and(|p| p.1.is_some()), |d| d.child(section("Shades", style).child(shades_row)))
+                .when(pos.is_some_and(|p| p.1.is_some()), |d| {
+                    d.child(section("Shades", style).child(shades_row))
+                })
                 .child(section("Hex code", style).child(row().w_full().child(hex).child(dropper)))
-                .child(div().text_size(px(10.0)).text_color(style.muted).child(format!("{title}: keys q–b pick a colour, 1–5 a shade"))),
+                .child(
+                    div()
+                        .text_size(px(10.0))
+                        .text_color(style.muted)
+                        .child(format!("{title}: keys q–b pick a colour, 1–5 a shade")),
+                ),
         )
     }
 
-    fn render_context_menu(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_context_menu(
+        &self,
+        style: &ExcalidrawStyle,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let at = self.context_menu.unwrap_or_default();
         let b = self.bounds.get();
         let entries = self.context_entries();
         let rows = entries.iter().filter(|e| e.is_some()).count() as f32;
         let seps = entries.iter().filter(|e| e.is_none()).count() as f32;
         let (w, h) = (240.0, rows * 28.0 + seps * 9.0 + 12.0);
-        let x = f32::from(at.x - b.origin.x).min(f32::from(b.size.width) - w - 8.0).max(8.0);
-        let y = f32::from(at.y - b.origin.y).min(f32::from(b.size.height) - h - 8.0).max(8.0);
+        let x = f32::from(at.x - b.origin.x)
+            .min(f32::from(b.size.width) - w - 8.0)
+            .max(8.0);
+        let y = f32::from(at.y - b.origin.y)
+            .min(f32::from(b.size.height) - h - 8.0)
+            .max(8.0);
         let mut list = island(style)
             .id("context-menu")
             .debug_selector(|| "context-menu".into())
@@ -1472,7 +2360,13 @@ impl ExcalidrawView {
             match e {
                 None => {
                     if !last_sep {
-                        list = list.child(div().my(px(4.0)).h(px(1.0)).w_full().bg(style.island_border));
+                        list = list.child(
+                            div()
+                                .my(px(4.0))
+                                .h(px(1.0))
+                                .w_full()
+                                .bg(style.island_border),
+                        );
                     }
                     last_sep = true;
                 }
@@ -1491,9 +2385,15 @@ impl ExcalidrawView {
                             .justify_between()
                             .rounded(px(4.0))
                             .text_size(px(13.0))
-                            .text_color(if a == crate::actions::Action::Delete { gpui_kit::red() } else { style.fg })
+                            .text_color(if a == crate::actions::Action::Delete {
+                                gpui_kit::red()
+                            } else {
+                                style.fg
+                            })
                             .hover(|s| s.bg(style.hover_bg))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.run_action(a, window, cx)))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                this.run_action(a, window, cx)
+                            }))
                             .child(format!("{}{}", if checked { "✓ " } else { "" }, label))
                             .child(div().text_size(px(11.0)).text_color(style.muted).child(key)),
                     );
@@ -1503,13 +2403,25 @@ impl ExcalidrawView {
         div().absolute().left(px(x)).top(px(y)).child(list)
     }
 
-    fn render_dialog(&self, dlg: crate::actions::Dialog, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_dialog(
+        &self,
+        dlg: crate::actions::Dialog,
+        style: &ExcalidrawStyle,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         use crate::actions::Dialog;
         let title = match dlg {
             Dialog::Export => "Export image",
             Dialog::Help => "Help",
         };
-        let close = text_button("dlg-close".into(), "×", false, style, |v, _, _| v.dialog = None, cx);
+        let close = text_button(
+            "dlg-close".into(),
+            "×",
+            false,
+            style,
+            |v, _, _| v.dialog = None,
+            cx,
+        );
         let header = div()
             .flex()
             .w_full()
@@ -1530,14 +2442,22 @@ impl ExcalidrawView {
             .justify_center()
             .bg(gpui_kit::black().opacity(0.3))
             .occlude()
-            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                this.dialog = None;
-                cx.notify();
-            }))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.dialog = None;
+                    cx.notify();
+                }),
+            )
             .child(
                 island(style)
-                    .id(SharedString::from(format!("dialog-{}", title.to_lowercase().replace(' ', "-"))))
-                    .debug_selector(move || format!("dialog-{}", title.to_lowercase().replace(' ', "-")))
+                    .id(SharedString::from(format!(
+                        "dialog-{}",
+                        title.to_lowercase().replace(' ', "-")
+                    )))
+                    .debug_selector(move || {
+                        format!("dialog-{}", title.to_lowercase().replace(' ', "-"))
+                    })
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .flex_col()
                     .items_start()
@@ -1555,7 +2475,10 @@ impl ExcalidrawView {
         let mut cols = div().flex().gap(px(16.0)).items_start().w_full();
         for (group, items) in HELP {
             let mut c = div().flex().flex_col().flex_1().gap(px(4.0)).child(
-                div().text_size(px(13.0)).text_color(style.muted).child(*group),
+                div()
+                    .text_size(px(13.0))
+                    .text_color(style.muted)
+                    .child(*group),
             );
             for (label, key) in *items {
                 c = c.child(
@@ -1576,7 +2499,11 @@ impl ExcalidrawView {
 
     fn render_export(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
         let e = self.export.clone();
-        let toggle = |id: &'static str, label: &'static str, on: bool, f: fn(&mut crate::actions::ExportState), cx: &mut Context<Self>| {
+        let toggle = |id: &'static str,
+                      label: &'static str,
+                      on: bool,
+                      f: fn(&mut crate::actions::ExportState),
+                      cx: &mut Context<Self>| {
             div()
                 .flex()
                 .w_full()
@@ -1585,25 +2512,63 @@ impl ExcalidrawView {
                 .text_size(px(13.0))
                 .text_color(style.fg)
                 .child(label)
-                .child(text_button(id.into(), if on { "On" } else { "Off" }, on, style, move |v, _, _| {
-                    f(&mut v.export);
-                    v.export_preview = None;
-                }, cx))
+                .child(text_button(
+                    id.into(),
+                    if on { "On" } else { "Off" },
+                    on,
+                    style,
+                    move |v, _, _| {
+                        f(&mut v.export);
+                        v.export_preview = None;
+                    },
+                    cx,
+                ))
         };
         let mut scales = row();
         for s in [1u8, 2, 3] {
-            scales = scales.child(text_button(format!("ex-{s}").into(), format!("{s}×"), e.scale == s as f64, style, move |v, _, _| v.export.scale = s as f64, cx));
+            scales = scales.child(text_button(
+                format!("ex-{s}").into(),
+                format!("{s}×"),
+                e.scale == s as f64,
+                style,
+                move |v, _, _| v.export.scale = s as f64,
+                cx,
+            ));
         }
         div()
             .flex()
             .flex_col()
             .w_full()
             .gap(px(8.0))
-            .child(toggle("ex-bg", "Background", e.background, |s| s.background = !s.background, cx))
-            .child(toggle("ex-dark", "Dark mode", e.dark, |s| s.dark = !s.dark, cx))
-            .child(toggle("ex-embed", "Embed scene", e.embed_scene, |s| s.embed_scene = !s.embed_scene, cx))
+            .child(toggle(
+                "ex-bg",
+                "Background",
+                e.background,
+                |s| s.background = !s.background,
+                cx,
+            ))
+            .child(toggle(
+                "ex-dark",
+                "Dark mode",
+                e.dark,
+                |s| s.dark = !s.dark,
+                cx,
+            ))
+            .child(toggle(
+                "ex-embed",
+                "Embed scene",
+                e.embed_scene,
+                |s| s.embed_scene = !s.embed_scene,
+                cx,
+            ))
             .when(!self.selected.is_empty(), |d| {
-                d.child(toggle("ex-only", "Only selected", e.only_selected, |s| s.only_selected = !s.only_selected, cx))
+                d.child(toggle(
+                    "ex-only",
+                    "Only selected",
+                    e.only_selected,
+                    |s| s.only_selected = !s.only_selected,
+                    cx,
+                ))
             })
             .child(
                 div()
@@ -1619,11 +2584,32 @@ impl ExcalidrawView {
             .child(
                 row()
                     .gap(px(8.0))
-                    .child(text_button("ex-png".into(), "PNG", false, style, |v, _, cx| v.export_to_file(false, cx), cx))
-                    .child(text_button("ex-svg".into(), "SVG", false, style, |v, _, cx| v.export_to_file(true, cx), cx))
-                    .child(text_button("ex-copy".into(), "Copy PNG", false, style, |v, _, cx| {
-                        v.copy_as_png(cx);
-                    }, cx)),
+                    .child(text_button(
+                        "ex-png".into(),
+                        "PNG",
+                        false,
+                        style,
+                        |v, _, cx| v.export_to_file(false, cx),
+                        cx,
+                    ))
+                    .child(text_button(
+                        "ex-svg".into(),
+                        "SVG",
+                        false,
+                        style,
+                        |v, _, cx| v.export_to_file(true, cx),
+                        cx,
+                    ))
+                    .child(text_button(
+                        "ex-copy".into(),
+                        "Copy PNG",
+                        false,
+                        style,
+                        |v, _, cx| {
+                            v.copy_as_png(cx);
+                        },
+                        cx,
+                    )),
             )
     }
 }

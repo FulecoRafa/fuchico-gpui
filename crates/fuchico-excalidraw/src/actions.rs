@@ -23,7 +23,6 @@ pub enum PickerTarget {
     Canvas,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialog {
     Export,
@@ -42,7 +41,13 @@ pub struct ExportState {
 
 impl Default for ExportState {
     fn default() -> Self {
-        Self { background: true, dark: false, embed_scene: false, scale: 2.0, only_selected: false }
+        Self {
+            background: true,
+            dark: false,
+            embed_scene: false,
+            scale: 2.0,
+            only_selected: false,
+        }
     }
 }
 
@@ -137,8 +142,18 @@ impl ExcalidrawView {
                 v.push(e(Action::UnlockAll, "Unlock all elements", ""));
             }
             v.push(None);
-            v.push(Some((Action::ToggleGrid, "Toggle grid".into(), "⌘'", self.scene.grid_enabled())));
-            v.push(Some((Action::ToggleObjectSnap, "Snap to objects".into(), "⌥S", self.scene.app_bool("objectsSnapModeEnabled"))));
+            v.push(Some((
+                Action::ToggleGrid,
+                "Toggle grid".into(),
+                "⌘'",
+                self.scene.grid_enabled(),
+            )));
+            v.push(Some((
+                Action::ToggleObjectSnap,
+                "Snap to objects".into(),
+                "⌥S",
+                self.scene.app_bool("objectsSnapModeEnabled"),
+            )));
             v.push(e(Action::ZoomToFit, "Zoom to fit all elements", "⇧1"));
             v.push(None);
             v.push(e(Action::Export, "Export image…", "⇧⌘E"));
@@ -196,7 +211,10 @@ impl ExcalidrawView {
             Action::CopyStyles => self.copy_styles(),
             Action::PasteStyles => self.paste_styles(cx),
             Action::AddToLibrary => self.add_selection_to_library(cx),
-            Action::SendBackward | Action::BringForward | Action::SendToBack | Action::BringToFront => {
+            Action::SendBackward
+            | Action::BringForward
+            | Action::SendToBack
+            | Action::BringToFront => {
                 let fwd = matches!(a, Action::BringForward | Action::BringToFront);
                 let end = matches!(a, Action::SendToBack | Action::BringToFront);
                 self.scene.reorder(&s, fwd, end);
@@ -270,28 +288,52 @@ impl ExcalidrawView {
             .filter(|e| ids.contains(&e.id) && e.container_id().is_none())
             .cloned()
             .collect();
-        let Some(bb) = tops.iter().map(geom::aabb).reduce(geom::union) else { return };
-        let axis = if horizontal { (bb[0] + bb[2]) / 2.0 } else { (bb[1] + bb[3]) / 2.0 };
+        let Some(bb) = tops.iter().map(geom::aabb).reduce(geom::union) else {
+            return;
+        };
+        let axis = if horizontal {
+            (bb[0] + bb[2]) / 2.0
+        } else {
+            (bb[1] + bb[3]) / 2.0
+        };
         for o in &tops {
             let mut el = o.clone();
             let c = geom::center(o);
-            let nc = if horizontal { [2.0 * axis - c[0], c[1]] } else { [c[0], 2.0 * axis - c[1]] };
-            el.f.angle.set(Num((-o.angle()).rem_euclid(std::f64::consts::TAU)));
+            let nc = if horizontal {
+                [2.0 * axis - c[0], c[1]]
+            } else {
+                [c[0], 2.0 * axis - c[1]]
+            };
+            el.f.angle
+                .set(Num((-o.angle()).rem_euclid(std::f64::consts::TAU)));
             if o.has_points() {
                 let lc = geom::local_center(o);
                 let pts: Vec<P> = o
                     .points()
                     .iter()
-                    .map(|p| if horizontal { [2.0 * lc[0] - p[0], p[1]] } else { [p[0], 2.0 * lc[1] - p[1]] })
+                    .map(|p| {
+                        if horizontal {
+                            [2.0 * lc[0] - p[0], p[1]]
+                        } else {
+                            [p[0], 2.0 * lc[1] - p[1]]
+                        }
+                    })
                     .collect();
                 let shift = pts[0];
-                let pts: Vec<P> = pts.iter().map(|p| [p[0] - shift[0], p[1] - shift[1]]).collect();
+                let pts: Vec<P> = pts
+                    .iter()
+                    .map(|p| [p[0] - shift[0], p[1] - shift[1]])
+                    .collect();
                 el.set_points(&pts);
                 // Arrowheads stay on their ends; bindings follow below.
             }
             if o.kind == "image" {
                 let mut sc = o.f.scale.get().cloned().unwrap_or([Num(1.0), Num(1.0)]);
-                if horizontal { sc[0] = Num(-sc[0].0) } else { sc[1] = Num(-sc[1].0) }
+                if horizontal {
+                    sc[0] = Num(-sc[0].0)
+                } else {
+                    sc[1] = Num(-sc[1].0)
+                }
                 el.f.scale.set(sc);
             }
             let lc = geom::local_center(&el);
@@ -331,7 +373,12 @@ impl ExcalidrawView {
     }
 
     pub(crate) fn unlock_all(&mut self, cx: &mut Context<Self>) {
-        let ids: Vec<String> = self.scene.elements().filter(|e| e.locked()).map(|e| e.id.clone()).collect();
+        let ids: Vec<String> = self
+            .scene
+            .elements()
+            .filter(|e| e.locked())
+            .map(|e| e.id.clone())
+            .collect();
         for id in &ids {
             if let Some(e) = self.scene.get_mut(id) {
                 e.f.locked.set(false);
@@ -347,14 +394,21 @@ impl ExcalidrawView {
         let list = self.selection_list();
         // Prefer a shape over its text for the shape styles; remember the
         // text styles of either.
-        let Some(first) = list.first().map(|e| (*e).clone()) else { return };
+        let Some(first) = list.first().map(|e| (*e).clone()) else {
+            return;
+        };
         let mut st = first.clone();
         let text = list
             .iter()
             .find(|e| e.kind == "text")
             .map(|e| (*e).clone())
             .or_else(|| {
-                first.bound_elements().iter().find(|b| b.kind == "text").and_then(|b| self.scene.get(&b.id)).cloned()
+                first
+                    .bound_elements()
+                    .iter()
+                    .find(|b| b.kind == "text")
+                    .and_then(|b| self.scene.get(&b.id))
+                    .cloned()
             });
         if let Some(t) = text {
             st.f.font_size = t.f.font_size.clone();
@@ -366,7 +420,9 @@ impl ExcalidrawView {
     }
 
     pub(crate) fn paste_styles(&mut self, cx: &mut Context<Self>) {
-        let Some(st) = self.copied_styles.clone() else { return };
+        let Some(st) = self.copied_styles.clone() else {
+            return;
+        };
         self.apply(
             move |e, _| {
                 if e.kind.is_empty() {
@@ -382,18 +438,19 @@ impl ExcalidrawView {
                     e.f.roughness = s.roughness.clone();
                 }
                 e.f.opacity = s.opacity.clone();
-                if e.kind == "text"
-                    && s.font_size.get().is_some() {
-                        e.f.font_size = s.font_size.clone();
-                        e.f.font_family = s.font_family.clone();
-                        e.f.text_align = s.text_align.clone();
-                        e.f.line_height = s.line_height.clone();
-                    }
+                if e.kind == "text" && s.font_size.get().is_some() {
+                    e.f.font_size = s.font_size.clone();
+                    e.f.font_family = s.font_family.clone();
+                    e.f.text_align = s.text_align.clone();
+                    e.f.line_height = s.line_height.clone();
+                }
                 if e.kind == "arrow" && st.kind == "arrow" {
                     e.f.start_arrowhead = s.start_arrowhead.clone();
                     e.f.end_arrowhead = s.end_arrowhead.clone();
                 }
-                if matches!(e.kind.as_str(), "rectangle" | "diamond" | "line" | "arrow") && !s.roundness.is_absent() {
+                if matches!(e.kind.as_str(), "rectangle" | "diamond" | "line" | "arrow")
+                    && !s.roundness.is_absent()
+                {
                     e.f.roundness = s.roundness.clone();
                 }
             },
@@ -456,7 +513,11 @@ impl ExcalidrawView {
             if el.container_id().is_some() {
                 continue;
             }
-            let key = el.group_ids().last().cloned().unwrap_or_else(|| format!("#{}", el.id));
+            let key = el
+                .group_ids()
+                .last()
+                .cloned()
+                .unwrap_or_else(|| format!("#{}", el.id));
             if !by_group.contains_key(&key) {
                 order.push(key.clone());
             }
@@ -466,7 +527,11 @@ impl ExcalidrawView {
             .into_iter()
             .map(|k| {
                 let els = &by_group[&k];
-                let b = els.iter().map(|e| geom::aabb(e)).reduce(geom::union).unwrap();
+                let b = els
+                    .iter()
+                    .map(|e| geom::aabb(e))
+                    .reduce(geom::union)
+                    .unwrap();
                 (els.iter().map(|e| e.id.clone()).collect(), b)
             })
             .collect()
@@ -498,7 +563,13 @@ impl ExcalidrawView {
     pub(crate) fn toggle_grid(&mut self, cx: &mut Context<Self>) {
         let on = !self.scene.grid_enabled();
         self.scene.set_app_state("gridModeEnabled", Value::Bool(on));
-        if self.scene.app_state().and_then(|a| a.get("gridSize")).map(|v| v.is_null()).unwrap_or(true) {
+        if self
+            .scene
+            .app_state()
+            .and_then(|a| a.get("gridSize"))
+            .map(|v| v.is_null())
+            .unwrap_or(true)
+        {
             self.scene.set_app_state("gridSize", Value::from(20));
         }
         self.commit(cx);
@@ -506,7 +577,8 @@ impl ExcalidrawView {
 
     pub(crate) fn toggle_object_snap(&mut self, cx: &mut Context<Self>) {
         let on = !self.scene.app_bool("objectsSnapModeEnabled");
-        self.scene.set_app_state("objectsSnapModeEnabled", Value::Bool(on));
+        self.scene
+            .set_app_state("objectsSnapModeEnabled", Value::Bool(on));
         self.commit(cx);
     }
 
@@ -521,7 +593,8 @@ impl ExcalidrawView {
     }
 
     pub(crate) fn object_snap_on(&self, m: &Modifiers) -> bool {
-        self.scene.app_bool("objectsSnapModeEnabled") != (m.platform || m.control) && !self.scene.grid_enabled()
+        self.scene.app_bool("objectsSnapModeEnabled") != (m.platform || m.control)
+            && !self.scene.grid_enabled()
     }
 
     /// Bounding boxes other elements offer for object snapping.
@@ -546,7 +619,11 @@ impl ExcalidrawView {
             dark: e.dark,
             embed_scene: e.embed_scene,
             scale: e.scale,
-            only: if e.only_selected && !self.selected.is_empty() { Some(self.selection_with_bound()) } else { None },
+            only: if e.only_selected && !self.selected.is_empty() {
+                Some(self.selection_with_bound())
+            } else {
+                None
+            },
             padding: 10.0,
         }
     }
@@ -563,7 +640,11 @@ impl ExcalidrawView {
 
     fn clipboard_opts(&self) -> ExportOptions {
         ExportOptions {
-            only: if self.selected.is_empty() { None } else { Some(self.selection_with_bound()) },
+            only: if self.selected.is_empty() {
+                None
+            } else {
+                Some(self.selection_with_bound())
+            },
             scale: 2.0,
             ..Default::default()
         }
@@ -572,7 +653,10 @@ impl ExcalidrawView {
     pub(crate) fn copy_as_png(&mut self, cx: &mut Context<Self>) {
         match export::to_png(&self.scene, &self.clipboard_opts()) {
             Ok(png) => {
-                cx.write_to_clipboard(ClipboardItem::new_image(&Image::from_bytes(ImageFormat::Png, png)));
+                cx.write_to_clipboard(ClipboardItem::new_image(&Image::from_bytes(
+                    ImageFormat::Png,
+                    png,
+                )));
                 self.toast("Copied to clipboard as PNG");
             }
             Err(e) => self.toast(&format!("Couldn't export: {e}")),
@@ -608,7 +692,12 @@ impl ExcalidrawView {
             .source_path
             .as_ref()
             .and_then(|p| p.file_name())
-            .map(|n| n.to_string_lossy().trim_end_matches(".excalidraw").trim_end_matches(".md").to_string())
+            .map(|n| {
+                n.to_string_lossy()
+                    .trim_end_matches(".excalidraw")
+                    .trim_end_matches(".md")
+                    .to_string()
+            })
             .unwrap_or_else(|| "drawing".into());
         let name = format!("{stem}{}", if svg { ".svg" } else { ".png" });
         let dir = self
@@ -655,7 +744,9 @@ impl ExcalidrawView {
 
     /// Inserts a library item centred at `at` (world) or the viewport.
     pub(crate) fn insert_library_item(&mut self, id: &str, at: Option<P>, cx: &mut Context<Self>) {
-        let Some(item) = self.library.get(id) else { return };
+        let Some(item) = self.library.get(id) else {
+            return;
+        };
         let mut els = library::item_elements(item);
         if els.is_empty() {
             return;
@@ -688,7 +779,12 @@ impl ExcalidrawView {
             prompt: Some("Import library".into()),
         });
         cx.spawn(async move |this: WeakEntity<Self>, cx: &mut AsyncApp| {
-            let paths = rx.await.ok().and_then(|r| r.ok()).flatten().unwrap_or_default();
+            let paths = rx
+                .await
+                .ok()
+                .and_then(|r| r.ok())
+                .flatten()
+                .unwrap_or_default();
             let _ = this.update(cx, |v, cx| {
                 for p in paths {
                     v.import_library_file(&p);
@@ -700,11 +796,16 @@ impl ExcalidrawView {
     }
 
     pub(crate) fn import_library_file(&mut self, p: &std::path::Path) -> bool {
-        let Ok(s) = std::fs::read_to_string(p) else { return false };
+        let Ok(s) = std::fs::read_to_string(p) else {
+            return false;
+        };
         match self.library.import(&s) {
             Ok(n) => {
                 self.library_open = true;
-                self.toast(&format!("Imported {n} library item{}", if n == 1 { "" } else { "s" }));
+                self.toast(&format!(
+                    "Imported {n} library item{}",
+                    if n == 1 { "" } else { "s" }
+                ));
                 true
             }
             Err(e) => {
@@ -737,23 +838,61 @@ impl ExcalidrawView {
 pub const PALETTE: [(&str, [&str; 5]); 15] = [
     ("transparent", ["transparent"; 5]),
     ("white", ["#ffffff"; 5]),
-    ("gray", ["#f8f9fa", "#e9ecef", "#ced4da", "#868e96", "#343a40"]),
+    (
+        "gray",
+        ["#f8f9fa", "#e9ecef", "#ced4da", "#868e96", "#343a40"],
+    ),
     ("black", ["#1e1e1e"; 5]),
-    ("bronze", ["#f8f1ee", "#eaddd7", "#d2bab0", "#a18072", "#846358"]),
-    ("red", ["#fff5f5", "#ffc9c9", "#ff8787", "#fa5252", "#e03131"]),
-    ("pink", ["#fff0f6", "#fcc2d7", "#f783ac", "#e64980", "#c2255c"]),
-    ("grape", ["#f8f0fc", "#eebefa", "#da77f2", "#be4bdb", "#9c36b5"]),
-    ("violet", ["#f3f0ff", "#d0bfff", "#9775fa", "#7950f2", "#6741d9"]),
-    ("blue", ["#e7f5ff", "#a5d8ff", "#4dabf7", "#228be6", "#1971c2"]),
-    ("cyan", ["#e3fafc", "#99e9f2", "#3bc9db", "#15aabf", "#0c8599"]),
-    ("teal", ["#e6fcf5", "#96f2d7", "#38d9a9", "#12b886", "#099268"]),
-    ("green", ["#ebfbee", "#b2f2bb", "#69db7c", "#40c057", "#2f9e44"]),
-    ("yellow", ["#fff9db", "#ffec99", "#ffd43b", "#fab005", "#f08c00"]),
-    ("orange", ["#fff4e6", "#ffd8a8", "#ffa94d", "#fd7e14", "#e8590c"]),
+    (
+        "bronze",
+        ["#f8f1ee", "#eaddd7", "#d2bab0", "#a18072", "#846358"],
+    ),
+    (
+        "red",
+        ["#fff5f5", "#ffc9c9", "#ff8787", "#fa5252", "#e03131"],
+    ),
+    (
+        "pink",
+        ["#fff0f6", "#fcc2d7", "#f783ac", "#e64980", "#c2255c"],
+    ),
+    (
+        "grape",
+        ["#f8f0fc", "#eebefa", "#da77f2", "#be4bdb", "#9c36b5"],
+    ),
+    (
+        "violet",
+        ["#f3f0ff", "#d0bfff", "#9775fa", "#7950f2", "#6741d9"],
+    ),
+    (
+        "blue",
+        ["#e7f5ff", "#a5d8ff", "#4dabf7", "#228be6", "#1971c2"],
+    ),
+    (
+        "cyan",
+        ["#e3fafc", "#99e9f2", "#3bc9db", "#15aabf", "#0c8599"],
+    ),
+    (
+        "teal",
+        ["#e6fcf5", "#96f2d7", "#38d9a9", "#12b886", "#099268"],
+    ),
+    (
+        "green",
+        ["#ebfbee", "#b2f2bb", "#69db7c", "#40c057", "#2f9e44"],
+    ),
+    (
+        "yellow",
+        ["#fff9db", "#ffec99", "#ffd43b", "#fab005", "#f08c00"],
+    ),
+    (
+        "orange",
+        ["#fff4e6", "#ffd8a8", "#ffa94d", "#fd7e14", "#e8590c"],
+    ),
 ];
 
 /// Keyboard keys of the palette grid (Excalidraw's colour-picker keys).
-pub const PALETTE_KEYS: [&str; 15] = ["q", "w", "e", "r", "t", "a", "s", "d", "f", "g", "z", "x", "c", "v", "b"];
+pub const PALETTE_KEYS: [&str; 15] = [
+    "q", "w", "e", "r", "t", "a", "s", "d", "f", "g", "z", "x", "c", "v", "b",
+];
 
 /// Shade index Excalidraw picks for a hue in each picker.
 pub fn default_shade(t: PickerTarget) -> usize {
@@ -803,26 +942,44 @@ impl ExcalidrawView {
                     return;
                 }
                 if k == "round" {
-                    e.f.roundness.set(crate::model::Roundness { kind: Num(2.0), value: Default::default(), extra: Default::default() });
+                    e.f.roundness.set(crate::model::Roundness {
+                        kind: Num(2.0),
+                        value: Default::default(),
+                        extra: Default::default(),
+                    });
                 } else {
                     e.f.roundness.set_null();
                 }
                 e.f.elbowed.set(k == "elbow");
                 if k == "elbow" {
                     e.f.extra.entry("fixedSegments").or_insert(Value::Null);
-                    e.f.extra.entry("startIsSpecial").or_insert(Value::Bool(false));
-                    e.f.extra.entry("endIsSpecial").or_insert(Value::Bool(false));
+                    e.f.extra
+                        .entry("startIsSpecial")
+                        .or_insert(Value::Bool(false));
+                    e.f.extra
+                        .entry("endIsSpecial")
+                        .or_insert(Value::Bool(false));
                 }
             },
             cx,
         );
-        let arrows: Vec<String> = self.selection_list().iter().filter(|e| e.kind == "arrow").map(|e| e.id.clone()).collect();
+        let arrows: Vec<String> = self
+            .selection_list()
+            .iter()
+            .filter(|e| e.kind == "arrow")
+            .map(|e| e.id.clone())
+            .collect();
         for a in &arrows {
             if k == "elbow" {
                 // Elbow bindings use fixed points instead of focus.
                 for start in [true, false] {
                     let t = self.scene.get(a).and_then(|e| {
-                        if start { e.f.start_binding.get() } else { e.f.end_binding.get() }.map(|b| b.element_id.clone())
+                        if start {
+                            e.f.start_binding.get()
+                        } else {
+                            e.f.end_binding.get()
+                        }
+                        .map(|b| b.element_id.clone())
                     });
                     if let Some(t) = t {
                         self.scene.bind(a, start, Some(&t));
@@ -841,10 +998,12 @@ impl ExcalidrawView {
     pub(crate) fn current_color(&self, t: PickerTarget) -> String {
         let first = self.selection_list().first().map(|e| (*e).clone());
         match t {
-            PickerTarget::Stroke => first.map(|e| e.stroke_color().to_string()).unwrap_or(self.defaults.stroke_color.clone()),
-            PickerTarget::Background => {
-                first.map(|e| e.background_color().to_string()).unwrap_or(self.defaults.background_color.clone())
-            }
+            PickerTarget::Stroke => first
+                .map(|e| e.stroke_color().to_string())
+                .unwrap_or(self.defaults.stroke_color.clone()),
+            PickerTarget::Background => first
+                .map(|e| e.background_color().to_string())
+                .unwrap_or(self.defaults.background_color.clone()),
             PickerTarget::Canvas => self.scene.view_background(),
         }
     }
@@ -875,7 +1034,11 @@ impl ExcalidrawView {
     pub(crate) fn toggle_picker(&mut self, t: PickerTarget) {
         self.eyedropper = None;
         self.hex = None;
-        self.picker = if self.picker == Some(t) { None } else { Some(t) };
+        self.picker = if self.picker == Some(t) {
+            None
+        } else {
+            Some(t)
+        };
     }
 
     /// Picker keyboard: q..b pick a hue, 1-5 a shade, typing edits the hex
@@ -898,7 +1061,9 @@ impl ExcalidrawView {
                 "backspace" => {
                     h.pop();
                 }
-                k if k.len() == 1 && k.chars().all(|c| c.is_ascii_hexdigit()) && h.len() < 8 => h.push_str(k),
+                k if k.len() == 1 && k.chars().all(|c| c.is_ascii_hexdigit()) && h.len() < 8 => {
+                    h.push_str(k)
+                }
                 _ => return key != "escape",
             }
             return true;

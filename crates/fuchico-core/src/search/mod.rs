@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-
 use crate::events::{CoreEvent, EventSink};
 use crate::fs::file::write_atomic;
 use crate::fs::to_canon;
@@ -99,7 +98,6 @@ pub fn search_files(root: String, query: String) -> Result<Vec<SearchMatch>, Str
     Ok(matches)
 }
 
-
 #[derive(Serialize, Default, Debug, PartialEq)]
 pub struct ReplaceResult {
     pub files_changed: usize,
@@ -111,7 +109,11 @@ pub struct ReplaceResult {
 /// written on disk with `replacement` verbatim. Only files whose canonical
 /// path is in `files` are touched when the list is given. Returns the
 /// number of files and occurrences changed.
-fn replace_in_content(content: &str, needle_lower: &str, replacement: &str) -> Option<(String, usize)> {
+fn replace_in_content(
+    content: &str,
+    needle_lower: &str,
+    replacement: &str,
+) -> Option<(String, usize)> {
     let lower = content.to_lowercase();
     // to_lowercase can change byte lengths for some scripts; fall back to a
     // char-wise comparison when the lengths diverge so we never slice
@@ -136,7 +138,11 @@ fn replace_in_content(content: &str, needle_lower: &str, replacement: &str) -> O
     Some((out, count))
 }
 
-fn replace_by_chars(content: &str, needle_lower: &str, replacement: &str) -> Option<(String, usize)> {
+fn replace_by_chars(
+    content: &str,
+    needle_lower: &str,
+    replacement: &str,
+) -> Option<(String, usize)> {
     let chars: Vec<char> = content.chars().collect();
     let needle: Vec<char> = needle_lower.chars().collect();
     let mut out = String::with_capacity(content.len());
@@ -178,9 +184,10 @@ fn do_replace(
     for file in paths {
         let file_str = to_canon(&file);
         if let Some(allow) = files
-            && !allow.contains(&file_str) {
-                continue;
-            }
+            && !allow.contains(&file_str)
+        {
+            continue;
+        }
         let Ok(content) = std::fs::read_to_string(&file) else {
             continue;
         };
@@ -254,8 +261,17 @@ mod tests {
         let root = dir.path().to_string_lossy().into_owned();
         let mut written = Vec::new();
         let r = do_replace(&root, "hello", "bye", None, |p| written.push(p.to_string())).unwrap();
-        assert_eq!(r, ReplaceResult { files_changed: 1, replacements: 3 });
-        assert_eq!(std::fs::read_to_string(dir.path().join("a.md")).unwrap(), "bye bye\nbye\n");
+        assert_eq!(
+            r,
+            ReplaceResult {
+                files_changed: 1,
+                replacements: 3
+            }
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("a.md")).unwrap(),
+            "bye bye\nbye\n"
+        );
         assert_eq!(written.len(), 1);
         assert!(written[0].ends_with("a.md"));
     }
@@ -269,8 +285,14 @@ mod tests {
         let only = vec![to_canon(dir.path().join("b.md"))];
         let r = do_replace(&root, "x", "y", Some(&only), |_| {}).unwrap();
         assert_eq!(r.files_changed, 1);
-        assert_eq!(std::fs::read_to_string(dir.path().join("a.md")).unwrap(), "x");
-        assert_eq!(std::fs::read_to_string(dir.path().join("b.md")).unwrap(), "y");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("a.md")).unwrap(),
+            "x"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("b.md")).unwrap(),
+            "y"
+        );
     }
 
     #[test]
@@ -288,11 +310,22 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("a.md"), "Hello World\nsecond line\n").unwrap();
         std::fs::write(dir.path().join("b.txt"), "no match here\nhello again\n").unwrap();
-        let matches =
-            search_files(dir.path().to_string_lossy().into_owned(), "hello".to_string()).unwrap();
+        let matches = search_files(
+            dir.path().to_string_lossy().into_owned(),
+            "hello".to_string(),
+        )
+        .unwrap();
         assert_eq!(matches.len(), 2);
-        assert!(matches.iter().any(|m| m.text == "Hello World" && m.line == 1));
-        assert!(matches.iter().any(|m| m.text == "hello again" && m.line == 2));
+        assert!(
+            matches
+                .iter()
+                .any(|m| m.text == "Hello World" && m.line == 1)
+        );
+        assert!(
+            matches
+                .iter()
+                .any(|m| m.text == "hello again" && m.line == 2)
+        );
     }
 
     #[test]
@@ -322,7 +355,12 @@ mod tests {
 
     #[test]
     fn group_by_file_keeps_first_seen_order() {
-        let m = |f: &str, l| SearchMatch { file: f.into(), line: l, column: 1, text: String::new() };
+        let m = |f: &str, l| SearchMatch {
+            file: f.into(),
+            line: l,
+            column: 1,
+            text: String::new(),
+        };
         let g = group_by_file(&[m("b", 1), m("a", 2), m("b", 3)]);
         assert_eq!(g.len(), 2);
         assert_eq!(g[0].0, "b");

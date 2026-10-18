@@ -9,11 +9,11 @@
 //! Pure rules live in [`tree`] and are unit tested there.
 
 mod drag;
+#[cfg(test)]
+mod snapshot_tests;
 mod tree;
 #[cfg(test)]
 mod ui_tests;
-#[cfg(test)]
-mod snapshot_tests;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -26,13 +26,13 @@ use gpui_kit::component::menu::ContextMenuExt;
 use gpui_kit::component::{Icon, IconName};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, App, ClickEvent, Context, DragMoveEvent, Entity, EventEmitter, ExternalPaths, FocusHandle,
-    Focusable, KeyDownEvent, MouseButton, Pixels, Point, ScrollStrategy, SharedString, Subscription, Task,
-    UniformListScrollHandle, WeakEntity, Window, div, uniform_list,
+    AnyElement, App, ClickEvent, Context, DragMoveEvent, Entity, EventEmitter, ExternalPaths,
+    FocusHandle, Focusable, KeyDownEvent, MouseButton, Pixels, Point, ScrollStrategy, SharedString,
+    Subscription, Task, UniformListScrollHandle, WeakEntity, Window, div, uniform_list,
 };
 
-pub use drag::DraggedPaths;
 use drag::DragGhost;
+pub use drag::DraggedPaths;
 pub use tree::{DirState, Entry, Row};
 use tree::{PendingCreate, PendingKind, Selection};
 
@@ -184,10 +184,18 @@ impl Explorer {
     }
 
     fn refresh_root(&mut self, cx: &mut Context<Self>) {
-        let Some(root) = self.root.clone() else { return };
+        let Some(root) = self.root.clone() else {
+            return;
+        };
         self.refetch(root.clone(), cx);
         // `notifyFsChanged(root)`: other windows and indexes refresh too.
-        bus::emit(cx, AppEvent::Core(CoreEvent::FsChanged { dir: root, from: Some("main".into()) }));
+        bus::emit(
+            cx,
+            AppEvent::Core(CoreEvent::FsChanged {
+                dir: root,
+                from: Some("main".into()),
+            }),
+        );
     }
 
     fn input_open(&self) -> bool {
@@ -200,7 +208,9 @@ impl Explorer {
 
     fn entry_at(&self, path: &str) -> Option<(usize, &Entry, bool)> {
         self.rows.iter().enumerate().find_map(|(i, r)| match r {
-            Row::Entry { entry, expanded, .. } if entry.path == path => Some((i, entry, *expanded)),
+            Row::Entry {
+                entry, expanded, ..
+            } if entry.path == path => Some((i, entry, *expanded)),
             _ => None,
         })
     }
@@ -217,19 +227,29 @@ impl Explorer {
 
     // ----- mouse -------------------------------------------------------
 
-    fn click_entry(&mut self, entry: &Entry, ev: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
+    fn click_entry(
+        &mut self,
+        entry: &Entry,
+        ev: &ClickEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.input_open() || !ev.standard_click() {
             return;
         }
         let m = ev.modifiers();
         let toggle = m.platform || m.control;
         let entries = self.entries();
-        self.sel.select(&entry.path, m.shift, toggle && !m.shift, &entries);
+        self.sel
+            .select(&entry.path, m.shift, toggle && !m.shift, &entries);
         if !m.shift && !toggle {
             if entry.is_dir {
                 self.toggle(&entry.path, cx);
             } else {
-                cx.emit(ViewEvent::OpenFile { path: entry.path.clone(), line: None });
+                cx.emit(ViewEvent::OpenFile {
+                    path: entry.path.clone(),
+                    line: None,
+                });
             }
             if ev.click_count() == 2 {
                 self.begin_rename(entry.path.clone(), window, cx);
@@ -255,7 +275,12 @@ impl Explorer {
     }
 
     /// `handleKeyDown`; returns whether the key was consumed.
-    fn handle_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
+    fn handle_key(
+        &mut self,
+        ev: &KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         if self.input_open() || self.root.is_none() {
             return false;
         }
@@ -266,7 +291,11 @@ impl Explorer {
         let ks = &ev.keystroke;
         let m = ks.modifiers;
         let key = ks.key.as_str();
-        let cur = self.sel.focus.as_ref().and_then(|f| entries.iter().position(|p| p == f));
+        let cur = self
+            .sel
+            .focus
+            .as_ref()
+            .and_then(|f| entries.iter().position(|p| p == f));
         let modk = (m.platform || m.control) && !m.alt && !m.shift;
         if modk {
             match key {
@@ -279,7 +308,8 @@ impl Explorer {
                 "v" if !self.cut.is_empty() => {
                     let dir = match cur {
                         Some(i) => {
-                            let is_dir = self.entry_at(&entries[i]).is_none_or(|(_, e, _)| e.is_dir);
+                            let is_dir =
+                                self.entry_at(&entries[i]).is_none_or(|(_, e, _)| e.is_dir);
                             tree::drop_dir_for(&entries[i], is_dir)
                         }
                         None => self.root.clone().unwrap_or_default(),
@@ -310,7 +340,11 @@ impl Explorer {
                 true
             }
             "up" if plain => {
-                move_to(self, cur.map_or(entries.len() as isize - 1, |c| c as isize - 1), m.shift);
+                move_to(
+                    self,
+                    cur.map_or(entries.len() as isize - 1, |c| c as isize - 1),
+                    m.shift,
+                );
                 true
             }
             "right" if plain => {
@@ -345,7 +379,10 @@ impl Explorer {
                     if is_dir {
                         self.toggle(&p, cx);
                     } else {
-                        cx.emit(ViewEvent::OpenFile { path: p, line: None });
+                        cx.emit(ViewEvent::OpenFile {
+                            path: p,
+                            line: None,
+                        });
                     }
                 }
                 true
@@ -365,25 +402,40 @@ impl Explorer {
         }
     }
 
-    fn type_ahead(&mut self, ks: &gpui_kit::Keystroke, entries: &[String], cur: Option<usize>) -> bool {
+    fn type_ahead(
+        &mut self,
+        ks: &gpui_kit::Keystroke,
+        entries: &[String],
+        cur: Option<usize>,
+    ) -> bool {
         let m = ks.modifiers;
         if m.platform || m.control || m.alt || m.function {
             return false;
         }
         // `key_char` is what the key types; fall back to a 1-char key name.
-        let typed = ks.key_char.as_deref().or(Some(ks.key.as_str()).filter(|k| k.chars().count() == 1));
-        let Some(ch) = typed.filter(|c| c.chars().count() == 1 && !c.chars().all(char::is_control)) else {
+        let typed = ks
+            .key_char
+            .as_deref()
+            .or(Some(ks.key.as_str()).filter(|k| k.chars().count() == 1));
+        let Some(ch) = typed.filter(|c| c.chars().count() == 1 && !c.chars().all(char::is_control))
+        else {
             return false;
         };
         let now = Instant::now();
-        let fresh = self
-            .type_ahead
-            .1
-            .is_none_or(|at| now.duration_since(at) >= Duration::from_millis(tree::TYPE_AHEAD_RESET_MS));
+        let fresh = self.type_ahead.1.is_none_or(|at| {
+            now.duration_since(at) >= Duration::from_millis(tree::TYPE_AHEAD_RESET_MS)
+        });
         let ch = ch.to_lowercase();
-        let buffer = if fresh { ch } else { format!("{}{ch}", self.type_ahead.0) };
+        let buffer = if fresh {
+            ch
+        } else {
+            format!("{}{ch}", self.type_ahead.0)
+        };
         self.type_ahead = (buffer.clone(), Some(now));
-        let names: Vec<String> = entries.iter().map(|p| tree::basename(p).to_string()).collect();
+        let names: Vec<String> = entries
+            .iter()
+            .map(|p| tree::basename(p).to_string())
+            .collect();
         if let Some(i) = tree::type_ahead_target(&buffer, &names, cur) {
             self.sel.select(&entries[i], false, false, entries);
             self.scroll_to(&entries[i]);
@@ -393,7 +445,13 @@ impl Explorer {
 
     // ----- inline inputs -----------------------------------------------
 
-    fn start_input(&mut self, initial: &str, placeholder: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+    fn start_input(
+        &mut self,
+        initial: &str,
+        placeholder: Option<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let initial = initial.to_string();
         let state = cx.new(|cx| {
             let s = InputState::new(window, cx).default_value(initial);
@@ -402,14 +460,18 @@ impl Explorer {
                 None => s,
             }
         });
-        let sub = cx.subscribe_in(&state, window, |this, _, ev: &InputEvent, window, cx| match ev {
-            InputEvent::PressEnter { .. } => {
-                this.commit_input(cx);
-                window.focus(&this.focus, cx);
-            }
-            InputEvent::Blur => this.commit_input(cx),
-            _ => {}
-        });
+        let sub = cx.subscribe_in(
+            &state,
+            window,
+            |this, _, ev: &InputEvent, window, cx| match ev {
+                InputEvent::PressEnter { .. } => {
+                    this.commit_input(cx);
+                    window.focus(&this.focus, cx);
+                }
+                InputEvent::Blur => this.commit_input(cx),
+                _ => {}
+            },
+        );
         state.update(cx, |s, cx| {
             s.focus(window, cx);
             s.select_all(window, cx);
@@ -427,7 +489,9 @@ impl Explorer {
     }
 
     fn commit_input(&mut self, cx: &mut Context<Self>) {
-        let Some((state, _)) = self.input.take() else { return };
+        let Some((state, _)) = self.input.take() else {
+            return;
+        };
         let value = state.read(cx).value().to_string();
         if let Some(p) = self.pending.take() {
             self.commit_create(p, &value, cx);
@@ -458,12 +522,19 @@ impl Explorer {
             PendingKind::File => crate::t!(ExplorerNewFile),
             PendingKind::Dir => crate::t!(ExplorerNewFolder),
         });
-        self.pending = Some(PendingCreate { parent, kind, default_ext, placeholder });
+        self.pending = Some(PendingCreate {
+            parent,
+            kind,
+            default_ext,
+            placeholder,
+        });
         self.start_input("", Some(ph), window, cx);
     }
 
     fn commit_create(&mut self, p: PendingCreate, value: &str, cx: &mut Context<Self>) {
-        let Some(name) = tree::create_name(value, p.default_ext) else { return };
+        let Some(name) = tree::create_name(value, p.default_ext) else {
+            return;
+        };
         let path = tree::join(&p.parent, &name);
         let kind = p.kind;
         // "New drawing" goes through the same helper as the excalidraw module
@@ -472,7 +543,9 @@ impl Explorer {
         let dir = p.parent.clone();
         let task = cx.background_spawn(async move {
             match kind {
-                PendingKind::File if drawing => crate::excalidraw::create_drawing(&dir, &name).map(|_| ()),
+                PendingKind::File if drawing => {
+                    crate::excalidraw::create_drawing(&dir, &name).map(|_| ())
+                }
                 PendingKind::File => fuchico_core::fs::mutate::fs_create_file(path),
                 PendingKind::Dir => fuchico_core::fs::mutate::fs_create_dir(path),
             }
@@ -496,7 +569,9 @@ impl Explorer {
     }
 
     fn commit_rename(&mut self, from: String, value: &str, cx: &mut Context<Self>) {
-        let Some(to) = tree::rename_target(&from, value) else { return };
+        let Some(to) = tree::rename_target(&from, value) else {
+            return;
+        };
         let task = cx.background_spawn({
             let (from, to) = (from.clone(), to.clone());
             async move { fuchico_core::fs::mutate::fs_rename(from, to) }
@@ -505,7 +580,10 @@ impl Explorer {
             let res = task.await;
             this.update(cx, |this, cx| {
                 match res {
-                    Ok(_) => cx.emit(ViewEvent::PathRenamed { from: from.clone(), to }),
+                    Ok(_) => cx.emit(ViewEvent::PathRenamed {
+                        from: from.clone(),
+                        to,
+                    }),
                     Err(e) => log::warn!("rename failed: {e}"),
                 }
                 if let Some(parent) = tree::parent_dir(&from) {
@@ -529,34 +607,42 @@ impl Explorer {
             crate::t!(ExplorerItemsCount, count = paths.len())
         };
         let this = cx.entity().downgrade();
-        confirm(window, cx, ConfirmOptions::new(crate::t!(ExplorerConfirmDelete, name = name)).danger(), move |_, cx| {
-            let (paths, this) = (paths.clone(), this.clone());
-            cx.spawn(async move |cx| {
-                for path in paths {
-                    let task = cx.background_spawn({
-                        let path = path.clone();
-                        async move { fuchico_core::fs::mutate::fs_delete(path) }
-                    });
-                    if let Err(e) = task.await {
-                        log::warn!("delete failed: {e}");
-                        continue;
-                    }
-                    this.update(cx, |this, cx| {
-                        cx.emit(ViewEvent::PathDeleted(path.clone()));
-                        if let Some(parent) = tree::parent_dir(&path) {
-                            this.refetch(parent, cx);
+        confirm(
+            window,
+            cx,
+            ConfirmOptions::new(crate::t!(ExplorerConfirmDelete, name = name)).danger(),
+            move |_, cx| {
+                let (paths, this) = (paths.clone(), this.clone());
+                cx.spawn(async move |cx| {
+                    for path in paths {
+                        let task = cx.background_spawn({
+                            let path = path.clone();
+                            async move { fuchico_core::fs::mutate::fs_delete(path) }
+                        });
+                        if let Err(e) = task.await {
+                            log::warn!("delete failed: {e}");
+                            continue;
                         }
-                    })
-                    .ok();
-                }
-            })
-            .detach();
-        });
+                        this.update(cx, |this, cx| {
+                            cx.emit(ViewEvent::PathDeleted(path.clone()));
+                            if let Some(parent) = tree::parent_dir(&path) {
+                                this.refetch(parent, cx);
+                            }
+                        })
+                        .ok();
+                    }
+                })
+                .detach();
+            },
+        );
     }
 
     /// `moveAll`: one at a time, in order; skipped when not allowed.
     fn move_all(&mut self, paths: Vec<String>, to_dir: String, cx: &mut Context<Self>) {
-        let paths: Vec<String> = paths.into_iter().filter(|p| tree::can_move(p, &to_dir)).collect();
+        let paths: Vec<String> = paths
+            .into_iter()
+            .filter(|p| tree::can_move(p, &to_dir))
+            .collect();
         if paths.is_empty() {
             return;
         }
@@ -570,7 +656,10 @@ impl Explorer {
                 let res = task.await;
                 let ok = this.update(cx, |this, cx| {
                     match res {
-                        Ok(_) => cx.emit(ViewEvent::PathRenamed { from: from.clone(), to }),
+                        Ok(_) => cx.emit(ViewEvent::PathRenamed {
+                            from: from.clone(),
+                            to,
+                        }),
                         Err(e) => log::warn!("move failed: {e}"),
                     }
                     if let Some(parent) = tree::parent_dir(&from) {
@@ -608,11 +697,21 @@ impl Explorer {
                 }
                 let folder = tree::basename(&to_dir).to_string();
                 let notice = if !res.errors.is_empty() {
-                    (crate::t!(ExplorerImportFailed, errors = res.errors.join("; ")), true)
+                    (
+                        crate::t!(ExplorerImportFailed, errors = res.errors.join("; ")),
+                        true,
+                    )
                 } else if res.imported.len() == 1 {
                     (crate::t!(ExplorerImportedOne, folder = folder), false)
                 } else {
-                    (crate::t!(ExplorerImportedMany, count = res.imported.len(), folder = folder), false)
+                    (
+                        crate::t!(
+                            ExplorerImportedMany,
+                            count = res.imported.len(),
+                            folder = folder
+                        ),
+                        false,
+                    )
                 };
                 this.show_notice(notice, cx);
             })
@@ -624,7 +723,9 @@ impl Explorer {
     fn show_notice(&mut self, notice: (String, bool), cx: &mut Context<Self>) {
         self.notice = Some(notice);
         self.notice_task = Some(cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(tree::NOTICE_MS)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(tree::NOTICE_MS))
+                .await;
             this.update(cx, |this, cx| {
                 this.notice = None;
                 cx.notify();
@@ -638,12 +739,20 @@ impl Explorer {
 
     /// The folder a drag at `pos` would land in (`dragged` = internal
     /// paths; `None` for OS files, which are always accepted).
-    fn drop_target_at(&self, pos: Point<Pixels>, bounds: gpui_kit::Bounds<Pixels>, dragged: Option<&[String]>, window: &Window) -> DropTarget {
+    fn drop_target_at(
+        &self,
+        pos: Point<Pixels>,
+        bounds: gpui_kit::Bounds<Pixels>,
+        dragged: Option<&[String]>,
+        window: &Window,
+    ) -> DropTarget {
         let root = self.root.clone()?;
         if !bounds.contains(&pos) {
             return None;
         }
-        let valid = |dir: &str| dragged.is_none_or(|ps| !ps.is_empty() && ps.iter().all(|p| tree::can_move(p, dir)));
+        let valid = |dir: &str| {
+            dragged.is_none_or(|ps| !ps.is_empty() && ps.iter().all(|p| tree::can_move(p, dir)))
+        };
         let root_target = valid(&root).then(|| root.clone());
         let list = self.scroll.0.borrow().base_handle.bounds();
         let offset = self.scroll.0.borrow().base_handle.offset();
@@ -674,9 +783,13 @@ impl Explorer {
         // `DROP_EXPAND_MS` of hovering.
         if let Some(dir) = target.filter(|d| !self.is_root(d) && !self.expanded.contains(d)) {
             self.spring = Some(cx.spawn(async move |this, cx| {
-                cx.background_executor().timer(Duration::from_millis(tree::DROP_EXPAND_MS)).await;
+                cx.background_executor()
+                    .timer(Duration::from_millis(tree::DROP_EXPAND_MS))
+                    .await;
                 this.update(cx, |this, cx| {
-                    if this.drop_target.as_deref() == Some(dir.as_str()) && !this.expanded.contains(&dir) {
+                    if this.drop_target.as_deref() == Some(dir.as_str())
+                        && !this.expanded.contains(&dir)
+                    {
                         this.toggle(&dir, cx);
                     }
                 })
@@ -721,7 +834,9 @@ impl Explorer {
             items.push(
                 MenuEntry::item(
                     crate::t!(ExplorerNewFile),
-                    act(Rc::new(move |this, w, cx| this.begin_create(p.clone(), PendingKind::File, None, None, w, cx))),
+                    act(Rc::new(move |this, w, cx| {
+                        this.begin_create(p.clone(), PendingKind::File, None, None, w, cx)
+                    })),
                 )
                 .icon(AppIcon::FilePlus),
             );
@@ -729,7 +844,9 @@ impl Explorer {
             items.push(
                 MenuEntry::item(
                     crate::t!(ExplorerNewFolder),
-                    act(Rc::new(move |this, w, cx| this.begin_create(p.clone(), PendingKind::Dir, None, None, w, cx))),
+                    act(Rc::new(move |this, w, cx| {
+                        this.begin_create(p.clone(), PendingKind::Dir, None, None, w, cx)
+                    })),
                 )
                 .icon(AppIcon::FolderPlus),
             );
@@ -739,7 +856,14 @@ impl Explorer {
                     crate::t!(ExplorerNewDrawing),
                     act(Rc::new(move |this, w, cx| {
                         let ph = Some(crate::t!(ExplorerNewDrawing));
-                        this.begin_create(p.clone(), PendingKind::File, Some("excalidraw"), ph, w, cx)
+                        this.begin_create(
+                            p.clone(),
+                            PendingKind::File,
+                            Some("excalidraw"),
+                            ph,
+                            w,
+                            cx,
+                        )
                     })),
                 )
                 .icon(AppIcon::PenTool),
@@ -750,17 +874,28 @@ impl Explorer {
             items.push(
                 MenuEntry::item(
                     crate::t!(TabsOpenInNewWindow),
-                    act(Rc::new(move |_, _, cx| cx.emit(ViewEvent::OpenInNewWindow(p.clone())))),
+                    act(Rc::new(move |_, _, cx| {
+                        cx.emit(ViewEvent::OpenInNewWindow(p.clone()))
+                    })),
                 )
                 .icon(AppIcon::AppWindow),
             );
         }
         let p = path.clone();
         items.push(
-            MenuEntry::item(crate::t!(CommonRename), act(Rc::new(move |this, w, cx| this.begin_rename(p.clone(), w, cx))))
-                .icon(AppIcon::Pencil),
+            MenuEntry::item(
+                crate::t!(CommonRename),
+                act(Rc::new(move |this, w, cx| {
+                    this.begin_rename(p.clone(), w, cx)
+                })),
+            )
+            .icon(AppIcon::Pencil),
         );
-        let cut_label = if n > 1 { crate::t!(ExplorerCutItems, count = n) } else { crate::t!(ExplorerCut) };
+        let cut_label = if n > 1 {
+            crate::t!(ExplorerCutItems, count = n)
+        } else {
+            crate::t!(ExplorerCut)
+        };
         let t = targets.clone();
         items.push(
             MenuEntry::item(
@@ -790,10 +925,15 @@ impl Explorer {
         items.push(MenuEntry::Separator);
         let p = path.clone();
         items.push(
-            MenuEntry::item(crate::t!(CommonRevealInFileManager), move |_, cx| cx.reveal_path(std::path::Path::new(&p)))
-                .icon(IconName::Eye),
+            MenuEntry::item(crate::t!(CommonRevealInFileManager), move |_, cx| {
+                cx.reveal_path(std::path::Path::new(&p))
+            })
+            .icon(IconName::Eye),
         );
-        let tool = crate::settings::SettingsStore::get(cx).external_tool.trim().to_string();
+        let tool = crate::settings::SettingsStore::get(cx)
+            .external_tool
+            .trim()
+            .to_string();
         let open_label = if tool.is_empty() {
             crate::t!(ExplorerOpenWithDefault)
         } else {
@@ -801,10 +941,16 @@ impl Explorer {
         };
         let p = path.clone();
         items.push(
-            MenuEntry::item(open_label, move |w, cx| open_with_external_tool(p.clone(), tool.clone(), w, cx))
-                .icon(AppIcon::ExternalLink),
+            MenuEntry::item(open_label, move |w, cx| {
+                open_with_external_tool(p.clone(), tool.clone(), w, cx)
+            })
+            .icon(AppIcon::ExternalLink),
         );
-        let copy_label = if n > 1 { crate::t!(ExplorerCopyPaths, count = n) } else { crate::t!(CommonCopyPath) };
+        let copy_label = if n > 1 {
+            crate::t!(ExplorerCopyPaths, count = n)
+        } else {
+            crate::t!(CommonCopyPath)
+        };
         let joined = targets.join("\n");
         items.push(
             MenuEntry::item(copy_label, move |_, cx| {
@@ -813,11 +959,20 @@ impl Explorer {
             .icon(IconName::Copy),
         );
         items.push(MenuEntry::Separator);
-        let del_label = if n > 1 { crate::t!(ExplorerDeleteItems, count = n) } else { crate::t!(CommonDelete) };
+        let del_label = if n > 1 {
+            crate::t!(ExplorerDeleteItems, count = n)
+        } else {
+            crate::t!(CommonDelete)
+        };
         items.push(
-            MenuEntry::item(del_label, act(Rc::new(move |this, w, cx| this.delete_all(targets.clone(), w, cx))))
-                .icon(AppIcon::Trash)
-                .danger(),
+            MenuEntry::item(
+                del_label,
+                act(Rc::new(move |this, w, cx| {
+                    this.delete_all(targets.clone(), w, cx)
+                })),
+            )
+            .icon(AppIcon::Trash)
+            .danger(),
         );
         items
     }
@@ -844,7 +999,12 @@ impl Explorer {
         self.last_entries = entries;
     }
 
-    fn render_header(&self, root: &str, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_header(
+        &self,
+        root: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let th = AppTheme::get(cx).clone();
         let title: SharedString = tree::basename(root).to_string().into();
         let full: SharedString = root.to_string().into();
@@ -865,7 +1025,11 @@ impl Explorer {
             .px(u(6.))
             .border_b_1()
             .border_color(alpha(th.colors.border, 0.6))
-            .when(targeted, |d| d.bg(th.colors.accent).border_1().border_color(th.colors.ring))
+            .when(targeted, |d| {
+                d.bg(th.colors.accent)
+                    .border_1()
+                    .border_color(th.colors.ring)
+            })
             .child(
                 div()
                     .id("explorer-title")
@@ -879,7 +1043,9 @@ impl Explorer {
                     .text_ellipsis()
                     .whitespace_nowrap()
                     .child(title)
-                    .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(full.clone()).build(w, cx)),
+                    .tooltip(move |w, cx| {
+                        gpui_kit::component::tooltip::Tooltip::new(full.clone()).build(w, cx)
+                    }),
             )
             .child(header_button(
                 "ex-open",
@@ -893,14 +1059,18 @@ impl Explorer {
                 AppIcon::FilePlus.into(),
                 crate::t!(ExplorerNewFile),
                 &th,
-                cx.listener(move |this, _: &ClickEvent, w, cx| this.begin_create(r1.clone(), PendingKind::File, None, None, w, cx)),
+                cx.listener(move |this, _: &ClickEvent, w, cx| {
+                    this.begin_create(r1.clone(), PendingKind::File, None, None, w, cx)
+                }),
             ))
             .child(header_button(
                 "ex-new-folder",
                 AppIcon::FolderPlus.into(),
                 crate::t!(ExplorerNewFolder),
                 &th,
-                cx.listener(move |this, _: &ClickEvent, w, cx| this.begin_create(r2.clone(), PendingKind::Dir, None, None, w, cx)),
+                cx.listener(move |this, _: &ClickEvent, w, cx| {
+                    this.begin_create(r2.clone(), PendingKind::Dir, None, None, w, cx)
+                }),
             ))
             .child(header_button(
                 "ex-new-drawing",
@@ -921,8 +1091,16 @@ impl Explorer {
             ))
     }
 
-    fn render_input_row(&self, depth: usize, icon: Icon, th: &AppTheme, cx: &mut Context<Self>) -> AnyElement {
-        let Some((state, _)) = &self.input else { return div().into_any_element() };
+    fn render_input_row(
+        &self,
+        depth: usize,
+        icon: Icon,
+        th: &AppTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let Some((state, _)) = &self.input else {
+            return div().into_any_element();
+        };
         div()
             .id("explorer-input-row")
             .debug_selector(|| "ex-input".to_string())
@@ -934,7 +1112,11 @@ impl Explorer {
             .pr(u(6.))
             .text_size(u(13.))
             .child(div().flex_none().size(u(14.)))
-            .child(icon.size(u(14.)).flex_none().text_color(th.colors.muted_foreground))
+            .child(
+                icon.size(u(14.))
+                    .flex_none()
+                    .text_color(th.colors.muted_foreground),
+            )
             .child(
                 div()
                     .flex_1()
@@ -945,7 +1127,9 @@ impl Explorer {
                     .rounded(u(th.radius.sm))
                     .bg(th.colors.background)
                     .text_color(th.colors.foreground)
-                    .on_action(cx.listener(|this, _: &Escape, window, cx| this.cancel_input(window, cx)))
+                    .on_action(
+                        cx.listener(|this, _: &Escape, window, cx| this.cancel_input(window, cx)),
+                    )
                     .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                         // Don't stop propagation: that would also suppress text
                         // insertion. The tree ignores keys while the input is open.
@@ -954,7 +1138,12 @@ impl Explorer {
                             cx.stop_propagation();
                         }
                     }))
-                    .child(Input::new(state).appearance(false).h(u(20.)).text_size(u(13.))),
+                    .child(
+                        Input::new(state)
+                            .appearance(false)
+                            .h(u(20.))
+                            .text_size(u(13.)),
+                    ),
             )
             .into_any_element()
     }
@@ -996,9 +1185,17 @@ fn open_with_external_tool(path: String, tool: String, window: &mut Window, cx: 
     window
         .spawn(cx, async move |cx| {
             if let Err(e) = task.await {
-                let app = if tool.is_empty() { crate::t!(ExplorerTheDefaultApp) } else { tool };
+                let app = if tool.is_empty() {
+                    crate::t!(ExplorerTheDefaultApp)
+                } else {
+                    tool
+                };
                 cx.update(|window, cx| {
-                    crate::ui::toast::toast_error(window, cx, crate::t!(ExplorerOpenWithFailed, app = app, error = e))
+                    crate::ui::toast::toast_error(
+                        window,
+                        cx,
+                        crate::t!(ExplorerOpenWithFailed, app = app, error = e),
+                    )
                 })
                 .ok();
             }
@@ -1038,7 +1235,11 @@ fn spawn_open(path: &str, tool: &str) -> Result<(), String> {
         Ok(())
     } else {
         let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
-        Err(if err.is_empty() { out.status.to_string() } else { err })
+        Err(if err.is_empty() {
+            out.status.to_string()
+        } else {
+            err
+        })
     }
 }
 
@@ -1057,25 +1258,43 @@ impl Render for Explorer {
             self.drop_target = None;
             self.spring = None;
         }
-        let rows = tree::flatten(&self.tree, &root, &self.expanded, self.renaming.as_deref(), self.pending.as_ref());
+        let rows = tree::flatten(
+            &self.tree,
+            &root,
+            &self.expanded,
+            self.renaming.as_deref(),
+            self.pending.as_ref(),
+        );
         self.reconcile(&rows);
         let rows = Rc::new(rows);
         self.rows = rows.clone();
 
-        let root_pending = self.pending.as_ref().filter(|p| p.parent == root).map(|p| p.kind);
+        let root_pending = self
+            .pending
+            .as_ref()
+            .filter(|p| p.parent == root)
+            .map(|p| p.kind);
         let body = match self.tree.get(&root) {
             Some(DirState::Loaded(_)) => {
                 let view = cx.entity();
                 let rows2 = rows.clone();
                 uniform_list("explorer-rows", rows.len(), move |range, _window, cx| {
-                    view.update(cx, |this, cx| range.map(|i| this.render_row(&rows2[i], i, cx)).collect::<Vec<_>>())
+                    view.update(cx, |this, cx| {
+                        range
+                            .map(|i| this.render_row(&rows2[i], i, cx))
+                            .collect::<Vec<_>>()
+                    })
                 })
                 .track_scroll(&self.scroll)
                 .flex_1()
                 .into_any_element()
             }
-            Some(DirState::Error(e)) => status_line(e.clone(), th.colors.destructive).into_any_element(),
-            _ => status_line(crate::t!(CommonLoading), th.colors.muted_foreground).into_any_element(),
+            Some(DirState::Error(e)) => {
+                status_line(e.clone(), th.colors.destructive).into_any_element()
+            }
+            _ => {
+                status_line(crate::t!(CommonLoading), th.colors.muted_foreground).into_any_element()
+            }
         };
         let notice = self.notice.clone().map(|(text, err)| {
             div()
@@ -1085,10 +1304,15 @@ impl Render for Explorer {
                 .text_size(u(11.))
                 .border_b_1()
                 .border_color(th.colors.border)
-                .text_color(if err { th.colors.destructive } else { th.colors.muted_foreground })
+                .text_color(if err {
+                    th.colors.destructive
+                } else {
+                    th.colors.muted_foreground
+                })
                 .child(text)
         });
-        let pending_root = root_pending.map(|kind| self.render_input_row(0, kind_icon(kind), &th, cx));
+        let pending_root =
+            root_pending.map(|kind| self.render_input_row(0, kind_icon(kind), &th, cx));
 
         div()
             .id("explorer")
@@ -1108,15 +1332,19 @@ impl Render for Explorer {
                 }),
             )
             .on_key_down(cx.listener(Self::key_down))
-            .on_drag_move(cx.listener(|this, ev: &DragMoveEvent<DraggedPaths>, window, cx| {
-                let paths = ev.drag(cx).0.clone();
-                let t = this.drop_target_at(ev.event.position, ev.bounds, Some(&paths), window);
-                this.set_drop_target(t, cx);
-            }))
-            .on_drag_move(cx.listener(|this, ev: &DragMoveEvent<ExternalPaths>, window, cx| {
-                let t = this.drop_target_at(ev.event.position, ev.bounds, None, window);
-                this.set_drop_target(t, cx);
-            }))
+            .on_drag_move(
+                cx.listener(|this, ev: &DragMoveEvent<DraggedPaths>, window, cx| {
+                    let paths = ev.drag(cx).0.clone();
+                    let t = this.drop_target_at(ev.event.position, ev.bounds, Some(&paths), window);
+                    this.set_drop_target(t, cx);
+                }),
+            )
+            .on_drag_move(
+                cx.listener(|this, ev: &DragMoveEvent<ExternalPaths>, window, cx| {
+                    let t = this.drop_target_at(ev.event.position, ev.bounds, None, window);
+                    this.set_drop_target(t, cx);
+                }),
+            )
             .on_drop(cx.listener(|this, p: &DraggedPaths, _, cx| this.drop_paths(p, cx)))
             .on_drop(cx.listener(|this, p: &ExternalPaths, _, cx| this.drop_external(p, cx)))
             .child(self.render_header(&root, window, cx))
@@ -1146,30 +1374,62 @@ impl Explorer {
                 .pl(u(6. + *depth as f32 * 12. + 18.))
                 .pr(u(12.))
                 .text_size(u(11.))
-                .text_color(if *error { th.colors.destructive } else { th.colors.muted_foreground })
+                .text_color(if *error {
+                    th.colors.destructive
+                } else {
+                    th.colors.muted_foreground
+                })
                 .overflow_hidden()
                 .whitespace_nowrap()
                 .text_ellipsis()
                 .child(text.clone())
                 .into_any_element(),
-            Row::Pending { depth, kind, .. } => self.render_input_row(*depth, kind_icon(*kind), &th, cx),
-            Row::Rename { entry, depth } => self.render_input_row(*depth, entry_icon(entry), &th, cx),
-            Row::Entry { entry, depth, expanded } => self.render_entry(entry, *depth, *expanded, ix, &th, cx),
+            Row::Pending { depth, kind, .. } => {
+                self.render_input_row(*depth, kind_icon(*kind), &th, cx)
+            }
+            Row::Rename { entry, depth } => {
+                self.render_input_row(*depth, entry_icon(entry), &th, cx)
+            }
+            Row::Entry {
+                entry,
+                depth,
+                expanded,
+            } => self.render_entry(entry, *depth, *expanded, ix, &th, cx),
         }
     }
 
-    fn render_entry(&self, entry: &Entry, depth: usize, expanded: bool, ix: usize, th: &AppTheme, cx: &mut Context<Self>) -> AnyElement {
+    fn render_entry(
+        &self,
+        entry: &Entry,
+        depth: usize,
+        expanded: bool,
+        ix: usize,
+        th: &AppTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let is_sel = self.sel.contains(&entry.path);
         let is_cut = self.cut.contains(&entry.path);
         let is_drop = entry.is_dir && self.drop_target.as_deref() == Some(entry.path.as_str());
-        let chevron = div().flex_none().size(u(14.)).flex().items_center().justify_center().when(entry.is_dir, |d| {
-            d.child(
-                Icon::new(IconName::ChevronRight)
-                    .size(u(12.))
-                    .when(expanded, |i| i.rotate(gpui_kit::radians(std::f32::consts::FRAC_PI_2))),
-            )
-        });
-        let muted = if is_sel { th.colors.accent_foreground } else { th.colors.muted_foreground };
+        let chevron = div()
+            .flex_none()
+            .size(u(14.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .when(entry.is_dir, |d| {
+                d.child(
+                    Icon::new(IconName::ChevronRight)
+                        .size(u(12.))
+                        .when(expanded, |i| {
+                            i.rotate(gpui_kit::radians(std::f32::consts::FRAC_PI_2))
+                        }),
+                )
+            });
+        let muted = if is_sel {
+            th.colors.accent_foreground
+        } else {
+            th.colors.muted_foreground
+        };
         let hover = alpha(th.colors.accent, 0.7);
         let view: WeakEntity<Explorer> = cx.entity().downgrade();
         let (v1, v2, v3) = (view.clone(), view.clone(), view);
@@ -1191,19 +1451,34 @@ impl Explorer {
             .font_family(th.ui_font.clone())
             .text_color(th.fg_alpha(0.85))
             .cursor_pointer()
-            .when(is_sel || is_drop, |d| d.bg(th.colors.accent).text_color(th.colors.accent_foreground))
+            .when(is_sel || is_drop, |d| {
+                d.bg(th.colors.accent)
+                    .text_color(th.colors.accent_foreground)
+            })
             .when(!is_sel && !is_drop, |d| d.hover(move |s| s.bg(hover)))
             .when(is_drop, |d| d.border_1().border_color(th.colors.ring))
             .when(is_cut, |d| d.opacity(0.55))
             .child(chevron.text_color(muted))
             .child(entry_icon(entry).size(u(14.)).flex_none().text_color(muted))
-            .child(div().flex_1().min_w_0().overflow_hidden().whitespace_nowrap().text_ellipsis().child(entry.name.clone()))
-            .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(w, cx))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
+                    .child(entry.name.clone()),
+            )
+            .tooltip(move |w, cx| {
+                gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(w, cx)
+            })
             .on_click(move |ev, window, cx| {
-                v1.update(cx, |this, cx| this.click_entry(&e1, ev, window, cx)).ok();
+                v1.update(cx, |this, cx| this.click_entry(&e1, ev, window, cx))
+                    .ok();
             })
             .on_mouse_down(MouseButton::Right, move |_, _, cx| {
-                v2.update(cx, |this, cx| this.right_click_entry(&path_sel, cx)).ok();
+                v2.update(cx, |this, cx| this.right_click_entry(&path_sel, cx))
+                    .ok();
             })
             .when(!self.input_open(), |d| {
                 let targets = self.sel.targets_for(&entry.path);
@@ -1213,11 +1488,16 @@ impl Explorer {
                     entry.name.clone().into()
                 };
                 d.on_drag(DraggedPaths(targets), move |_, offset, _, cx| {
-                    cx.new(|_| DragGhost { label: label.clone(), offset })
+                    cx.new(|_| DragGhost {
+                        label: label.clone(),
+                        offset,
+                    })
                 })
             })
             .context_menu(move |menu, _, cx| {
-                let items = v3.update(cx, |this, cx| this.row_menu(&e3, cx)).unwrap_or_default();
+                let items = v3
+                    .update(cx, |this, cx| this.row_menu(&e3, cx))
+                    .unwrap_or_default();
                 build_menu(menu, items)
             });
         row.into_any_element()
@@ -1243,5 +1523,11 @@ fn entry_icon(entry: &Entry) -> Icon {
 }
 
 fn status_line(text: String, color: gpui_kit::Hsla) -> impl IntoElement {
-    div().py(u(8.)).pl(u(12.)).pr(u(12.)).text_size(u(11.)).text_color(color).child(text)
+    div()
+        .py(u(8.))
+        .pl(u(12.))
+        .pr(u(12.))
+        .text_size(u(11.))
+        .text_color(color)
+        .child(text)
 }

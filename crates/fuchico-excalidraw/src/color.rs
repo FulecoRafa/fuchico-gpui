@@ -11,18 +11,32 @@ pub struct Rgba {
 }
 
 impl Rgba {
-    pub const TRANSPARENT: Rgba = Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.0 };
+    pub const TRANSPARENT: Rgba = Rgba {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 0.0,
+    };
 
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self { r, g, b, a }
     }
 
     pub fn with_alpha(self, a: f32) -> Self {
-        Self { a: self.a * a, ..self }
+        Self {
+            a: self.a * a,
+            ..self
+        }
     }
 
     pub fn to_hsla(self) -> gpui_kit::Hsla {
-        gpui_kit::Rgba { r: self.r, g: self.g, b: self.b, a: self.a }.into()
+        gpui_kit::Rgba {
+            r: self.r,
+            g: self.g,
+            b: self.b,
+            a: self.a,
+        }
+        .into()
     }
 
     /// `#rrggbb` (alpha dropped).
@@ -68,9 +82,19 @@ pub fn parse(s: &str) -> Option<Rgba> {
         let (r, g, b, a) = match hex.len() {
             3 | 4 => {
                 let d = |i| h(i, 1).map(|v| v * 17);
-                (d(0)?, d(1)?, d(2)?, if hex.len() == 4 { d(3)? } else { 255 })
+                (
+                    d(0)?,
+                    d(1)?,
+                    d(2)?,
+                    if hex.len() == 4 { d(3)? } else { 255 },
+                )
             }
-            6 | 8 => (h(0, 2)?, h(2, 2)?, h(4, 2)?, if hex.len() == 8 { h(6, 2)? } else { 255 }),
+            6 | 8 => (
+                h(0, 2)?,
+                h(2, 2)?,
+                h(4, 2)?,
+                if hex.len() == 8 { h(6, 2)? } else { 255 },
+            ),
             _ => return None,
         };
         return Some(Rgba::new(
@@ -101,7 +125,12 @@ pub fn parse(s: &str) -> Option<Rgba> {
         }
         let a = parts.get(3).copied().unwrap_or(1.0);
         let a = if a > 1.0 { a / 255.0 } else { a };
-        return Some(Rgba::new(parts[0] / 255.0, parts[1] / 255.0, parts[2] / 255.0, a));
+        return Some(Rgba::new(
+            parts[0] / 255.0,
+            parts[1] / 255.0,
+            parts[2] / 255.0,
+            a,
+        ));
     }
     let named = match t.as_str() {
         "black" => "#000000",

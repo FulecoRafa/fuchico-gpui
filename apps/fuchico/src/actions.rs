@@ -63,8 +63,9 @@ gpui_kit::actions!(
 // Defined by the editor crate (same `fuchico::` names); re-exported so the
 // palette and the editor view share one action type.
 pub use fuchico_editor::{
-    EditorInsertDate, EditorInsertDateTime, EditorInsertRegion, EditorInsertTable, EditorOpenOutline,
-    EditorPickDueDate, EditorPickRecurrence, EditorToggleCheckbox, EditorToggleTaskLine, GoToLine,
+    EditorInsertDate, EditorInsertDateTime, EditorInsertRegion, EditorInsertTable,
+    EditorOpenOutline, EditorPickDueDate, EditorPickRecurrence, EditorToggleCheckbox,
+    EditorToggleTaskLine, GoToLine,
 };
 
 /// The editor action for a `SHORTCUT_ACTIONS` id (`"insertDate"`, ...).

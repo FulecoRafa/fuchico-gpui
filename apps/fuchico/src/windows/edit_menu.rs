@@ -25,7 +25,14 @@ pub enum EditCommand {
 }
 
 impl EditCommand {
-    pub const ALL: [EditCommand; 6] = [Self::Undo, Self::Redo, Self::Cut, Self::Copy, Self::Paste, Self::SelectAll];
+    pub const ALL: [EditCommand; 6] = [
+        Self::Undo,
+        Self::Redo,
+        Self::Cut,
+        Self::Copy,
+        Self::Paste,
+        Self::SelectAll,
+    ];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -76,7 +83,14 @@ impl EditCommand {
     }
 
     fn keystroke(self) -> Keystroke {
-        let k = self.keys().replace("secondary", if cfg!(target_os = "macos") { "cmd" } else { "ctrl" });
+        let k = self.keys().replace(
+            "secondary",
+            if cfg!(target_os = "macos") {
+                "cmd"
+            } else {
+                "ctrl"
+            },
+        );
         Keystroke::parse(&k).expect("valid keystroke")
     }
 }
@@ -90,7 +104,11 @@ pub fn forward(cmd: EditCommand, cx: &mut App) {
 fn forward_now(cmd: EditCommand, cx: &mut App) {
     let Some(h) = cx.active_window() else { return };
     h.update(cx, |_, window, cx| {
-        match cmd.targets().into_iter().find(|a| window.is_action_available(a.as_ref(), cx)) {
+        match cmd
+            .targets()
+            .into_iter()
+            .find(|a| window.is_action_available(a.as_ref(), cx))
+        {
             Some(a) => window.dispatch_action(a, cx),
             None => {
                 window.dispatch_keystroke(cmd.keystroke(), cx);
@@ -121,8 +139,8 @@ pub fn register(cx: &mut App) {
 
 /// The Edit submenu.
 pub fn menu() -> gpui_kit::Menu {
-    use gpui_kit::MenuItem;
     use EditCommand::*;
+    use gpui_kit::MenuItem;
     gpui_kit::Menu::new("Edit").items([
         MenuItem::os_action(Undo.label(), MenuUndo, Undo.os_action()),
         MenuItem::os_action(Redo.label(), MenuRedo, Redo.os_action()),

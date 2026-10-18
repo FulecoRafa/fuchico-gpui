@@ -83,17 +83,27 @@ pub fn suggested_name(path: &str, ext: &str) -> String {
 }
 
 fn note_dir(path: &str) -> PathBuf {
-    Path::new(path).parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("/"))
+    Path::new(path)
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("/"))
 }
 
 /// Adds `ext` when the chosen name has no extension (the original's save
 /// dialog filter did the same).
 pub fn with_extension(p: PathBuf, ext: &str) -> PathBuf {
-    if p.extension().is_some() { p } else { p.with_extension(ext) }
+    if p.extension().is_some() {
+        p
+    } else {
+        p.with_extension(ext)
+    }
 }
 
 fn color_vars(th: &AppTheme) -> Vec<(String, String)> {
-    ColorTokens::NAMES.iter().filter_map(|n| th.colors.get(n).map(|c| (n.to_string(), hex(c)))).collect()
+    ColorTokens::NAMES
+        .iter()
+        .filter_map(|n| th.colors.get(n).map(|c| (n.to_string(), hex(c))))
+        .collect()
 }
 
 /// `THEME_VARIABLES` of the current theme (`currentThemeVars()`).
@@ -102,9 +112,18 @@ pub fn html_theme_vars(th: &AppTheme) -> Vec<(String, String)> {
     v.push(("--radius".into(), format!("{}px", th.radius.base)));
     v.push((
         "--font-sans".into(),
-        format!("\"{}\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif", th.ui_font),
+        format!(
+            "\"{}\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+            th.ui_font
+        ),
     ));
-    v.push(("--font-mono".into(), format!("\"{}\", ui-monospace, SFMono-Regular, monospace", th.mono_font)));
+    v.push((
+        "--font-mono".into(),
+        format!(
+            "\"{}\", ui-monospace, SFMono-Regular, monospace",
+            th.mono_font
+        ),
+    ));
     v
 }
 
@@ -123,8 +142,21 @@ pub fn pdf_style(th: &AppTheme, title: &str) -> pdf::PdfStyle {
 /// The HTML document written by [`export_html`].
 pub fn export_html_document(markdown: &str, title: &str, th: &AppTheme) -> String {
     let vars = html_theme_vars(th);
-    let mode = if th.appearance.is_dark() { ThemeMode::Dark } else { ThemeMode::Light };
-    render_html(markdown, &RenderOptions { title, resolve_href: None, body_extra: "", theme_vars: &vars, mode })
+    let mode = if th.appearance.is_dark() {
+        ThemeMode::Dark
+    } else {
+        ThemeMode::Light
+    };
+    render_html(
+        markdown,
+        &RenderOptions {
+            title,
+            resolve_href: None,
+            body_extra: "",
+            theme_vars: &vars,
+            mode,
+        },
+    )
 }
 
 // ----- entry points -------------------------------------------------------
@@ -189,7 +221,9 @@ fn run_export(
             let res = match content.await {
                 Ok(text) => {
                     let t2 = target.clone();
-                    cx.background_spawn(async move { write(text, t2) }).await.map(|_| target)
+                    cx.background_spawn(async move { write(text, t2) })
+                        .await
+                        .map(|_| target)
                 }
                 Err(e) => Err(e),
             };
@@ -208,7 +242,12 @@ pub fn export_html(path: &str, window: &mut Window, cx: &mut App) {
         cx,
         move |text, target| {
             let html = export_html_document(&text, &title, &th);
-            fs_write_file(target.to_string_lossy().into_owned(), html, Some("export".into()), &*bus::sink())
+            fs_write_file(
+                target.to_string_lossy().into_owned(),
+                html,
+                Some("export".into()),
+                &*bus::sink(),
+            )
         },
         false,
     );
@@ -218,7 +257,8 @@ pub fn export_pdf(path: &str, window: &mut Window, cx: &mut App) {
     let style = pdf_style(AppTheme::get(cx), &stem(path));
     let dir = note_dir(path);
     // Scan system fonts while the save dialog is up.
-    cx.background_spawn(async { pdf::world::prewarm() }).detach();
+    cx.background_spawn(async { pdf::world::prewarm() })
+        .detach();
     run_export(
         path,
         "pdf",
@@ -226,7 +266,12 @@ pub fn export_pdf(path: &str, window: &mut Window, cx: &mut App) {
         cx,
         move |text, target| {
             let bytes = pdf::render_pdf(&text, &style, &dir)?;
-            fs_write_bytes(target.to_string_lossy().into_owned(), &bytes, Some("export".into()), &*bus::sink())
+            fs_write_bytes(
+                target.to_string_lossy().into_owned(),
+                &bytes,
+                Some("export".into()),
+                &*bus::sink(),
+            )
         },
         true,
     );
@@ -262,7 +307,9 @@ pub fn print_pdf(path: &str, window: &mut Window, cx: &mut App) {
             };
             let _ = cx.update(|window, cx| match res {
                 Ok(p) => cx.open_with_system(&p),
-                Err(e) => crate::ui::toast::toast_error(window, cx, t!(ExportPrintFailed, message = e)),
+                Err(e) => {
+                    crate::ui::toast::toast_error(window, cx, t!(ExportPrintFailed, message = e))
+                }
             });
         })
         .detach();
@@ -288,7 +335,13 @@ mod tests {
 
     #[test]
     fn missing_extension_is_added() {
-        assert_eq!(with_extension("/x/a".into(), "html"), PathBuf::from("/x/a.html"));
-        assert_eq!(with_extension("/x/a.htm".into(), "html"), PathBuf::from("/x/a.htm"));
+        assert_eq!(
+            with_extension("/x/a".into(), "html"),
+            PathBuf::from("/x/a.html")
+        );
+        assert_eq!(
+            with_extension("/x/a.htm".into(), "html"),
+            PathBuf::from("/x/a.htm")
+        );
     }
 }

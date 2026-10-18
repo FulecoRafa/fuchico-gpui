@@ -84,7 +84,12 @@ pub fn parse_frontmatter(text: &str) -> Option<ParsedFrontmatter> {
         }
         offset += l.len() + 1;
     }
-    Some(ParsedFrontmatter { data, raw, body_start, end_line: close_idx + 1 })
+    Some(ParsedFrontmatter {
+        data,
+        raw,
+        body_start,
+        end_line: close_idx + 1,
+    })
 }
 
 fn parse_yaml_block(lines: &[&str]) -> Data {
@@ -114,7 +119,11 @@ fn parse_yaml_block(lines: &[&str]) -> Data {
                     continue;
                 }
                 if next_trimmed.starts_with("- ") || next_trimmed == "-" {
-                    let item_val = if next_trimmed == "-" { "" } else { next_trimmed[2..].trim() };
+                    let item_val = if next_trimmed == "-" {
+                        ""
+                    } else {
+                        next_trimmed[2..].trim()
+                    };
                     items.push(coerce_scalar(strip_quotes(item_val)));
                     j += 1;
                     continue;
@@ -152,7 +161,9 @@ fn parse_yaml_block(lines: &[&str]) -> Data {
 
 fn strip_quotes(s: &str) -> &str {
     let b = s.as_bytes();
-    if b.len() >= 2 && ((b[0] == b'"' && b[b.len() - 1] == b'"') || (b[0] == b'\'' && b[b.len() - 1] == b'\'')) {
+    if b.len() >= 2
+        && ((b[0] == b'"' && b[b.len() - 1] == b'"') || (b[0] == b'\'' && b[b.len() - 1] == b'\''))
+    {
         &s[1..s.len() - 1]
     } else {
         s
@@ -166,9 +177,15 @@ fn coerce_scalar(s: &str) -> Value {
         "false" => Value::Bool(false),
         _ if INT_RE.is_match(s) => match s.parse::<i64>() {
             Ok(n) => Value::Int(n),
-            Err(_) => s.parse::<f64>().map(Value::Float).unwrap_or_else(|_| Value::Str(s.to_string())),
+            Err(_) => s
+                .parse::<f64>()
+                .map(Value::Float)
+                .unwrap_or_else(|_| Value::Str(s.to_string())),
         },
-        _ if FLOAT_RE.is_match(s) => s.parse::<f64>().map(Value::Float).unwrap_or_else(|_| Value::Str(s.to_string())),
+        _ if FLOAT_RE.is_match(s) => s
+            .parse::<f64>()
+            .map(Value::Float)
+            .unwrap_or_else(|_| Value::Str(s.to_string())),
         _ => Value::Str(s.to_string()),
     }
 }
@@ -214,9 +231,15 @@ mod tests {
         assert_eq!(fm.data.get("none"), Some(&Value::Null));
         assert_eq!(
             fm.data.get("tags"),
-            Some(&Value::List(vec![Value::Str("a".into()), Value::Str("b, c".into())]))
+            Some(&Value::List(vec![
+                Value::Str("a".into()),
+                Value::Str("b, c".into())
+            ]))
         );
-        assert_eq!(fm.data.get("list"), Some(&Value::List(vec![Value::Str("x".into()), Value::Int(2)])));
+        assert_eq!(
+            fm.data.get("list"),
+            Some(&Value::List(vec![Value::Str("x".into()), Value::Int(2)]))
+        );
         assert_eq!(&text[fm.body_start..], "body");
         assert_eq!(fm.end_line, 11);
     }

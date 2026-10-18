@@ -7,7 +7,9 @@ use gpui_kit::component::Icon;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::prelude::*;
-use gpui_kit::{AnyElement, App, ClickEvent, ElementId, Entity, FontWeight, Hsla, SharedString, Window, div};
+use gpui_kit::{
+    AnyElement, App, ClickEvent, ElementId, Entity, FontWeight, Hsla, SharedString, Window, div,
+};
 
 use crate::assets::AppIcon;
 use crate::theme::AppTheme;
@@ -26,7 +28,12 @@ pub struct Section {
 
 impl Section {
     pub fn new(title: String, desc: String) -> Self {
-        Section { title, desc, desc_el: None, items: Vec::new() }
+        Section {
+            title,
+            desc,
+            desc_el: None,
+            items: Vec::new(),
+        }
     }
 
     pub fn desc_el(mut self, el: impl IntoElement) -> Self {
@@ -36,7 +43,8 @@ impl Section {
 
     /// A filterable field (its `text` is what the search matches).
     pub fn field(mut self, text: impl Into<String>, el: impl IntoElement) -> Self {
-        self.items.push(Item::Field(text.into(), el.into_any_element()));
+        self.items
+            .push(Item::Field(text.into(), el.into_any_element()));
         self
     }
 
@@ -65,7 +73,12 @@ pub fn label(text: impl Into<SharedString>, cx: &App) -> gpui_kit::Div {
 /// `.settings-hint`: 12px muted.
 pub fn hint(cx: &App) -> gpui_kit::Div {
     let th = AppTheme::get(cx);
-    div().flex().flex_wrap().gap_x(u(4.)).text_size(u(12.)).text_color(th.colors.muted_foreground)
+    div()
+        .flex()
+        .flex_wrap()
+        .gap_x(u(4.))
+        .text_size(u(12.))
+        .text_color(th.colors.muted_foreground)
 }
 
 pub fn hint_text(text: impl Into<SharedString>, cx: &App) -> gpui_kit::Div {
@@ -90,13 +103,22 @@ pub fn status(text: impl Into<SharedString>, ok: bool, cx: &App) -> gpui_kit::Di
     div()
         .mt(u(6.))
         .text_size(u(12.))
-        .text_color(if ok { th.colors.syntax_function } else { th.colors.destructive })
+        .text_color(if ok {
+            th.colors.syntax_function
+        } else {
+            th.colors.destructive
+        })
         .child(text.into())
 }
 
 /// `.settings-field`: label above control, optional hint below.
 pub fn field(label_text: &str, control: impl IntoElement, cx: &App) -> gpui_kit::Div {
-    div().flex().flex_col().gap(u(4.)).child(label(label_text.to_string(), cx)).child(control)
+    div()
+        .flex()
+        .flex_col()
+        .gap(u(4.))
+        .child(label(label_text.to_string(), cx))
+        .child(control)
 }
 
 /// A framed single-line text input.
@@ -148,7 +170,11 @@ pub fn btn(
         .when_some(icon, |d, i| d.child(Icon::new(i).size(u(13.))))
         .child(label.into())
         .when(disabled, |d| d.opacity(0.5))
-        .when(!disabled, |d| d.cursor_pointer().hover(move |s| s.bg(hover)).on_click(on_click))
+        .when(!disabled, |d| {
+            d.cursor_pointer()
+                .hover(move |s| s.bg(hover))
+                .on_click(on_click)
+        })
 }
 
 /// One toggle button of a [`toggles`] group (`theme-palette-btn`).
@@ -205,30 +231,40 @@ pub fn toggles(items: Vec<Toggle>, cx: &App) -> gpui_kit::Div {
         th.colors.foreground,
     );
     let radius = u(th.radius.sm);
-    div().flex().flex_wrap().gap(u(6.)).children(items.into_iter().map(move |t| {
-        let on_click = t.on_click.clone();
-        let tooltip = t.tooltip.clone();
-        div()
-            .id(ElementId::Name(t.id.clone()))
-            .debug_selector(|| t.id.to_string())
-            .flex()
-            .items_center()
-            .gap(u(4.))
-            .px(u(10.))
-            .py(u(5.))
-            .border_1()
-            .rounded(radius)
-            .text_size(u(12.))
-            .when(t.active, |d| d.bg(primary).border_color(primary).text_color(primary_fg))
-            .when(!t.active, |d| d.bg(bg).border_color(border).text_color(fg))
-            .when(t.disabled, |d| d.opacity(0.5))
-            .when(!t.disabled, |d| {
-                d.cursor_pointer().hover(move |s| s.border_color(ring)).on_click(move |e, w, cx| on_click(e, w, cx))
-            })
-            .when_some(tooltip, |d, tip| d.tooltip(move |w, cx| Tooltip::new(tip.clone()).build(w, cx)))
-            .when_some(t.icon, |d, i| d.child(Icon::new(i).size(u(13.))))
-            .child(t.label)
-    }))
+    div()
+        .flex()
+        .flex_wrap()
+        .gap(u(6.))
+        .children(items.into_iter().map(move |t| {
+            let on_click = t.on_click.clone();
+            let tooltip = t.tooltip.clone();
+            div()
+                .id(ElementId::Name(t.id.clone()))
+                .debug_selector(|| t.id.to_string())
+                .flex()
+                .items_center()
+                .gap(u(4.))
+                .px(u(10.))
+                .py(u(5.))
+                .border_1()
+                .rounded(radius)
+                .text_size(u(12.))
+                .when(t.active, |d| {
+                    d.bg(primary).border_color(primary).text_color(primary_fg)
+                })
+                .when(!t.active, |d| d.bg(bg).border_color(border).text_color(fg))
+                .when(t.disabled, |d| d.opacity(0.5))
+                .when(!t.disabled, |d| {
+                    d.cursor_pointer()
+                        .hover(move |s| s.border_color(ring))
+                        .on_click(move |e, w, cx| on_click(e, w, cx))
+                })
+                .when_some(tooltip, |d, tip| {
+                    d.tooltip(move |w, cx| Tooltip::new(tip.clone()).build(w, cx))
+                })
+                .when_some(t.icon, |d, i| d.child(Icon::new(i).size(u(13.))))
+                .child(t.label)
+        }))
 }
 
 /// Bordered row (account / link / shortcut / sync log).
@@ -247,7 +283,11 @@ pub fn row_box(cx: &App) -> gpui_kit::Div {
 
 /// The preview card: toolbar with three dots, Primary / Secondary buttons,
 /// the pangram and a syntax-colored code sample, drawn with `th`.
-pub fn preview_card(th: &AppTheme, ui_font: Option<SharedString>, mono_font: Option<SharedString>) -> gpui_kit::Div {
+pub fn preview_card(
+    th: &AppTheme,
+    ui_font: Option<SharedString>,
+    mono_font: Option<SharedString>,
+) -> gpui_kit::Div {
     let c = &th.colors;
     let dot = || div().size(u(8.)).rounded_full().bg(c.muted);
     let pill = |text: String, bg: Hsla, fg: Hsla| {
@@ -301,11 +341,17 @@ pub fn preview_card(th: &AppTheme, ui_font: Option<SharedString>, mono_font: Opt
         .overflow_hidden()
         .bg(c.background)
         .text_color(c.foreground)
-        .child(div().flex().gap(u(4.)).px(u(10.)).py(u(8.)).bg(c.card).border_b_1().border_color(c.border).children([
-            dot(),
-            dot(),
-            dot(),
-        ]))
+        .child(
+            div()
+                .flex()
+                .gap(u(4.))
+                .px(u(10.))
+                .py(u(8.))
+                .bg(c.card)
+                .border_b_1()
+                .border_color(c.border)
+                .children([dot(), dot(), dot()]),
+        )
         .child(
             div()
                 .flex()
@@ -322,10 +368,22 @@ pub fn preview_card(th: &AppTheme, ui_font: Option<SharedString>, mono_font: Opt
                             div()
                                 .flex()
                                 .gap(u(8.))
-                                .child(pill(crate::t!(SettingsPreviewPrimary), c.primary, c.primary_foreground))
-                                .child(pill(crate::t!(SettingsPreviewSecondary), c.secondary, c.secondary_foreground)),
+                                .child(pill(
+                                    crate::t!(SettingsPreviewPrimary),
+                                    c.primary,
+                                    c.primary_foreground,
+                                ))
+                                .child(pill(
+                                    crate::t!(SettingsPreviewSecondary),
+                                    c.secondary,
+                                    c.secondary_foreground,
+                                )),
                         )
-                        .child(div().text_size(u(13.)).child(crate::t!(SettingsPreviewPangram))),
+                        .child(
+                            div()
+                                .text_size(u(13.))
+                                .child(crate::t!(SettingsPreviewPangram)),
+                        ),
                 )
                 .child(code),
         )

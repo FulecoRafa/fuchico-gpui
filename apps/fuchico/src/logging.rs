@@ -47,7 +47,12 @@ struct RotatingFile {
 
 impl RotatingFile {
     fn open(path: PathBuf, max: u64) -> std::io::Result<RotatingFile> {
-        let mut f = RotatingFile { path, file: None, size: 0, max };
+        let mut f = RotatingFile {
+            path,
+            file: None,
+            size: 0,
+            max,
+        };
         f.reopen()?;
         if f.size >= f.max {
             f.rotate()?;
@@ -56,7 +61,10 @@ impl RotatingFile {
     }
 
     fn reopen(&mut self) -> std::io::Result<()> {
-        let file = OpenOptions::new().create(true).append(true).open(&self.path)?;
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)?;
         self.size = file.metadata()?.len();
         self.file = Some(file);
         Ok(())
@@ -93,8 +101,16 @@ struct Logger {
 
 /// `[2026-10-18][12:34:56][target][INFO] message` (UTC, like the plugin's
 /// default `TimezoneStrategy::UseUtc`).
-pub fn format_line(now: chrono::DateTime<chrono::Utc>, target: &str, level: log::Level, msg: &str) -> String {
-    format!("{}[{target}][{level}] {msg}", now.format("[%Y-%m-%d][%H:%M:%S]"))
+pub fn format_line(
+    now: chrono::DateTime<chrono::Utc>,
+    target: &str,
+    level: log::Level,
+    msg: &str,
+) -> String {
+    format!(
+        "{}[{target}][{level}] {msg}",
+        now.format("[%Y-%m-%d][%H:%M:%S]")
+    )
 }
 
 impl Log for Logger {
@@ -106,7 +122,12 @@ impl Log for Logger {
         if !self.enabled(r.metadata()) {
             return;
         }
-        let line = format_line(chrono::Utc::now(), r.target(), r.level(), &r.args().to_string());
+        let line = format_line(
+            chrono::Utc::now(),
+            r.target(),
+            r.level(),
+            &r.args().to_string(),
+        );
         if self.stdout {
             let _ = writeln!(std::io::stdout().lock(), "{line}");
         }
@@ -129,7 +150,10 @@ impl Log for Logger {
 }
 
 fn level_from_env() -> LevelFilter {
-    std::env::var("RUST_LOG").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(LevelFilter::Trace)
+    std::env::var("RUST_LOG")
+        .ok()
+        .and_then(|v| v.trim().parse().ok())
+        .unwrap_or(LevelFilter::Trace)
 }
 
 /// Installs the logger (once, at startup). A log dir that can't be created
@@ -140,7 +164,11 @@ pub fn init() {
         RotatingFile::open(log_file(&dir), MAX_FILE_SIZE).ok()
     });
     let level = level_from_env();
-    let logger = Logger { level, stdout: true, file: file.map(Mutex::new) };
+    let logger = Logger {
+        level,
+        stdout: true,
+        file: file.map(Mutex::new),
+    };
     if log::set_boxed_logger(Box::new(logger)).is_ok() {
         log::set_max_level(level);
     }

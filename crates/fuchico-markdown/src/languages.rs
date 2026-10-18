@@ -185,7 +185,10 @@ fn is_js_word(c: Option<char>) -> bool {
 /// characters or is delimited by non-word characters on both sides.
 pub fn match_language_name(name: &str, fuzzy: bool) -> Option<&'static LanguageDesc> {
     let name = name.to_lowercase();
-    if let Some(d) = LANGUAGES.iter().find(|d| d.alias.iter().any(|a| *a == name)) {
+    if let Some(d) = LANGUAGES
+        .iter()
+        .find(|d| d.alias.iter().any(|a| *a == name))
+    {
         return Some(d);
     }
     if !fuzzy {
@@ -224,8 +227,27 @@ pub fn language_for_info(info: &str) -> Option<&'static LanguageDesc> {
 /// The fence toolbar's language list (`<select class="cm-fence-lang">`),
 /// after the leading `plain` (value `""`).
 pub const TOOLBAR_LANGUAGES: &[&str] = &[
-    "typescript", "javascript", "tsx", "jsx", "python", "rust", "go", "java", "c", "cpp", "css", "html", "json",
-    "yaml", "toml", "xml", "sql", "bash", "sh", "markdown", "dockerfile",
+    "typescript",
+    "javascript",
+    "tsx",
+    "jsx",
+    "python",
+    "rust",
+    "go",
+    "java",
+    "c",
+    "cpp",
+    "css",
+    "html",
+    "json",
+    "yaml",
+    "toml",
+    "xml",
+    "sql",
+    "bash",
+    "sh",
+    "markdown",
+    "dockerfile",
 ];
 
 /// Options shown by the toolbar for a block whose current info string is
@@ -252,23 +274,77 @@ pub struct FileLanguage {
 }
 
 pub static FILE_LANGUAGES: &[FileLanguage] = &[
-    FileLanguage { name: "JavaScript", extensions: &["js", "cjs", "mjs"], grammar: "JavaScript (Babel)", is_markdown: false },
-    FileLanguage { name: "TypeScript", extensions: &["ts", "cts", "mts"], grammar: "TypeScript", is_markdown: false },
-    FileLanguage { name: "JavaScript React", extensions: &["jsx"], grammar: "JavaScript (Babel)", is_markdown: false },
-    FileLanguage { name: "TypeScript React", extensions: &["tsx"], grammar: "TypeScriptReact", is_markdown: false },
-    FileLanguage { name: "Rust", extensions: &["rs"], grammar: "Rust", is_markdown: false },
-    FileLanguage { name: "Python", extensions: &["py"], grammar: "Python", is_markdown: false },
-    FileLanguage { name: "JSON", extensions: &["json", "jsonc"], grammar: "JSON", is_markdown: false },
-    FileLanguage { name: "Markdown", extensions: &["md", "markdown"], grammar: "Markdown", is_markdown: true },
-    FileLanguage { name: "HTML", extensions: &["html", "htm"], grammar: "HTML", is_markdown: false },
-    FileLanguage { name: "CSS", extensions: &["css"], grammar: "CSS", is_markdown: false },
+    FileLanguage {
+        name: "JavaScript",
+        extensions: &["js", "cjs", "mjs"],
+        grammar: "JavaScript (Babel)",
+        is_markdown: false,
+    },
+    FileLanguage {
+        name: "TypeScript",
+        extensions: &["ts", "cts", "mts"],
+        grammar: "TypeScript",
+        is_markdown: false,
+    },
+    FileLanguage {
+        name: "JavaScript React",
+        extensions: &["jsx"],
+        grammar: "JavaScript (Babel)",
+        is_markdown: false,
+    },
+    FileLanguage {
+        name: "TypeScript React",
+        extensions: &["tsx"],
+        grammar: "TypeScriptReact",
+        is_markdown: false,
+    },
+    FileLanguage {
+        name: "Rust",
+        extensions: &["rs"],
+        grammar: "Rust",
+        is_markdown: false,
+    },
+    FileLanguage {
+        name: "Python",
+        extensions: &["py"],
+        grammar: "Python",
+        is_markdown: false,
+    },
+    FileLanguage {
+        name: "JSON",
+        extensions: &["json", "jsonc"],
+        grammar: "JSON",
+        is_markdown: false,
+    },
+    FileLanguage {
+        name: "Markdown",
+        extensions: &["md", "markdown"],
+        grammar: "Markdown",
+        is_markdown: true,
+    },
+    FileLanguage {
+        name: "HTML",
+        extensions: &["html", "htm"],
+        grammar: "HTML",
+        is_markdown: false,
+    },
+    FileLanguage {
+        name: "CSS",
+        extensions: &["css"],
+        grammar: "CSS",
+        is_markdown: false,
+    },
 ];
 
 /// `resolveLanguage(path)`: lower-cased basename; exact filename match (none
 /// are defined), then the substring after the last `.`. A name with no dot or
 /// ending in a dot has no extension.
 pub fn resolve_file_language(path: &str) -> Option<&'static FileLanguage> {
-    let base = path.rsplit(['/', '\\']).next().unwrap_or(path).to_lowercase();
+    let base = path
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(path)
+        .to_lowercase();
     let dot = base.rfind('.')?;
     let ext = &base[dot + 1..];
     if ext.is_empty() {
@@ -280,7 +356,9 @@ pub fn resolve_file_language(path: &str) -> Option<&'static FileLanguage> {
 /// `resolveDisplayName(filename)`: `None` → `"Plain Text"`; a known language
 /// → its name; otherwise the basename with its first letter capitalised.
 pub fn resolve_display_name(filename: Option<&str>) -> String {
-    let Some(f) = filename else { return "Plain Text".into() };
+    let Some(f) = filename else {
+        return "Plain Text".into();
+    };
     if let Some(l) = resolve_file_language(f) {
         return l.name.into();
     }
@@ -311,8 +389,14 @@ mod tests {
         assert_eq!(match_language_name("zsh", true).unwrap().name, "Shell");
         assert_eq!(match_language_name("rb", true).unwrap().name, "Ruby");
         assert_eq!(match_language_name("tex", true).unwrap().name, "LaTeX");
-        assert_eq!(match_language_name("ini", true).unwrap().name, "Properties files");
-        assert_eq!(match_language_name("objc", true).unwrap().name, "Objective-C");
+        assert_eq!(
+            match_language_name("ini", true).unwrap().name,
+            "Properties files"
+        );
+        assert_eq!(
+            match_language_name("objc", true).unwrap().name,
+            "Objective-C"
+        );
     }
 
     #[test]
@@ -321,7 +405,10 @@ mod tests {
         assert_eq!(match_language_name("text", true).unwrap().name, "LaTeX");
         // "javascript-x" contains "java" first (Java precedes JavaScript in
         // the list), exactly like the original.
-        assert_eq!(match_language_name("javascript-x", true).unwrap().name, "Java");
+        assert_eq!(
+            match_language_name("javascript-x", true).unwrap().name,
+            "Java"
+        );
         // Short aliases need non-word chars on *both* sides; a string edge
         // counts as a word char (JS `/\w/.test(undefined)`), so "c-lang"
         // does not match C ... but it does contain "lang"? no alias -> None.

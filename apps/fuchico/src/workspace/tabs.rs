@@ -26,7 +26,8 @@ pub fn renamed(path: &str, from: &str, to: &str) -> Option<String> {
         return Some(to.to_string());
     }
     let prefix = format!("{from}/");
-    path.strip_prefix(&prefix).map(|rest| format!("{to}/{rest}"))
+    path.strip_prefix(&prefix)
+        .map(|rest| format!("{to}/{rest}"))
 }
 
 /// Whether `path` is `target` or lives under it.
@@ -36,7 +37,9 @@ pub fn is_same_or_under(path: &str, target: &str) -> bool {
 
 /// Basename split on `/` or `\`, ignoring empty parts.
 pub fn basename(path: &str) -> &str {
-    path.split(['/', '\\']).rfind(|s| !s.is_empty()).unwrap_or(path)
+    path.split(['/', '\\'])
+        .rfind(|s| !s.is_empty())
+        .unwrap_or(path)
 }
 
 impl Tabs {
@@ -82,7 +85,9 @@ impl Tabs {
 
     /// Closes `path`; when it was active, activates `next[min(idx, len-1)]`.
     pub fn close(&mut self, path: &str) {
-        let Some(idx) = self.index_of(path) else { return };
+        let Some(idx) = self.index_of(path) else {
+            return;
+        };
         self.tabs.remove(idx);
         if self.active.as_deref() == Some(path) {
             self.active = self
@@ -128,9 +133,15 @@ impl Tabs {
     /// Closes every tab at or under `deleted`; if the active one went away,
     /// activates `next[min(firstRemovedIdx, len-1)]`.
     pub fn delete(&mut self, deleted: &str) {
-        let first = self.tabs.iter().position(|t| is_same_or_under(&t.path, deleted));
+        let first = self
+            .tabs
+            .iter()
+            .position(|t| is_same_or_under(&t.path, deleted));
         let Some(first) = first else { return };
-        let active_gone = self.active.as_deref().is_some_and(|a| is_same_or_under(a, deleted));
+        let active_gone = self
+            .active
+            .as_deref()
+            .is_some_and(|a| is_same_or_under(a, deleted));
         self.tabs.retain(|t| !is_same_or_under(&t.path, deleted));
         if active_gone {
             self.active = self
@@ -146,7 +157,11 @@ impl Tabs {
             return;
         }
         let n = self.tabs.len() as isize;
-        let cur = self.active.as_deref().and_then(|a| self.index_of(a)).unwrap_or(0) as isize;
+        let cur = self
+            .active
+            .as_deref()
+            .and_then(|a| self.index_of(a))
+            .unwrap_or(0) as isize;
         let next = (cur + delta).rem_euclid(n) as usize;
         self.active = Some(self.tabs[next].path.clone());
     }
@@ -213,7 +228,10 @@ mod tests {
     #[test]
     fn renamed_matches_prefix_with_slash_only() {
         assert_eq!(renamed("/v/a", "/v/a", "/v/b").as_deref(), Some("/v/b"));
-        assert_eq!(renamed("/v/a/x.md", "/v/a", "/v/b").as_deref(), Some("/v/b/x.md"));
+        assert_eq!(
+            renamed("/v/a/x.md", "/v/a", "/v/b").as_deref(),
+            Some("/v/b/x.md")
+        );
         assert_eq!(renamed("/v/ab.md", "/v/a", "/v/b"), None);
     }
 

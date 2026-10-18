@@ -75,27 +75,57 @@ fn refresh(view: usize) {
 #[cfg(not(target_os = "macos"))]
 fn refresh(_: usize) {}
 
-fn run_line(line: &str, view: &Entity<ExcalidrawView>, window: &mut Window, cx: &mut App) -> Option<u64> {
+fn run_line(
+    line: &str,
+    view: &Entity<ExcalidrawView>,
+    window: &mut Window,
+    cx: &mut App,
+) -> Option<u64> {
     let a: Vec<&str> = line.split_whitespace().collect();
     let cmd = a.first().copied()?;
     let m = |i: usize| mods(a.get(i).copied().unwrap_or("-"));
     let down = |window: &mut Window, cx: &mut App, p, m, clicks, button| {
         window.dispatch_event(
-            PlatformInput::MouseDown(MouseDownEvent { button, position: p, modifiers: m, click_count: clicks, first_mouse: false }),
+            PlatformInput::MouseDown(MouseDownEvent {
+                button,
+                position: p,
+                modifiers: m,
+                click_count: clicks,
+                first_mouse: false,
+            }),
             cx,
         );
     };
     let up = |window: &mut Window, cx: &mut App, p, m, clicks, button| {
-        window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button, position: p, modifiers: m, click_count: clicks }), cx);
+        window.dispatch_event(
+            PlatformInput::MouseUp(MouseUpEvent {
+                button,
+                position: p,
+                modifiers: m,
+                click_count: clicks,
+            }),
+            cx,
+        );
     };
     let mv = |window: &mut Window, cx: &mut App, p, m, pressed| {
-        window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: pressed, modifiers: m }), cx);
+        window.dispatch_event(
+            PlatformInput::MouseMove(MouseMoveEvent {
+                position: p,
+                pressed_button: pressed,
+                modifiers: m,
+            }),
+            cx,
+        );
     };
     match cmd {
         "move" => mv(window, cx, pt(&a, 1), m(3), None),
         "down" => {
             let clicks = a.get(4).and_then(|s| s.parse().ok()).unwrap_or(1);
-            let b = if a.get(5) == Some(&"right") { MouseButton::Right } else { MouseButton::Left };
+            let b = if a.get(5) == Some(&"right") {
+                MouseButton::Right
+            } else {
+                MouseButton::Left
+            };
             mv(window, cx, pt(&a, 1), m(3), None);
             down(window, cx, pt(&a, 1), m(3), clicks, b);
         }
@@ -162,7 +192,10 @@ fn run_line(line: &str, view: &Entity<ExcalidrawView>, window: &mut Window, cx: 
         "wait" => return a.get(1).and_then(|s| s.parse().ok()),
         "export" => {
             let path = PathBuf::from(a.get(1).copied().unwrap_or("export.png"));
-            let opts = ExportOptions { background: true, ..Default::default() };
+            let opts = ExportOptions {
+                background: true,
+                ..Default::default()
+            };
             let v = view.read(cx);
             let bytes = if path.extension().map(|e| e == "svg").unwrap_or(false) {
                 v.export_svg(&opts).into_bytes()
@@ -183,15 +216,25 @@ fn run_line(line: &str, view: &Entity<ExcalidrawView>, window: &mut Window, cx: 
 pub fn start(dir: PathBuf, handle: AnyWindowHandle, view: Entity<ExcalidrawView>, cx: &mut App) {
     let cmd = dir.join("cmd");
     let ack = dir.join("ack");
-    let nsview = cx.update_window(handle, |_, window, _| ns_view(window)).unwrap_or(0);
+    let nsview = cx
+        .update_window(handle, |_, window, _| ns_view(window))
+        .unwrap_or(0);
     cx.spawn(async move |cx: &mut AsyncApp| {
         let mut n = 0u64;
         loop {
-            cx.background_executor().timer(Duration::from_millis(100)).await;
-            let Ok(script) = std::fs::read_to_string(&cmd) else { continue };
+            cx.background_executor()
+                .timer(Duration::from_millis(100))
+                .await;
+            let Ok(script) = std::fs::read_to_string(&cmd) else {
+                continue;
+            };
             let _ = std::fs::remove_file(&cmd);
             n += 1;
-            for line in script.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+            for line in script
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            {
                 let wait = cx
                     .update_window(handle, |_, window, cx| {
                         let w = run_line(line, &view, window, cx);
@@ -201,11 +244,15 @@ pub fn start(dir: PathBuf, handle: AnyWindowHandle, view: Entity<ExcalidrawView>
                     .ok()
                     .flatten();
                 refresh(nsview);
-                cx.background_executor().timer(Duration::from_millis(wait.unwrap_or(40))).await;
+                cx.background_executor()
+                    .timer(Duration::from_millis(wait.unwrap_or(40)))
+                    .await;
             }
             for _ in 0..3 {
                 refresh(nsview);
-                cx.background_executor().timer(Duration::from_millis(80)).await;
+                cx.background_executor()
+                    .timer(Duration::from_millis(80))
+                    .await;
             }
             let _ = std::fs::write(&ack, format!("{n}\n"));
         }

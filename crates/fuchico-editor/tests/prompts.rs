@@ -100,13 +100,17 @@ async fn search_prompt_moves_to_match(cx: &mut TestAppContext) {
 async fn find_bar_mod_f(cx: &mut TestAppContext) {
     let mut ui = open(cx, "one two one three one\n", EditorOptions::default());
     ui.press("cmd-f");
-    assert_eq!(ui.read(|v, _| v.find_query()), Some((String::new(), 0, 0)));
+    // `openSearchPanel` seeds the query from the selection (the Helix
+    // block cursor covers `o`); the field text is selected.
+    assert_eq!(ui.read(|v, _| v.find_query()), Some(("o".into(), 0, 4)));
     ui.type_text("one");
     assert_eq!(ui.read(|v, _| v.find_query()), Some(("one".into(), 0, 3)));
+    // Typing only updates the query (CodeMirror doesn't search as you type).
     let r = ui.read(|v, _| v.selection().main());
-    assert_eq!((r.from(), r.to()), (0, 3));
+    assert_eq!((r.from(), r.to()), (0, 1));
     ui.press("enter");
     assert_eq!(ui.read(|v, _| v.selection().main().from()), 8);
+    assert_eq!(ui.read(|v, _| v.find_query()), Some(("one".into(), 1, 3)));
     ui.press("enter");
     assert_eq!(ui.read(|v, _| v.selection().main().from()), 18);
     ui.press("shift-enter");

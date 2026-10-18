@@ -8,7 +8,11 @@ use crate::theme::{AppTheme, hex};
 /// current theme; here the resolved AppTheme tokens are handed over.
 pub fn mermaid_theme(th: &AppTheme) -> MermaidTheme {
     let c = &th.colors;
-    let mut t = if th.appearance.is_dark() { MermaidTheme::dark() } else { MermaidTheme::light() };
+    let mut t = if th.appearance.is_dark() {
+        MermaidTheme::dark()
+    } else {
+        MermaidTheme::light()
+    };
     t.background = hex(c.background);
     t.foreground = hex(c.foreground);
     t.card = hex(c.card);

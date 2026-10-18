@@ -67,16 +67,21 @@ pub fn parse_multistatus(xml: &str) -> Vec<DavResponse> {
             cur.is_calendar_collection = true;
         }
     };
-    let record_comp = |current: &mut Option<DavResponse>, reader: &Reader<&[u8]>, e: &quick_xml::events::BytesStart| {
+    let record_comp = |current: &mut Option<DavResponse>,
+                       reader: &Reader<&[u8]>,
+                       e: &quick_xml::events::BytesStart| {
         if let Some(cur) = current.as_mut()
             && let Some(Ok(attr)) = e
                 .attributes()
                 .flatten()
                 .find(|a| local_name(a.key.as_ref()) == "name")
-                .map(|a| a.decode_and_unescape_value(reader.decoder()).map(|v| v.to_string()))
-            {
-                cur.supported_components.push(attr);
-            }
+                .map(|a| {
+                    a.decode_and_unescape_value(reader.decoder())
+                        .map(|v| v.to_string())
+                })
+        {
+            cur.supported_components.push(attr);
+        }
     };
 
     loop {
@@ -204,7 +209,11 @@ pub struct CalDavClient {
 }
 
 impl CalDavClient {
-    pub fn new(server_url: impl Into<String>, username: impl Into<String>, password: impl Into<String>) -> Self {
+    pub fn new(
+        server_url: impl Into<String>,
+        username: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Self {
         Self {
             http: reqwest::Client::new(),
             server_url: server_url.into(),
@@ -291,8 +300,11 @@ impl CalDavClient {
                 body: text,
             });
         }
-        let principal_href = first_href_for(&text, "current-user-principal")
-            .ok_or_else(|| CalDavError::Status { status: 0, body: "no current-user-principal in response".into() })?;
+        let principal_href =
+            first_href_for(&text, "current-user-principal").ok_or_else(|| CalDavError::Status {
+                status: 0,
+                body: "no current-user-principal in response".into(),
+            })?;
         let principal_url = self.resolve(&principal_href);
 
         let home_set_body = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -314,15 +326,21 @@ impl CalDavClient {
                 body: text,
             });
         }
-        let home_href = first_href_for(&text, "calendar-home-set")
-            .ok_or_else(|| CalDavError::Status { status: 0, body: "no calendar-home-set in response".into() })?;
+        let home_href =
+            first_href_for(&text, "calendar-home-set").ok_or_else(|| CalDavError::Status {
+                status: 0,
+                body: "no calendar-home-set in response".into(),
+            })?;
         Ok(self.resolve(&home_href))
     }
 
     /// Lists calendar collections under `calendar_home_url`, keeping only
     /// those advertising `VTODO` support (Reminders lists) -- v1 syncs
     /// checkbox tasks only, see the CalDAV sync plan.
-    pub async fn list_task_calendars(&self, calendar_home_url: &str) -> Result<Vec<DavResponse>, CalDavError> {
+    pub async fn list_task_calendars(
+        &self,
+        calendar_home_url: &str,
+    ) -> Result<Vec<DavResponse>, CalDavError> {
         let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
   <D:prop>
@@ -351,7 +369,9 @@ impl CalDavClient {
             .into_iter()
             .filter(|r| {
                 r.is_calendar_collection
-                    && r.supported_components.iter().any(|c| c.eq_ignore_ascii_case("VTODO"))
+                    && r.supported_components
+                        .iter()
+                        .any(|c| c.eq_ignore_ascii_case("VTODO"))
             })
             .collect())
     }
@@ -537,8 +557,7 @@ pub(crate) mod tests {
         let vtodo_calendars: Vec<_> = all
             .iter()
             .filter(|r| {
-                r.is_calendar_collection
-                    && r.supported_components.iter().any(|c| c == "VTODO")
+                r.is_calendar_collection && r.supported_components.iter().any(|c| c == "VTODO")
             })
             .collect();
         assert_eq!(vtodo_calendars.len(), 1);
@@ -549,7 +568,10 @@ pub(crate) mod tests {
     #[test]
     fn does_not_mistake_root_collection_for_a_calendar() {
         let all = parse_multistatus(CALENDAR_LIST_RESPONSE);
-        let root = all.iter().find(|r| r.href == "/1234567/calendars/").unwrap();
+        let root = all
+            .iter()
+            .find(|r| r.href == "/1234567/calendars/")
+            .unwrap();
         assert!(!root.is_calendar_collection);
     }
 
@@ -559,7 +581,13 @@ pub(crate) mod tests {
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].href, "/1234567/calendars/home/task1.ics");
         assert_eq!(all[0].etag.as_deref(), Some("\"abc123\""));
-        assert!(all[0].calendar_data.as_deref().unwrap().contains("Buy milk"));
+        assert!(
+            all[0]
+                .calendar_data
+                .as_deref()
+                .unwrap()
+                .contains("Buy milk")
+        );
     }
 
     #[test]
@@ -634,7 +662,13 @@ pub(crate) mod tests {
         let calendar_url = format!("{}/1234567/calendars/home/", server.uri());
         let todos = client.list_vtodos(&calendar_url).await.unwrap();
         assert_eq!(todos.len(), 1);
-        assert!(todos[0].calendar_data.as_deref().unwrap().contains("Buy milk"));
+        assert!(
+            todos[0]
+                .calendar_data
+                .as_deref()
+                .unwrap()
+                .contains("Buy milk")
+        );
     }
 
     #[tokio::test]
@@ -649,7 +683,10 @@ pub(crate) mod tests {
 
         let client = CalDavClient::new(server.uri(), "user", "pass");
         let url = format!("{}/1234567/calendars/home/new-task.ics", server.uri());
-        let etag = client.put_ics(&url, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", None).await.unwrap();
+        let etag = client
+            .put_ics(&url, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", None)
+            .await
+            .unwrap();
         assert_eq!(etag.as_deref(), Some("\"etag-1\""));
     }
 
@@ -666,7 +703,11 @@ pub(crate) mod tests {
         let client = CalDavClient::new(server.uri(), "user", "pass");
         let url = format!("{}/1234567/calendars/home/task1.ics", server.uri());
         let result = client
-            .put_ics(&url, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", Some("\"abc123\""))
+            .put_ics(
+                &url,
+                "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
+                Some("\"abc123\""),
+            )
             .await;
         assert!(result.is_ok());
     }
@@ -685,15 +726,31 @@ pub(crate) mod tests {
 
         let client = CalDavClient::new(server.uri(), "user", "pass");
         let url = format!("{}/t.ics", server.uri());
-        client.put_ics(&url, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", None).await.unwrap();
+        client
+            .put_ics(&url, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", None)
+            .await
+            .unwrap();
         let _ = client.discover_calendar_home().await;
 
         let reqs = server.received_requests().await.unwrap();
         let put = reqs.iter().find(|r| r.method.as_str() == "PUT").unwrap();
-        let cts: Vec<_> = put.headers.get_all("content-type").iter().map(|v| v.to_str().unwrap().to_string()).collect();
+        let cts: Vec<_> = put
+            .headers
+            .get_all("content-type")
+            .iter()
+            .map(|v| v.to_str().unwrap().to_string())
+            .collect();
         assert_eq!(cts, vec!["text/calendar; charset=utf-8".to_string()]);
-        let propfind = reqs.iter().find(|r| r.method.as_str() == "PROPFIND").unwrap();
-        let cts: Vec<_> = propfind.headers.get_all("content-type").iter().map(|v| v.to_str().unwrap().to_string()).collect();
+        let propfind = reqs
+            .iter()
+            .find(|r| r.method.as_str() == "PROPFIND")
+            .unwrap();
+        let cts: Vec<_> = propfind
+            .headers
+            .get_all("content-type")
+            .iter()
+            .map(|v| v.to_str().unwrap().to_string())
+            .collect();
         assert_eq!(cts, vec!["application/xml; charset=utf-8".to_string()]);
     }
 
@@ -709,7 +766,11 @@ pub(crate) mod tests {
         let client = CalDavClient::new(server.uri(), "user", "pass");
         let url = format!("{}/x.ics", server.uri());
         let err = client
-            .put_ics(&url, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", Some("\"stale\""))
+            .put_ics(
+                &url,
+                "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
+                Some("\"stale\""),
+            )
             .await
             .unwrap_err();
         match err {

@@ -15,11 +15,17 @@ pub struct TextEdit {
 
 impl TextEdit {
     pub fn new(range: Range<usize>, insert: impl Into<String>) -> Self {
-        Self { range, insert: insert.into() }
+        Self {
+            range,
+            insert: insert.into(),
+        }
     }
 
     pub fn insert(at: usize, text: impl Into<String>) -> Self {
-        Self { range: at..at, insert: text.into() }
+        Self {
+            range: at..at,
+            insert: text.into(),
+        }
     }
 }
 
@@ -103,7 +109,10 @@ impl LineIndex {
                 starts.push(i + 1);
             }
         }
-        Self { starts, len: text.len() }
+        Self {
+            starts,
+            len: text.len(),
+        }
     }
 
     /// Number of lines (an empty document has one empty line).
@@ -133,7 +142,11 @@ impl LineIndex {
 
     /// End of the line's text, excluding the `\n`.
     pub fn line_end(&self, line: usize) -> usize {
-        if line + 1 < self.starts.len() { self.starts[line + 1] - 1 } else { self.len }
+        if line + 1 < self.starts.len() {
+            self.starts[line + 1] - 1
+        } else {
+            self.len
+        }
     }
 
     /// Byte range of the line's text, excluding the `\n`.

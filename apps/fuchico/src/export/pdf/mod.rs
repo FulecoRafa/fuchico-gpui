@@ -30,7 +30,12 @@ pub struct PdfStyle {
 impl PdfStyle {
     /// A Typst colour expression for a CSS variable (black when missing).
     pub fn color(&self, css_name: &str) -> String {
-        let hex = self.colors.iter().find(|(n, _)| n == css_name).map(|(_, v)| v.as_str()).unwrap_or("#000000");
+        let hex = self
+            .colors
+            .iter()
+            .find(|(n, _)| n == css_name)
+            .map(|(_, v)| v.as_str())
+            .unwrap_or("#000000");
         format!("rgb(\"{}\")", markup::esc(hex))
     }
 
@@ -52,8 +57,19 @@ impl PdfStyle {
     /// Paper size for a locale: US Letter for the Americas' letter
     /// countries, A4 elsewhere.
     pub fn paper_for_locale(locale: &str) -> &'static str {
-        let region = locale.split(['-', '_']).nth(1).unwrap_or("").to_ascii_uppercase();
-        if matches!(region.as_str(), "US" | "CA" | "MX" | "PH" | "CL" | "CO" | "VE") { "us-letter" } else { "a4" }
+        let region = locale
+            .split(['-', '_'])
+            .nth(1)
+            .unwrap_or("")
+            .to_ascii_uppercase();
+        if matches!(
+            region.as_str(),
+            "US" | "CA" | "MX" | "PH" | "CL" | "CO" | "VE"
+        ) {
+            "us-letter"
+        } else {
+            "a4"
+        }
     }
 
     #[cfg(test)]
@@ -77,7 +93,10 @@ impl PdfStyle {
         PdfStyle {
             title: "Test".into(),
             paper: "a4",
-            colors: colors.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect(),
+            colors: colors
+                .iter()
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+                .collect(),
             font_sans: "Inter".into(),
             font_mono: "JetBrains Mono".into(),
             mermaid: MermaidTheme::light(),
@@ -87,7 +106,13 @@ impl PdfStyle {
 
 /// Renders a note to PDF bytes. `note_dir` resolves relative image paths.
 pub fn render_pdf(markdown: &str, style: &PdfStyle, note_dir: &Path) -> Result<Vec<u8>, String> {
-    let doc = markup::to_typst(markdown, style, &DiskImages { note_dir: note_dir.to_path_buf() });
+    let doc = markup::to_typst(
+        markdown,
+        style,
+        &DiskImages {
+            note_dir: note_dir.to_path_buf(),
+        },
+    );
     compile(doc)
 }
 
@@ -102,7 +127,10 @@ pub fn compile(doc: markup::TypstDoc) -> Result<Vec<u8>, String> {
 }
 
 fn diag_message(errs: &[typst::diag::SourceDiagnostic]) -> String {
-    errs.iter().map(|e| e.message.to_string()).collect::<Vec<_>>().join("; ")
+    errs.iter()
+        .map(|e| e.message.to_string())
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 #[cfg(test)]
@@ -171,7 +199,8 @@ graph TD; A-->B
 
     #[test]
     fn hostile_text_cannot_break_out() {
-        let md = "\"; #panic(\"x\") ]] ) } #let a = 1 \\ `#panic()` [x](\"q) <script>#panic()</script>";
+        let md =
+            "\"; #panic(\"x\") ]] ) } #let a = 1 \\ `#panic()` [x](\"q) <script>#panic()</script>";
         render_pdf(md, &PdfStyle::test(), Path::new("/nonexistent")).expect("pdf");
     }
 

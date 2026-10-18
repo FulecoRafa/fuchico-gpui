@@ -32,7 +32,12 @@ use crate::theme::AppTheme;
 use crate::workspace::view::DockEvent;
 
 /// Builds the shared view, themed and localised.
-fn new_view(label: &str, chrome: Chrome, text: Option<String>, cx: &mut App) -> Entity<MermaidView> {
+fn new_view(
+    label: &str,
+    chrome: Chrome,
+    text: Option<String>,
+    cx: &mut App,
+) -> Entity<MermaidView> {
     let th = theme::mermaid_theme(AppTheme::get(cx));
     cx.new(|cx| {
         let mut v = match text {
@@ -57,7 +62,12 @@ fn follow_theme<T: 'static>(view: &Entity<MermaidView>, cx: &mut Context<T>) -> 
 }
 
 /// Applies a `mermaid:update` for `key` to `view`, returning its text.
-fn apply_update(key: &str, ev: &AppEvent, view: &Entity<MermaidView>, cx: &mut App) -> Option<Option<String>> {
+fn apply_update(
+    key: &str,
+    ev: &AppEvent,
+    view: &Entity<MermaidView>,
+    cx: &mut App,
+) -> Option<Option<String>> {
     match ev {
         AppEvent::MermaidUpdate { block_key, text } if block_key == key => {
             view.update(cx, |v, cx| v.set_source(text.clone(), cx));
@@ -102,14 +112,25 @@ impl MermaidPane {
             cx.on_release(|this, _| {
                 if !this.popped {
                     // Queued, like the original's deferred emit.
-                    bus::send(AppEvent::MermaidClosed { block_key: this.block_key.clone() });
+                    bus::send(AppEvent::MermaidClosed {
+                        block_key: this.block_key.clone(),
+                    });
                 }
             }),
         ];
         if initial_text.is_none() {
-            bus::send(AppEvent::MermaidRequest { block_key: block_key.clone() });
+            bus::send(AppEvent::MermaidRequest {
+                block_key: block_key.clone(),
+            });
         }
-        MermaidPane { block_key, label, view, text: initial_text, popped: false, _subs: subs }
+        MermaidPane {
+            block_key,
+            label,
+            view,
+            text: initial_text,
+            popped: false,
+            _subs: subs,
+        }
     }
 
     pub fn block_key(&self) -> &str {
@@ -124,7 +145,11 @@ impl MermaidPane {
     /// without sending `mermaid:closed`.
     fn pop_out(&mut self, cx: &mut Context<Self>) {
         self.popped = true;
-        let (key, label, text) = (self.block_key.clone(), self.label.clone(), self.text.clone());
+        let (key, label, text) = (
+            self.block_key.clone(),
+            self.label.clone(),
+            self.text.clone(),
+        );
         cx.defer(move |cx| window::open_mermaid_window(key, label, text, cx));
         cx.emit(DockEvent::Close);
     }

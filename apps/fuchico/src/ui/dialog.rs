@@ -25,7 +25,12 @@ pub struct ConfirmOptions {
 
 impl ConfirmOptions {
     pub fn new(title: impl Into<SharedString>) -> Self {
-        ConfirmOptions { title: title.into(), message: None, ok_text: native_label(true).into(), danger: false }
+        ConfirmOptions {
+            title: title.into(),
+            message: None,
+            ok_text: native_label(true).into(),
+            danger: false,
+        }
     }
 
     pub fn message(mut self, m: impl Into<SharedString>) -> Self {
@@ -45,7 +50,12 @@ impl ConfirmOptions {
 }
 
 /// Opens a modal confirm; `on_ok` runs only when confirmed.
-pub fn confirm(window: &mut Window, cx: &mut App, opts: ConfirmOptions, on_ok: impl Fn(&mut Window, &mut App) + 'static) {
+pub fn confirm(
+    window: &mut Window,
+    cx: &mut App,
+    opts: ConfirmOptions,
+    on_ok: impl Fn(&mut Window, &mut App) + 'static,
+) {
     let on_ok = Rc::new(on_ok);
     let cancel: SharedString = native_label(false).into();
     window.open_alert_dialog(cx, move |dialog, _, _| {

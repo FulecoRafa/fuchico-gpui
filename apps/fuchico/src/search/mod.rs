@@ -17,20 +17,25 @@ use std::ops::Range;
 use std::rc::Rc;
 use std::time::Duration;
 
-use fuchico_core::search::{ReplaceResult, SearchMatch, group_by_file, search_files, search_replace_files};
+use fuchico_core::search::{
+    ReplaceResult, SearchMatch, group_by_file, search_files, search_replace_files,
+};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Icon, IconName};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, App, Context, Entity, EventEmitter, FontWeight, HighlightStyle, SharedString, StyledText, Subscription,
-    Task, WeakEntity, Window, div,
+    AnyElement, App, Context, Entity, EventEmitter, FontWeight, HighlightStyle, SharedString,
+    StyledText, Subscription, Task, WeakEntity, Window, div,
 };
 
 use crate::bus;
 use crate::i18n::{Msg, tn};
 use crate::theme::{AppTheme, alpha};
-use crate::ui::{ConfirmOptions, MenuEntry, build_menu, confirm, empty_state, file_row_menu, u, with_context_menu};
+use crate::ui::{
+    ConfirmOptions, MenuEntry, build_menu, confirm, empty_state, file_row_menu, u,
+    with_context_menu,
+};
 use crate::workspace::tabs::basename;
 use crate::workspace::view::{MainView, ViewEvent};
 
@@ -69,27 +74,39 @@ pub struct SearchView {
 
 impl SearchView {
     pub fn new(root: Option<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let query_input = cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(SearchPlaceholder)));
-        let replace_input = cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(SearchReplaceWith)));
+        let query_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(SearchPlaceholder)));
+        let replace_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(SearchReplaceWith)));
         let subs = vec![
-            cx.subscribe_in(&query_input, window, |this, input, ev: &InputEvent, _, cx| {
-                if matches!(ev, InputEvent::Change) {
-                    let q = input.read(cx).value().to_string();
-                    if q != this.query {
-                        this.query = q;
-                        this.notice = None;
-                        this.run(cx);
+            cx.subscribe_in(
+                &query_input,
+                window,
+                |this, input, ev: &InputEvent, _, cx| {
+                    if matches!(ev, InputEvent::Change) {
+                        let q = input.read(cx).value().to_string();
+                        if q != this.query {
+                            this.query = q;
+                            this.notice = None;
+                            this.run(cx);
+                        }
                     }
-                }
-            }),
-            cx.subscribe_in(&replace_input, window, |this, input, ev: &InputEvent, window, cx| match ev {
-                InputEvent::Change => {
-                    this.replacement = input.read(cx).value().to_string();
-                    cx.notify();
-                }
-                InputEvent::PressEnter { .. } if this.can_replace() => this.run_replace(None, window, cx),
-                _ => {}
-            }),
+                },
+            ),
+            cx.subscribe_in(
+                &replace_input,
+                window,
+                |this, input, ev: &InputEvent, window, cx| match ev {
+                    InputEvent::Change => {
+                        this.replacement = input.read(cx).value().to_string();
+                        cx.notify();
+                    }
+                    InputEvent::PressEnter { .. } if this.can_replace() => {
+                        this.run_replace(None, window, cx)
+                    }
+                    _ => {}
+                },
+            ),
         ];
         SearchView {
             root,
@@ -114,7 +131,8 @@ impl SearchView {
     /// Types `q` into the query box as the user would (Helix `Space /`,
     /// snapshots).
     pub fn set_query(&mut self, q: &str, window: &mut Window, cx: &mut Context<Self>) {
-        self.query_input.update(cx, |s, cx| s.set_value(q.to_string(), window, cx));
+        self.query_input
+            .update(cx, |s, cx| s.set_value(q.to_string(), window, cx));
         self.query = q.to_string();
         self.run(cx);
     }
@@ -137,7 +155,9 @@ impl SearchView {
         let query = self.query.clone();
         self.search_task = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(DEBOUNCE).await;
-            let res = cx.background_spawn(async move { search_files(root, query) }).await;
+            let res = cx
+                .background_spawn(async move { search_files(root, query) })
+                .await;
             this.update(cx, |this, cx| {
                 this.state = match res {
                     Ok(matches) => {
@@ -173,28 +193,67 @@ impl SearchView {
     }
 
     /// `runReplace(files?)`: confirm, then replace off the UI thread.
-    fn run_replace(&mut self, files: Option<Vec<String>>, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(root) = self.root.clone() else { return };
+    fn run_replace(
+        &mut self,
+        files: Option<Vec<String>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(root) = self.root.clone() else {
+            return;
+        };
         if !self.can_replace() {
             return;
         }
         let scope = match &files {
-            Some(f) => crate::t!(SearchScopeInFile, file = basename(f.first().map(String::as_str).unwrap_or(""))),
+            Some(f) => crate::t!(
+                SearchScopeInFile,
+                file = basename(f.first().map(String::as_str).unwrap_or(""))
+            ),
             None => crate::t!(
                 SearchScopeAcrossFiles,
-                files = tn(self.group_count() as i64, Msg::CountFileOne, Msg::CountFileMany)
+                files = tn(
+                    self.group_count() as i64,
+                    Msg::CountFileOne,
+                    Msg::CountFileMany
+                )
             ),
         };
         let (query, replacement) = (self.query.clone(), self.replacement.clone());
-        let msg = crate::t!(SearchConfirmReplace, query = query, replacement = replacement, scope = scope);
+        let msg = crate::t!(
+            SearchConfirmReplace,
+            query = query,
+            replacement = replacement,
+            scope = scope
+        );
         let this = cx.entity().downgrade();
-        confirm(window, cx, ConfirmOptions::new(msg).danger(), move |_, cx| {
-            let (root, query, replacement, files) = (root.clone(), query.clone(), replacement.clone(), files.clone());
-            this.update(cx, |this, cx| this.replace(root, query, replacement, files, cx)).ok();
-        });
+        confirm(
+            window,
+            cx,
+            ConfirmOptions::new(msg).danger(),
+            move |_, cx| {
+                let (root, query, replacement, files) = (
+                    root.clone(),
+                    query.clone(),
+                    replacement.clone(),
+                    files.clone(),
+                );
+                this.update(cx, |this, cx| {
+                    this.replace(root, query, replacement, files, cx)
+                })
+                .ok();
+            },
+        );
     }
 
-    fn replace(&mut self, root: String, query: String, replacement: String, files: Option<Vec<String>>, cx: &mut Context<Self>) {
+    fn replace(
+        &mut self,
+        root: String,
+        query: String,
+        replacement: String,
+        files: Option<Vec<String>>,
+        cx: &mut Context<Self>,
+    ) {
         self.busy = true;
         cx.notify();
         let task = cx.background_spawn(async move {
@@ -215,7 +274,10 @@ impl SearchView {
     }
 
     fn open(&self, file: &str, line: usize, cx: &mut Context<Self>) {
-        cx.emit(ViewEvent::OpenFile { path: file.to_string(), line: Some(line as u32) });
+        cx.emit(ViewEvent::OpenFile {
+            path: file.to_string(),
+            line: Some(line as u32),
+        });
     }
 
     /// `fileRowMenuItems(file, { onOpen, extra: [replace item] })`.
@@ -229,9 +291,15 @@ impl SearchView {
         };
         let extra = if self.replace_open {
             let f = file.to_string();
-            MenuEntry::item(crate::t!(SearchReplaceAllInFile, file = basename(file)), move |window, cx| {
-                this.update(cx, |this, cx| this.run_replace(Some(vec![f.clone()]), window, cx)).ok();
-            })
+            MenuEntry::item(
+                crate::t!(SearchReplaceAllInFile, file = basename(file)),
+                move |window, cx| {
+                    this.update(cx, |this, cx| {
+                        this.run_replace(Some(vec![f.clone()]), window, cx)
+                    })
+                    .ok();
+                },
+            )
             .disabled(!self.can_replace())
         } else {
             MenuEntry::item(crate::t!(SearchReplaceInThisFile), move |_, cx| {
@@ -248,7 +316,11 @@ impl SearchView {
     fn render_input_row(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let th = AppTheme::get(cx);
         let active = self.replace_open;
-        let (muted, fg, hover_bg) = (th.colors.muted_foreground, th.colors.foreground, th.fg_alpha(0.08));
+        let (muted, fg, hover_bg) = (
+            th.colors.muted_foreground,
+            th.colors.foreground,
+            th.fg_alpha(0.08),
+        );
         let title: SharedString = crate::t!(SearchFindReplaceTitle).into();
         let toggle = div()
             .id("search-replace-toggle")
@@ -278,8 +350,18 @@ impl SearchView {
             .py(u(10.))
             .border_b_1()
             .border_color(th.colors.border)
-            .child(Icon::new(IconName::Search).size(u(14.)).text_color(muted).flex_none())
-            .child(div().flex_1().min_w_0().child(bare_input(&self.query_input, "search-input")))
+            .child(
+                Icon::new(IconName::Search)
+                    .size(u(14.))
+                    .text_color(muted)
+                    .flex_none(),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .child(bare_input(&self.query_input, "search-input")),
+            )
             .child(toggle)
     }
 
@@ -320,14 +402,26 @@ impl SearchView {
             .pl(u(38.))
             .border_b_1()
             .border_color(th.colors.border)
-            .child(div().flex_1().min_w_0().child(bare_input(&self.replace_input, "search-replace-input")))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .child(bare_input(&self.replace_input, "search-replace-input")),
+            )
             .child(button)
     }
 
     fn render_results(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let th = AppTheme::get(cx).clone();
-        let status =
-            |text: String, color| div().px(u(4.)).py(u(8.)).text_size(u(12.)).text_color(color).child(text).into_any_element();
+        let status = |text: String, color| {
+            div()
+                .px(u(4.))
+                .py(u(8.))
+                .text_size(u(12.))
+                .text_color(color)
+                .child(text)
+                .into_any_element()
+        };
         let mut children: Vec<AnyElement> = Vec::new();
         if let Some(n) = &self.notice {
             children.push(
@@ -346,12 +440,19 @@ impl SearchView {
             );
         }
         match &self.state {
-            SearchState::Loading => children.push(status(crate::t!(SearchSearching), th.colors.muted_foreground)),
+            SearchState::Loading => children.push(status(
+                crate::t!(SearchSearching),
+                th.colors.muted_foreground,
+            )),
             SearchState::Error(e) => children.push(status(e.clone(), th.colors.destructive)),
-            SearchState::Idle if self.query.trim().is_empty() => {
-                children.push(status(crate::t!(SearchTypeToSearch), th.colors.muted_foreground))
-            }
-            SearchState::Loaded(_, 0) => children.push(status(crate::t!(SearchNoMatches), th.colors.muted_foreground)),
+            SearchState::Idle if self.query.trim().is_empty() => children.push(status(
+                crate::t!(SearchTypeToSearch),
+                th.colors.muted_foreground,
+            )),
+            SearchState::Loaded(_, 0) => children.push(status(
+                crate::t!(SearchNoMatches),
+                th.colors.muted_foreground,
+            )),
             SearchState::Loaded(groups, _) => {
                 let view = cx.entity().downgrade();
                 for (gi, (file, matches)) in groups.iter().enumerate() {
@@ -383,7 +484,12 @@ fn render_group(
     let radius = u(th.radius.sm);
     let first_line = matches.first().map(|m| m.line).unwrap_or(1);
     let tip: SharedString = file.to_string().into();
-    let (f1, f2, v1, v2) = (file.to_string(), file.to_string(), view.clone(), view.clone());
+    let (f1, f2, v1, v2) = (
+        file.to_string(),
+        file.to_string(),
+        view.clone(),
+        view.clone(),
+    );
     let header = div()
         .id(("search-file", gi))
         .flex()
@@ -398,7 +504,14 @@ fn render_group(
         .text_size(u(12.))
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(th.colors.foreground)
-        .child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_ellipsis().child(basename(file).to_string()))
+        .child(
+            div()
+                .min_w_0()
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .text_ellipsis()
+                .child(basename(file).to_string()),
+        )
         .child(
             div()
                 .ml_auto()
@@ -410,22 +523,36 @@ fn render_group(
         )
         .tooltip(move |w, cx| Tooltip::new(tip.clone()).build(w, cx))
         .on_click(move |_, _, cx| {
-            v1.update(cx, |this, cx| this.open(&f1, first_line, cx)).ok();
+            v1.update(cx, |this, cx| this.open(&f1, first_line, cx))
+                .ok();
         })
         .debug_selector(|| format!("search-file:{gi}"));
     let header = with_context_menu(("search-file-menu", gi), header, move |menu, _, cx| {
-        let items = v2.update(cx, |this, cx| this.row_menu(&f2, first_line, cx)).unwrap_or_default();
+        let items = v2
+            .update(cx, |this, cx| this.row_menu(&f2, first_line, cx))
+            .unwrap_or_default();
         build_menu(menu, items)
     });
     let highlight_bg = alpha(th.colors.syntax_function, 0.35);
     let rows = matches.iter().enumerate().map(|(ri, m)| {
         let (text, range) = row_text(&m.text, query);
         let styled = match range {
-            Some(r) => StyledText::new(text)
-                .with_highlights(vec![(r, HighlightStyle { background_color: Some(highlight_bg), ..Default::default() })]),
+            Some(r) => StyledText::new(text).with_highlights(vec![(
+                r,
+                HighlightStyle {
+                    background_color: Some(highlight_bg),
+                    ..Default::default()
+                },
+            )]),
             None => StyledText::new(text),
         };
-        let (line, f1, f2, v1, v2) = (m.line, m.file.clone(), m.file.clone(), view.clone(), view.clone());
+        let (line, f1, f2, v1, v2) = (
+            m.line,
+            m.file.clone(),
+            m.file.clone(),
+            view.clone(),
+            view.clone(),
+        );
         let row = div()
             .id(SharedString::from(format!("search-row-{gi}-{ri}")))
             .flex()
@@ -463,22 +590,42 @@ fn render_group(
                 v1.update(cx, |this, cx| this.open(&f1, line, cx)).ok();
             })
             .debug_selector(|| format!("search-row-{gi}-{ri}"));
-        with_context_menu(SharedString::from(format!("search-row-menu-{gi}-{ri}")), row, move |menu, _, cx| {
-            let items = v2.update(cx, |this, cx| this.row_menu(&f2, line, cx)).unwrap_or_default();
-            build_menu(menu, items)
-        })
+        with_context_menu(
+            SharedString::from(format!("search-row-menu-{gi}-{ri}")),
+            row,
+            move |menu, _, cx| {
+                let items = v2
+                    .update(cx, |this, cx| this.row_menu(&f2, line, cx))
+                    .unwrap_or_default();
+                build_menu(menu, items)
+            },
+        )
     });
-    div().mb(u(6.)).child(header).children(rows).into_any_element()
+    div()
+        .mb(u(6.))
+        .child(header)
+        .children(rows)
+        .into_any_element()
 }
 
 /// A borderless 13px input (`.search-input`).
 fn bare_input(state: &Entity<InputState>, id: &'static str) -> Input {
-    Input::new(state).id(id).appearance(false).px(u(0.)).py(u(0.)).h(u(20.)).text_size(u(13.))
+    Input::new(state)
+        .id(id)
+        .appearance(false)
+        .px(u(0.))
+        .py(u(0.))
+        .h(u(20.))
+        .text_size(u(13.))
 }
 
 /// "Replace all" / "Replace all (N)".
 fn replace_label(n: usize) -> String {
-    if n > 0 { format!("{} ({n})", crate::t!(SearchReplaceAll)) } else { crate::t!(SearchReplaceAll) }
+    if n > 0 {
+        format!("{} ({n})", crate::t!(SearchReplaceAll))
+    } else {
+        crate::t!(SearchReplaceAll)
+    }
 }
 
 /// The `search.replaced` / `search.replaceFailed` notice.
@@ -486,8 +633,16 @@ fn replace_notice(res: &Result<ReplaceResult, String>) -> String {
     match res {
         Ok(r) => crate::t!(
             SearchReplaced,
-            occurrences = tn(r.replacements as i64, Msg::CountOccurrenceOne, Msg::CountOccurrenceMany),
-            files = tn(r.files_changed as i64, Msg::CountFileOne, Msg::CountFileMany)
+            occurrences = tn(
+                r.replacements as i64,
+                Msg::CountOccurrenceOne,
+                Msg::CountOccurrenceMany
+            ),
+            files = tn(
+                r.files_changed as i64,
+                Msg::CountFileOne,
+                Msg::CountFileMany
+            )
         ),
         Err(e) => crate::t!(SearchReplaceFailed, error = e),
     }
@@ -524,7 +679,11 @@ pub fn highlight_range(text: &str, query: &str) -> Option<Range<usize>> {
 /// The row's displayed line (capped at [`ROW_TEXT_LIMIT`] chars) and the
 /// highlight inside it.
 fn row_text(text: &str, query: &str) -> (SharedString, Option<Range<usize>>) {
-    let cut = text.char_indices().nth(ROW_TEXT_LIMIT).map(|(i, _)| i).unwrap_or(text.len());
+    let cut = text
+        .char_indices()
+        .nth(ROW_TEXT_LIMIT)
+        .map(|(i, _)| i)
+        .unwrap_or(text.len());
     let range = highlight_range(text, query).filter(|r| r.end <= cut);
     (text[..cut].to_string().into(), range)
 }
@@ -541,8 +700,10 @@ impl MainView for SearchView {
 
     /// Unmount in the original: query, replacement, toggle and notice reset.
     fn on_hide(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.query_input.update(cx, |s, cx| s.set_value("", window, cx));
-        self.replace_input.update(cx, |s, cx| s.set_value("", window, cx));
+        self.query_input
+            .update(cx, |s, cx| s.set_value("", window, cx));
+        self.replace_input
+            .update(cx, |s, cx| s.set_value("", window, cx));
         self.query.clear();
         self.replacement.clear();
         self.replace_open = false;
@@ -560,8 +721,13 @@ impl Render for SearchView {
         let locale = crate::i18n::locale();
         if self.placeholder_locale != locale {
             self.placeholder_locale = locale;
-            for (input, msg) in [(&self.query_input, Msg::SearchPlaceholder), (&self.replace_input, Msg::SearchReplaceWith)] {
-                input.update(cx, |s, cx| s.set_placeholder(crate::i18n::tr(msg, &[]), window, cx));
+            for (input, msg) in [
+                (&self.query_input, Msg::SearchPlaceholder),
+                (&self.replace_input, Msg::SearchReplaceWith),
+            ] {
+                input.update(cx, |s, cx| {
+                    s.set_placeholder(crate::i18n::tr(msg, &[]), window, cx)
+                });
             }
         }
         let th = AppTheme::get(cx);
@@ -624,7 +790,10 @@ mod tests {
         let _ = translate(Locale::En, Msg::SearchReplaceAll, &[]);
         assert!(replace_label(3).ends_with(" (3)"));
         assert!(!replace_label(0).contains('('));
-        let ok = Ok(ReplaceResult { files_changed: 1, replacements: 3 });
+        let ok = Ok(ReplaceResult {
+            files_changed: 1,
+            replacements: 3,
+        });
         let s = replace_notice(&ok);
         assert!(s.contains('3') && s.contains('1'));
         assert!(replace_notice(&Err("boom".into())).contains("boom"));
@@ -636,8 +805,8 @@ mod ui_tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    use gpui_kit::component::WindowExt;
     use gpui_kit::TestAppContext;
+    use gpui_kit::component::WindowExt;
 
     use super::{SearchState, SearchView};
     use crate::test_ui;
@@ -664,16 +833,24 @@ mod ui_tests {
     async fn search_types_debounces_opens_and_replaces(cx: &mut TestAppContext) {
         cx.update(test_ui::init);
         let (_dir, root) = vault();
-        let (mut ui, view) = test_ui::open(cx, (900., 640.), |window, cx| SearchView::new(Some(root.clone()), window, cx));
+        let (mut ui, view) = test_ui::open(cx, (900., 640.), |window, cx| {
+            SearchView::new(Some(root.clone()), window, cx)
+        });
         let events: Rc<RefCell<Vec<ViewEvent>>> = Rc::default();
         let ev = events.clone();
-        cx.update(|cx| cx.subscribe(&view, move |_, e: &ViewEvent, _| ev.borrow_mut().push(e.clone())).detach());
+        cx.update(|cx| {
+            cx.subscribe(&view, move |_, e: &ViewEvent, _| {
+                ev.borrow_mut().push(e.clone())
+            })
+            .detach()
+        });
 
         // Idle placeholder, then typing goes Loading immediately.
         ui.frame();
         cx.update(|cx| assert!(matches!(view.read(cx).state(), SearchState::Idle)));
         let input = cx.update(|cx| view.read(cx).query_input.clone());
-        ui.cx.update(|window, cx| input.update(cx, |s, cx| s.focus(window, cx)));
+        ui.cx
+            .update(|window, cx| input.update(cx, |s, cx| s.focus(window, cx)));
         ui.cx.simulate_input("hel");
         cx.update(|cx| {
             assert_eq!(view.read(cx).query_input.read(cx).value().as_ref(), "hel");
@@ -682,7 +859,8 @@ mod ui_tests {
         });
         ui.type_text("lo");
         let v = view.clone();
-        ui.wait("results", move |cx| loaded(v.read(cx)).is_some()).await;
+        ui.wait("results", move |cx| loaded(v.read(cx)).is_some())
+            .await;
         // 3 matching lines in 2 files, grouped in walk order.
         cx.update(|cx| assert_eq!(loaded(view.read(cx)), Some((2, 3))));
         assert!(ui.has("search-file:0"));
@@ -691,20 +869,26 @@ mod ui_tests {
         ui.click("search-row-0-0");
         {
             let evs = events.borrow();
-            let ViewEvent::OpenFile { path, line } = evs.last().expect("open event") else { panic!() };
+            let ViewEvent::OpenFile { path, line } = evs.last().expect("open event") else {
+                panic!()
+            };
             assert!(path.ends_with(".md"));
             assert!(line.is_some());
         }
 
         // Whitespace-only query is idle.
-        ui.cx.update(|window, cx| input.update(cx, |s, cx| s.focus(window, cx)));
+        ui.cx
+            .update(|window, cx| input.update(cx, |s, cx| s.focus(window, cx)));
         ui.press("cmd-a");
         ui.type_text("   ");
         cx.update(|cx| assert!(matches!(view.read(cx).state(), SearchState::Idle)));
         ui.press("cmd-a");
         ui.type_text("HeLLo");
         let v = view.clone();
-        ui.wait("results again", move |cx| loaded(v.read(cx)) == Some((2, 3))).await;
+        ui.wait("results again", move |cx| {
+            loaded(v.read(cx)) == Some((2, 3))
+        })
+        .await;
 
         // Toggle replace row, type a replacement, confirm.
         assert!(!ui.has("search-replace-btn"));
@@ -712,16 +896,22 @@ mod ui_tests {
         cx.update(|cx| assert!(view.read(cx).replace_open));
         assert!(ui.has("search-replace-btn"));
         let rinput = cx.update(|cx| view.read(cx).replace_input.clone());
-        ui.cx.update(|window, cx| rinput.update(cx, |s, cx| s.focus(window, cx)));
+        ui.cx
+            .update(|window, cx| rinput.update(cx, |s, cx| s.focus(window, cx)));
         ui.type_text("Bye");
         cx.update(|cx| assert_eq!(view.read(cx).replacement, "Bye"));
         ui.click("search-replace-btn");
-        assert!(ui.cx.update(|window, cx| window.has_active_dialog(cx)), "confirm dialog shown");
+        assert!(
+            ui.cx.update(|window, cx| window.has_active_dialog(cx)),
+            "confirm dialog shown"
+        );
         ui.press("enter");
         let v = view.clone();
-        ui.wait("replace notice", move |cx| v.read(cx).notice.is_some()).await;
+        ui.wait("replace notice", move |cx| v.read(cx).notice.is_some())
+            .await;
         let v = view.clone();
-        ui.wait("rerun", move |cx| loaded(v.read(cx)) == Some((0, 0))).await;
+        ui.wait("rerun", move |cx| loaded(v.read(cx)) == Some((0, 0)))
+            .await;
         let notice = cx.update(|cx| view.read(cx).notice.clone().unwrap());
         assert_eq!(notice, "Replaced 3 occurrences in 2 files.");
         let a = std::fs::read_to_string(format!("{root}/a.md")).unwrap();
@@ -731,7 +921,9 @@ mod ui_tests {
 
         // Leaving the view resets component-local state.
         ui.cx.update(|window, cx| {
-            view.update(cx, |v, cx| crate::workspace::view::MainView::on_hide(v, window, cx));
+            view.update(cx, |v, cx| {
+                crate::workspace::view::MainView::on_hide(v, window, cx)
+            });
             let v = view.read(cx);
             assert!(v.query.is_empty() && v.notice.is_none() && !v.replace_open);
             assert!(matches!(v.state(), SearchState::Idle));

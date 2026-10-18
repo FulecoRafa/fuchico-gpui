@@ -42,12 +42,20 @@ impl TableData {
     }
 
     pub fn cell(&self, row: usize, col: usize) -> &str {
-        let r = if row == 0 { Some(&self.header) } else { self.rows.get(row - 1) };
+        let r = if row == 0 {
+            Some(&self.header)
+        } else {
+            self.rows.get(row - 1)
+        };
         r.and_then(|r| r.get(col)).map(String::as_str).unwrap_or("")
     }
 
     pub fn set_cell(&mut self, row: usize, col: usize, text: impl Into<String>) {
-        let r = if row == 0 { &mut self.header } else { &mut self.rows[row - 1] };
+        let r = if row == 0 {
+            &mut self.header
+        } else {
+            &mut self.rows[row - 1]
+        };
         if r.len() <= col {
             r.resize(col + 1, String::new());
         }
@@ -149,7 +157,13 @@ fn split_row(row: &str) -> Vec<Range<usize>> {
             b'\\' => i += 1,
             b'`' => {
                 let n = b[i..].iter().take_while(|c| **c == b'`').count();
-                in_code = if in_code == n { 0 } else if in_code == 0 { n } else { in_code };
+                in_code = if in_code == n {
+                    0
+                } else if in_code == 0 {
+                    n
+                } else {
+                    in_code
+                };
                 i += n - 1;
             }
             b'|' if in_code == 0 => pipes.push(i),
@@ -243,11 +257,19 @@ impl TableModel {
             let base = abs.start + skip;
             let cells: Vec<TableCell> = split_row(row)
                 .into_iter()
-                .map(|r| TableCell { text: unescape_pipes(&row[r.clone()]), range: base + r.start..base + r.end })
+                .map(|r| TableCell {
+                    text: unescape_pipes(&row[r.clone()]),
+                    range: base + r.start..base + r.end,
+                })
                 .collect();
             match l {
                 0 => header = cells,
-                1 => align = split_row(row).iter().map(|r| parse_align(&row[r.clone()])).collect(),
+                1 => {
+                    align = split_row(row)
+                        .iter()
+                        .map(|r| parse_align(&row[r.clone()]))
+                        .collect()
+                }
                 _ => rows.push(cells),
             }
         }
@@ -259,29 +281,50 @@ impl TableModel {
         for r in &mut rows {
             let end = r.last().map(|c| c.range.end).unwrap_or(range.end);
             while r.len() < n {
-                r.push(TableCell { text: String::new(), range: end..end });
+                r.push(TableCell {
+                    text: String::new(),
+                    range: end..end,
+                });
             }
         }
-        let data_rows: Vec<Vec<String>> = rows.iter().map(|r| r.iter().map(|c| c.text.clone()).collect()).collect();
+        let data_rows: Vec<Vec<String>> = rows
+            .iter()
+            .map(|r| r.iter().map(|c| c.text.clone()).collect())
+            .collect();
         let head: Vec<String> = header.iter().map(|c| c.text.clone()).collect();
         let widths = column_widths(&head, &data_rows);
         if quote_prefix.is_none() && quoted {
             quote_prefix = Some("> ".into());
         }
-        TableModel { range, header, align, rows, widths, quote_prefix }
+        TableModel {
+            range,
+            header,
+            align,
+            rows,
+            widths,
+            quote_prefix,
+        }
     }
 
     pub fn data(&self) -> TableData {
         TableData {
             header: self.header.iter().map(|c| c.text.clone()).collect(),
             align: self.align.clone(),
-            rows: self.rows.iter().map(|r| r.iter().map(|c| c.text.clone()).collect()).collect(),
+            rows: self
+                .rows
+                .iter()
+                .map(|r| r.iter().map(|c| c.text.clone()).collect())
+                .collect(),
         }
     }
 
     /// The cell at `(row, col)` (row 0 = header).
     pub fn cell(&self, row: usize, col: usize) -> Option<&TableCell> {
-        if row == 0 { self.header.get(col) } else { self.rows.get(row - 1)?.get(col) }
+        if row == 0 {
+            self.header.get(col)
+        } else {
+            self.rows.get(row - 1)?.get(col)
+        }
     }
 
     /// `(row, col)` of the cell containing byte offset `pos`, if any.
@@ -302,7 +345,18 @@ impl TableModel {
     pub fn render(&self, data: &TableData) -> String {
         let t = format_table(data);
         match &self.quote_prefix {
-            Some(p) => t.split('\n').enumerate().map(|(i, l)| if i == 0 { l.to_string() } else { format!("{p}{l}") }).collect::<Vec<_>>().join("\n"),
+            Some(p) => t
+                .split('\n')
+                .enumerate()
+                .map(|(i, l)| {
+                    if i == 0 {
+                        l.to_string()
+                    } else {
+                        format!("{p}{l}")
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
             None => t,
         }
     }
@@ -376,7 +430,10 @@ fn format_delimiter_row(widths: &[usize], align: &[Option<Align>]) -> String {
 /// `formatTable`: padded header, delimiter row and body rows joined by `\n`.
 pub fn format_table(t: &TableData) -> String {
     let widths = column_widths(&t.header, &t.rows);
-    let mut out = vec![format_data_row(&t.header, &widths, &t.align), format_delimiter_row(&widths, &t.align)];
+    let mut out = vec![
+        format_data_row(&t.header, &widths, &t.align),
+        format_delimiter_row(&widths, &t.align),
+    ];
     out.extend(t.rows.iter().map(|r| format_data_row(r, &widths, &t.align)));
     out.join("\n")
 }
@@ -434,7 +491,10 @@ pub struct TableOutcome {
 
 fn finish(doc: &str, table: &TableModel, data: TableData, next: Next) -> TableOutcome {
     let edit = table.flush(doc, &data);
-    let new_len = edit.as_ref().map(|e| e.insert.len()).unwrap_or(table.range.len());
+    let new_len = edit
+        .as_ref()
+        .map(|e| e.insert.len())
+        .unwrap_or(table.range.len());
     let from = table.range.start;
     let to = from + new_len;
     let doc_len = doc.len() - table.range.len() + new_len;
@@ -443,12 +503,21 @@ fn finish(doc: &str, table: &TableModel, data: TableData, next: Next) -> TableOu
             edit,
             // Parks the selection just inside the table (see `activate`).
             selection: (from + 1).min(from.max(to.saturating_sub(1))),
-            state: Some(TableEditState { anchor: from, row, col, editing }),
+            state: Some(TableEditState {
+                anchor: from,
+                row,
+                col,
+                editing,
+            }),
             data,
         },
         Next::Exit { before } => TableOutcome {
             edit,
-            selection: if before { from.saturating_sub(1) } else { doc_len.min(to + 1) },
+            selection: if before {
+                from.saturating_sub(1)
+            } else {
+                doc_len.min(to + 1)
+            },
             state: None,
             data,
         },
@@ -456,13 +525,25 @@ fn finish(doc: &str, table: &TableModel, data: TableData, next: Next) -> TableOu
 }
 
 enum Next {
-    Activate { row: usize, col: usize, editing: bool },
-    Exit { before: bool },
+    Activate {
+        row: usize,
+        col: usize,
+        editing: bool,
+    },
+    Exit {
+        before: bool,
+    },
 }
 
 /// Handles a key in the table widget. `data` is the live cell contents
 /// (possibly edited since the last flush).
-pub fn table_key(doc: &str, table: &TableModel, mut data: TableData, st: TableEditState, key: TableKey) -> TableOutcome {
+pub fn table_key(
+    doc: &str,
+    table: &TableModel,
+    mut data: TableData,
+    st: TableEditState,
+    key: TableKey,
+) -> TableOutcome {
     let cols = data.col_count().max(1);
     let rows = data.row_count();
     let clamp_c = |c: isize| c.clamp(0, cols as isize - 1) as usize;
@@ -481,21 +562,39 @@ pub fn table_key(doc: &str, table: &TableModel, mut data: TableData, st: TableEd
             } else if r as usize > rows - 1 {
                 Next::Exit { before: false }
             } else {
-                Next::Activate { row: r as usize, col: c, editing: false }
+                Next::Activate {
+                    row: r as usize,
+                    col: c,
+                    editing: false,
+                }
             }
         }
-        TableKey::Left | TableKey::Right | TableKey::Up | TableKey::Down => {
-            Next::Activate { row: st.row, col: st.col, editing: st.editing }
-        }
-        TableKey::Edit => Next::Activate { row: st.row, col: st.col, editing: true },
+        TableKey::Left | TableKey::Right | TableKey::Up | TableKey::Down => Next::Activate {
+            row: st.row,
+            col: st.col,
+            editing: st.editing,
+        },
+        TableKey::Edit => Next::Activate {
+            row: st.row,
+            col: st.col,
+            editing: true,
+        },
         TableKey::Enter if st.editing => {
             let nr = st.row + 1;
             if nr > rows - 1 {
                 data.insert_row(rows - 1);
             }
-            Next::Activate { row: nr, col: st.col, editing: true }
+            Next::Activate {
+                row: nr,
+                col: st.col,
+                editing: true,
+            }
         }
-        TableKey::Enter => Next::Activate { row: st.row, col: st.col, editing: true },
+        TableKey::Enter => Next::Activate {
+            row: st.row,
+            col: st.col,
+            editing: true,
+        },
         TableKey::Tab => {
             let mut r = st.row;
             let mut c = st.col as isize + 1;
@@ -507,7 +606,11 @@ pub fn table_key(doc: &str, table: &TableModel, mut data: TableData, st: TableEd
                     r = rows;
                 }
             }
-            Next::Activate { row: r, col: clamp_c(c), editing: true }
+            Next::Activate {
+                row: r,
+                col: clamp_c(c),
+                editing: true,
+            }
         }
         TableKey::ShiftTab => {
             let mut r = st.row;
@@ -516,28 +619,53 @@ pub fn table_key(doc: &str, table: &TableModel, mut data: TableData, st: TableEd
                 c = cols as isize - 1;
                 r = r.saturating_sub(1);
             }
-            Next::Activate { row: r, col: clamp_c(c), editing: true }
+            Next::Activate {
+                row: r,
+                col: clamp_c(c),
+                editing: true,
+            }
         }
-        TableKey::Escape if st.editing => Next::Activate { row: st.row, col: st.col, editing: false },
+        TableKey::Escape if st.editing => Next::Activate {
+            row: st.row,
+            col: st.col,
+            editing: false,
+        },
         TableKey::Escape => Next::Exit { before: true },
     };
     finish(doc, table, data, next)
 }
 
 /// Activates a cell (click / programmatic), flushing pending edits.
-pub fn table_activate(doc: &str, table: &TableModel, data: TableData, row: usize, col: usize, editing: bool) -> TableOutcome {
+pub fn table_activate(
+    doc: &str,
+    table: &TableModel,
+    data: TableData,
+    row: usize,
+    col: usize,
+    editing: bool,
+) -> TableOutcome {
     finish(doc, table, data, Next::Activate { row, col, editing })
 }
 
 /// "+ Add row" (appends after the last row); keeps the state.
-pub fn table_add_row(doc: &str, table: &TableModel, mut data: TableData, st: Option<TableEditState>) -> TableOutcome {
+pub fn table_add_row(
+    doc: &str,
+    table: &TableModel,
+    mut data: TableData,
+    st: Option<TableEditState>,
+) -> TableOutcome {
     let n = data.row_count();
     data.insert_row(n - 1);
     keep(doc, table, data, st)
 }
 
 /// "+" add column (appends after the last column); keeps the state.
-pub fn table_add_column(doc: &str, table: &TableModel, mut data: TableData, st: Option<TableEditState>) -> TableOutcome {
+pub fn table_add_column(
+    doc: &str,
+    table: &TableModel,
+    mut data: TableData,
+    st: Option<TableEditState>,
+) -> TableOutcome {
     let n = data.col_count();
     data.insert_column(n.saturating_sub(1));
     keep(doc, table, data, st)
@@ -545,17 +673,38 @@ pub fn table_add_column(doc: &str, table: &TableModel, mut data: TableData, st: 
 
 /// "×" remove row `row`: re-activates `min(activeRow, rows - 1)` in
 /// navigation mode.
-pub fn table_remove_row(doc: &str, table: &TableModel, mut data: TableData, row: usize, st: Option<TableEditState>) -> TableOutcome {
+pub fn table_remove_row(
+    doc: &str,
+    table: &TableModel,
+    mut data: TableData,
+    row: usize,
+    st: Option<TableEditState>,
+) -> TableOutcome {
     if !data.remove_row(row) {
         return keep(doc, table, data, st);
     }
     let active = st.map(|s| s.row.min(data.row_count() - 1)).unwrap_or(0);
     let col = st.map(|s| s.col).unwrap_or(0);
-    finish(doc, table, data, Next::Activate { row: active, col, editing: false })
+    finish(
+        doc,
+        table,
+        data,
+        Next::Activate {
+            row: active,
+            col,
+            editing: false,
+        },
+    )
 }
 
 /// Deletes column `col`, clamping the active column.
-pub fn table_delete_column(doc: &str, table: &TableModel, mut data: TableData, col: usize, st: Option<TableEditState>) -> TableOutcome {
+pub fn table_delete_column(
+    doc: &str,
+    table: &TableModel,
+    mut data: TableData,
+    col: usize,
+    st: Option<TableEditState>,
+) -> TableOutcome {
     data.delete_column(col);
     let st = st.map(|mut s| {
         s.col = s.col.min(data.col_count().saturating_sub(1));
@@ -565,17 +714,43 @@ pub fn table_delete_column(doc: &str, table: &TableModel, mut data: TableData, c
 }
 
 /// Sets column `col`'s alignment.
-pub fn table_set_alignment(doc: &str, table: &TableModel, mut data: TableData, col: usize, align: Option<Align>, st: Option<TableEditState>) -> TableOutcome {
+pub fn table_set_alignment(
+    doc: &str,
+    table: &TableModel,
+    mut data: TableData,
+    col: usize,
+    align: Option<Align>,
+    st: Option<TableEditState>,
+) -> TableOutcome {
     data.set_alignment(col, align);
     keep(doc, table, data, st)
 }
 
-fn keep(doc: &str, table: &TableModel, data: TableData, st: Option<TableEditState>) -> TableOutcome {
+fn keep(
+    doc: &str,
+    table: &TableModel,
+    data: TableData,
+    st: Option<TableEditState>,
+) -> TableOutcome {
     match st {
-        Some(s) => finish(doc, table, data, Next::Activate { row: s.row, col: s.col, editing: s.editing }),
+        Some(s) => finish(
+            doc,
+            table,
+            data,
+            Next::Activate {
+                row: s.row,
+                col: s.col,
+                editing: s.editing,
+            },
+        ),
         None => {
             let edit = table.flush(doc, &data);
-            TableOutcome { edit, selection: table.range.start, state: None, data }
+            TableOutcome {
+                edit,
+                selection: table.range.start,
+                state: None,
+                data,
+            }
         }
     }
 }
@@ -593,7 +768,10 @@ mod tests {
     #[test]
     fn parses_cells_ranges_alignment() {
         let m = model(T);
-        assert_eq!(m.header.iter().map(|c| c.text.as_str()).collect::<Vec<_>>(), ["a", "b"]);
+        assert_eq!(
+            m.header.iter().map(|c| c.text.as_str()).collect::<Vec<_>>(),
+            ["a", "b"]
+        );
         assert_eq!(m.align, [Some(Align::Left), Some(Align::Right)]);
         assert_eq!(m.rows.len(), 2);
         assert_eq!(&T[m.rows[1][1].range.clone()], "4");
@@ -625,21 +803,35 @@ mod tests {
             align: vec![None, Some(Align::Right), Some(Align::Center)],
             rows: vec![vec!["x".into(), "12".into(), "ab".into()]],
         };
-        assert_eq!(format_table(&data), "| Name |   n |  c  |\n| ---- | --: | :-: |\n| x    |  12 | ab  |");
-        assert_eq!(default_table_markdown(), "| Column 1 | Column 2 |\n| -------- | -------- |\n|          |          |");
+        assert_eq!(
+            format_table(&data),
+            "| Name |   n |  c  |\n| ---- | --: | :-: |\n| x    |  12 | ab  |"
+        );
+        assert_eq!(
+            default_table_markdown(),
+            "| Column 1 | Column 2 |\n| -------- | -------- |\n|          |          |"
+        );
     }
 
     #[test]
     fn reformat_only_when_changed() {
         let m = model(T);
         let e = m.reformat(T).unwrap();
-        assert_eq!(e.insert, "| a   |   b |\n| :-- | --: |\n| 1   |   2 |\n| 3   |   4 |");
+        assert_eq!(
+            e.insert,
+            "| a   |   b |\n| :-- | --: |\n| 1   |   2 |\n| 3   |   4 |"
+        );
         let doc2 = e.insert.clone();
         assert!(model(&doc2).reformat(&doc2).is_none());
     }
 
     fn st(row: usize, col: usize, editing: bool) -> TableEditState {
-        TableEditState { anchor: 0, row, col, editing }
+        TableEditState {
+            anchor: 0,
+            row,
+            col,
+            editing,
+        }
     }
 
     #[test]
@@ -659,7 +851,15 @@ mod tests {
         let o = table_key(&doc, &m, m.data(), st(1, 0, false), TableKey::Escape);
         assert!(o.state.is_none());
         let o = table_key(&doc, &m, m.data(), st(1, 0, true), TableKey::Escape);
-        assert_eq!(o.state, Some(TableEditState { anchor: 2, row: 1, col: 0, editing: false }));
+        assert_eq!(
+            o.state,
+            Some(TableEditState {
+                anchor: 2,
+                row: 1,
+                col: 0,
+                editing: false
+            })
+        );
         // Arrow keys while editing are the input's own (no move).
         let o = table_key(&doc, &m, m.data(), st(1, 0, true), TableKey::Down);
         assert_eq!(o.state.unwrap().row, 1);

@@ -49,10 +49,18 @@ fn reparse_5k_lines() {
     let files = vec!["/v/Wiki Link.md".to_string()];
 
     // Warm up (grammar loading, caches).
-    let ctx = DecorationContext { cursor_line: Some(2500), folds: &folds, vault_files: &files, table_edit: None };
+    let ctx = DecorationContext {
+        cursor_line: Some(2500),
+        folds: &folds,
+        vault_files: &files,
+        table_edit: None,
+    };
     let w = Instant::now();
     let _ = m.decorations(2480..2540, &ctx);
-    println!("cold first decorations (syntax-set load + first fence highlight): {:.1} ms", w.elapsed().as_secs_f64() * 1e3);
+    println!(
+        "cold first decorations (syntax-set load + first fence highlight): {:.1} ms",
+        w.elapsed().as_secs_f64() * 1e3
+    );
 
     let n = 30;
     let mut doc = text.clone();
@@ -69,7 +77,12 @@ fn reparse_5k_lines() {
         m.update(&doc, std::slice::from_ref(&edit));
         let t1 = Instant::now();
         let line = m.lines().line_of(at);
-        let ctx = DecorationContext { cursor_line: Some(line), folds: &folds, vault_files: &files, table_edit: None };
+        let ctx = DecorationContext {
+            cursor_line: Some(line),
+            folds: &folds,
+            vault_files: &files,
+            table_edit: None,
+        };
         let d = m.decorations(line.saturating_sub(30)..line + 30, &ctx);
         let t2 = Instant::now();
         assert_eq!(d.lines.len(), 60);

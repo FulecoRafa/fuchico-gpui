@@ -10,13 +10,14 @@ use gpui_kit::component::IconName;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, App, Context, Entity, FocusHandle, FontWeight, KeystrokeEvent, SharedString, Subscription, Window, div,
+    AnyElement, App, Context, Entity, FocusHandle, FontWeight, KeystrokeEvent, SharedString,
+    Subscription, Window, div,
 };
 
 use crate::i18n::tr;
 use crate::keymap::{
-    FIXED_SHORTCUTS, FixedShortcut, SHORTCUT_ACTIONS, ShortcutAction, ShortcutGroup, binding_from_keystroke,
-    display_binding,
+    FIXED_SHORTCUTS, FixedShortcut, SHORTCUT_ACTIONS, ShortcutAction, ShortcutGroup,
+    binding_from_keystroke, display_binding,
 };
 use crate::settings::{Settings, SettingsStore};
 use crate::theme::{AppTheme, alpha};
@@ -26,7 +27,10 @@ use crate::ui::u;
 /// case-insensitive substring of the joined fields.
 pub fn matches(query: &str, fields: &[&str]) -> bool {
     let hay = fields.join(" ").to_lowercase();
-    query.to_lowercase().split_whitespace().all(|term| hay.contains(term))
+    query
+        .to_lowercase()
+        .split_whitespace()
+        .all(|term| hay.contains(term))
 }
 
 /// The rows left after filtering: rebindable actions and fixed shortcuts
@@ -42,12 +46,27 @@ pub fn filter(query: &str, settings: &Settings) -> Filtered {
         .iter()
         .filter(|a| {
             let b = settings.shortcut(a.id);
-            matches(query, &[editor, &tr(a.label, &[]), &tr(a.desc, &[]), b, &display_binding(b)])
+            matches(
+                query,
+                &[
+                    editor,
+                    &tr(a.label, &[]),
+                    &tr(a.desc, &[]),
+                    b,
+                    &display_binding(b),
+                ],
+            )
         })
         .collect();
     let mut groups: Vec<(ShortcutGroup, Vec<&'static FixedShortcut>)> = Vec::new();
     for f in FIXED_SHORTCUTS.iter() {
-        let fields = [&tr(f.group.label(), &[]), &tr(f.label, &[]), &tr(f.desc, &[]), &f.keys_text(), &display_binding(f.keys)];
+        let fields = [
+            &tr(f.group.label(), &[]),
+            &tr(f.label, &[]),
+            &tr(f.desc, &[]),
+            &f.keys_text(),
+            &display_binding(f.keys),
+        ];
         if !matches(query, &fields.map(String::as_str)) {
             continue;
         }
@@ -69,7 +88,9 @@ pub struct ShortcutsList {
 
 impl ShortcutsList {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let input = cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(ShortcutsSearchPlaceholder)));
+        let input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(crate::t!(ShortcutsSearchPlaceholder))
+        });
         let chip_focus = cx.focus_handle();
         let weak = cx.entity().downgrade();
         let focus = chip_focus.clone();
@@ -84,7 +105,9 @@ impl ShortcutsList {
                 cx.notify();
             }),
             cx.observe_global_in::<SettingsStore>(window, |this, window, cx| {
-                this.input.update(cx, |s, cx| s.set_placeholder(crate::t!(ShortcutsSearchPlaceholder), window, cx));
+                this.input.update(cx, |s, cx| {
+                    s.set_placeholder(crate::t!(ShortcutsSearchPlaceholder), window, cx)
+                });
                 cx.notify();
             }),
             // The recorder sees keys before any binding (Escape, Mod-p, ...).
@@ -93,19 +116,28 @@ impl ShortcutsList {
                     return;
                 }
                 let Some(this) = weak.upgrade() else { return };
-                let Some(action) = this.read(cx).recording else { return };
+                let Some(action) = this.read(cx).recording else {
+                    return;
+                };
                 if ev.keystroke.key == "escape" {
                     cx.stop_propagation();
                     this.update(cx, |this, cx| this.stop(cx));
                     return;
                 }
-                let Some(binding) = binding_from_keystroke(&ev.keystroke) else { return };
+                let Some(binding) = binding_from_keystroke(&ev.keystroke) else {
+                    return;
+                };
                 cx.stop_propagation();
                 SettingsStore::set_shortcut(cx, action, &binding);
                 this.update(cx, |this, cx| this.stop(cx));
             }),
         ];
-        ShortcutsList { input, recording: None, chip_focus, _subs: subs }
+        ShortcutsList {
+            input,
+            recording: None,
+            chip_focus,
+            _subs: subs,
+        }
     }
 
     fn stop(&mut self, cx: &mut Context<Self>) {
@@ -124,8 +156,18 @@ impl ShortcutsList {
             .flex_col()
             .gap(u(2.))
             .min_w_0()
-            .child(div().text_size(u(12.)).font_weight(FontWeight::SEMIBOLD).child(label))
-            .child(div().text_size(u(12.)).text_color(th.colors.muted_foreground).child(desc))
+            .child(
+                div()
+                    .text_size(u(12.))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(label),
+            )
+            .child(
+                div()
+                    .text_size(u(12.))
+                    .text_color(th.colors.muted_foreground)
+                    .child(desc),
+            )
     }
 
     fn row(info: impl IntoElement, chip: impl IntoElement, cx: &App) -> gpui_kit::Div {
@@ -189,7 +231,11 @@ impl Render for ShortcutsList {
         for a in &f.rebindable {
             let id = a.id;
             let recording = self.recording == Some(id);
-            let text = if recording { crate::t!(ShortcutsPressKeys) } else { display_binding(settings.shortcut(id)) };
+            let text = if recording {
+                crate::t!(ShortcutsPressKeys)
+            } else {
+                display_binding(settings.shortcut(id))
+            };
             let chip = Self::chip(text, cx)
                 .id(SharedString::from(format!("shortcut-key-{id}")))
                 .debug_selector(move || format!("shortcut-key-{id}"))
@@ -206,13 +252,27 @@ impl Render for ShortcutsList {
                     window.focus(&this.chip_focus, cx);
                     cx.notify();
                 }));
-            rows.push(Self::row(Self::render_info(tr(a.label, &[]), tr(a.desc, &[]), cx), chip, cx).into_any_element());
+            rows.push(
+                Self::row(
+                    Self::render_info(tr(a.label, &[]), tr(a.desc, &[]), cx),
+                    chip,
+                    cx,
+                )
+                .into_any_element(),
+            );
         }
         for (group, items) in &f.groups {
             rows.push(Self::group_header(tr(group.label(), &[]), cx));
             for s in items {
                 let chip = Self::chip(s.keys_text(), cx).opacity(0.85);
-                rows.push(Self::row(Self::render_info(tr(s.label, &[]), tr(s.desc, &[]), cx), chip, cx).into_any_element());
+                rows.push(
+                    Self::row(
+                        Self::render_info(tr(s.label, &[]), tr(s.desc, &[]), cx),
+                        chip,
+                        cx,
+                    )
+                    .into_any_element(),
+                );
             }
         }
         if f.rebindable.is_empty() && f.groups.is_empty() {
@@ -245,7 +305,13 @@ impl Render for ShortcutsList {
                             .rounded(u(th.radius.sm))
                             .bg(th.colors.background)
                             .text_color(th.colors.foreground)
-                            .child(Input::new(&self.input).appearance(false).px(u(8.)).py(u(6.)).text_size(u(13.))),
+                            .child(
+                                Input::new(&self.input)
+                                    .appearance(false)
+                                    .px(u(8.))
+                                    .py(u(6.))
+                                    .text_size(u(13.)),
+                            ),
                     ),
             )
             .child(div().flex().flex_col().gap(u(10.)).children(rows))
@@ -275,7 +341,12 @@ mod tests {
         assert_eq!(all.rebindable.len(), SHORTCUT_ACTIONS.len());
         assert_eq!(
             all.groups.iter().map(|(g, _)| *g).collect::<Vec<_>>(),
-            [ShortcutGroup::Global, ShortcutGroup::Editor, ShortcutGroup::Explorer, ShortcutGroup::Tabs]
+            [
+                ShortcutGroup::Global,
+                ShortcutGroup::Editor,
+                ShortcutGroup::Explorer,
+                ShortcutGroup::Tabs
+            ]
         );
         // "editor" matches every rebindable row plus the Editor group.
         let ed = filter("editor", &s);
@@ -283,7 +354,10 @@ mod tests {
         assert!(ed.groups.iter().any(|(g, _)| *g == ShortcutGroup::Editor));
         // Raw bindings are searchable.
         let tbl = filter("Mod-Alt-t", &s);
-        assert_eq!(tbl.rebindable.iter().map(|a| a.id).collect::<Vec<_>>(), ["insertTable"]);
+        assert_eq!(
+            tbl.rebindable.iter().map(|a| a.id).collect::<Vec<_>>(),
+            ["insertTable"]
+        );
         let none = filter("qqqzzz", &s);
         assert!(none.rebindable.is_empty() && none.groups.is_empty());
     }

@@ -74,12 +74,21 @@ mod tests {
         tx.emit(CoreEvent::CaldavSyncComplete { reports: 2 });
         let ev = rx.recv().unwrap();
         assert_eq!(ev.name(), "caldav:sync-complete");
-        assert_eq!(serde_json::to_value(&ev).unwrap(), serde_json::json!({"reports": 2}));
+        assert_eq!(
+            serde_json::to_value(&ev).unwrap(),
+            serde_json::json!({"reports": 2})
+        );
     }
 
     #[test]
     fn file_written_payload_omits_missing_source() {
-        let ev = CoreEvent::FileWritten { path: "/a".into(), source: None };
-        assert_eq!(serde_json::to_value(&ev).unwrap(), serde_json::json!({"path": "/a"}));
+        let ev = CoreEvent::FileWritten {
+            path: "/a".into(),
+            source: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&ev).unwrap(),
+            serde_json::json!({"path": "/a"})
+        );
     }
 }

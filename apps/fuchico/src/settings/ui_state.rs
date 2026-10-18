@@ -59,7 +59,11 @@ pub struct ScrollPositions(Vec<(String, f64)>);
 
 impl ScrollPositions {
     pub fn get(&self, path: &str) -> Option<f64> {
-        self.0.iter().rev().find(|(p, _)| p == path).map(|(_, v)| *v)
+        self.0
+            .iter()
+            .rev()
+            .find(|(p, _)| p == path)
+            .map(|(_, v)| *v)
     }
 
     /// Moves `path` to the most-recent end and trims to the cap.
@@ -138,14 +142,22 @@ impl UiState {
         cx.global_mut::<UiState>().scroll.set(path, value);
         let task = cx.spawn(async move |cx| {
             cx.background_executor().timer(SCROLL_SAVE_DEBOUNCE).await;
-            cx.update(|cx| persist::save(persist::KEY_SCROLL_POSITIONS, &cx.global::<UiState>().scroll));
+            cx.update(|cx| {
+                persist::save(
+                    persist::KEY_SCROLL_POSITIONS,
+                    &cx.global::<UiState>().scroll,
+                )
+            });
         });
         cx.global_mut::<UiState>().scroll_save = Some(task);
     }
 
     pub fn rename_path(cx: &mut App, from: &str, to: &str) {
         cx.global_mut::<UiState>().scroll.rename(from, to);
-        persist::save(persist::KEY_SCROLL_POSITIONS, &cx.global::<UiState>().scroll);
+        persist::save(
+            persist::KEY_SCROLL_POSITIONS,
+            &cx.global::<UiState>().scroll,
+        );
     }
 }
 
@@ -163,7 +175,15 @@ mod tests {
         assert_eq!(s.get("/f0"), None);
         s.set("/f10", 1.5);
         assert_eq!(s.get("/f10"), Some(1.5));
-        assert_eq!(serde_json::to_value(&s).unwrap().as_array().unwrap().last().unwrap(), &serde_json::json!(["/f10", 1.5]));
+        assert_eq!(
+            serde_json::to_value(&s)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .last()
+                .unwrap(),
+            &serde_json::json!(["/f10", 1.5])
+        );
         let parsed: ScrollPositions = serde_json::from_str(r#"[["/a", 3], ["/b", 4.5]]"#).unwrap();
         assert_eq!(parsed.get("/b"), Some(4.5));
     }
@@ -180,8 +200,14 @@ mod tests {
 
     #[test]
     fn section_ids() {
-        assert_eq!(SettingsSection::from_id("vault"), Some(SettingsSection::Vault));
+        assert_eq!(
+            SettingsSection::from_id("vault"),
+            Some(SettingsSection::Vault)
+        );
         assert_eq!(SettingsSection::from_id("nope"), None);
-        assert_eq!(serde_json::to_string(&SettingsSection::About).unwrap(), "\"about\"");
+        assert_eq!(
+            serde_json::to_string(&SettingsSection::About).unwrap(),
+            "\"about\""
+        );
     }
 }

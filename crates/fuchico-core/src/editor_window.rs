@@ -55,7 +55,13 @@ mod tests {
     fn derives_a_stable_capability_safe_label() {
         let a = editor_window_label("/vault/notes/Café ünïcode.md");
         assert_eq!(a, editor_window_label("/vault/notes/Café ünïcode.md"));
-        assert!(a.starts_with("editor-") && a[7..].chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) && a.len() > 7);
+        assert!(
+            a.starts_with("editor-")
+                && a[7..]
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+                && a.len() > 7
+        );
         assert_ne!(a, editor_window_label("/vault/notes/other.md"));
     }
 
@@ -67,7 +73,13 @@ mod tests {
 
     #[test]
     fn builds_the_route_with_path_and_root() {
-        assert_eq!(editor_window_url("/v/a b.md", Some("/v")), "index.html?window=editor&path=%2Fv%2Fa+b.md&root=%2Fv");
-        assert_eq!(editor_window_url("/v/a.md", None), "index.html?window=editor&path=%2Fv%2Fa.md");
+        assert_eq!(
+            editor_window_url("/v/a b.md", Some("/v")),
+            "index.html?window=editor&path=%2Fv%2Fa+b.md&root=%2Fv"
+        );
+        assert_eq!(
+            editor_window_url("/v/a.md", None),
+            "index.html?window=editor&path=%2Fv%2Fa.md"
+        );
     }
 }

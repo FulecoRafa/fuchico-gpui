@@ -96,10 +96,19 @@ pub(super) fn report_summary(locale: Locale, r: &ReportRow) -> String {
     let mut s = translate(
         locale,
         Msg::CaldavReportSummary,
-        &[("new", &r.pushed_new), ("pushed", &r.pushed_updated), ("pulled", &r.pulled_updated), ("fromServer", &r.pulled_new)],
+        &[
+            ("new", &r.pushed_new),
+            ("pushed", &r.pushed_updated),
+            ("pulled", &r.pulled_updated),
+            ("fromServer", &r.pulled_new),
+        ],
     );
     if !r.errors.is_empty() {
-        s.push_str(&translate(locale, Msg::CaldavReportErrors, &[("n", &r.errors.len())]));
+        s.push_str(&translate(
+            locale,
+            Msg::CaldavReportErrors,
+            &[("n", &r.errors.len())],
+        ));
     }
     s
 }
@@ -115,29 +124,49 @@ pub(super) fn format_synced(locale: Locale, at: DateTime<Utc>) -> String {
 
 /// A link row's meta line (task count, pending deletes, last sync).
 pub(super) fn link_meta(locale: Locale, st: Option<&StatusRow>) -> String {
-    let Some(st) = st else { return translate(locale, Msg::CaldavNeverSynced, &[]) };
+    let Some(st) = st else {
+        return translate(locale, Msg::CaldavNeverSynced, &[]);
+    };
     let mut s = translate(locale, Msg::CaldavTaskCount, &[("n", &st.task_count)]);
     if st.pending > 0 {
-        s.push_str(&translate(locale, Msg::CaldavPendingDelete, &[("n", &st.pending)]));
+        s.push_str(&translate(
+            locale,
+            Msg::CaldavPendingDelete,
+            &[("n", &st.pending)],
+        ));
     }
     if let Some(at) = st.last_synced {
-        s.push_str(&translate(locale, Msg::CaldavSyncedAt, &[("date", &format_synced(locale, at))]));
+        s.push_str(&translate(
+            locale,
+            Msg::CaldavSyncedAt,
+            &[("date", &format_synced(locale, at))],
+        ));
     }
     s
 }
 
 pub(super) fn basename(path: &str) -> String {
-    Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string())
+    Path::new(path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.to_string())
 }
 
 fn account_options(accounts: &[AccountRow]) -> SearchableVec<Opt> {
     SearchableVec::new(
-        accounts.iter().map(|a| Opt::new(format!("{} ({})", a.username, a.server_url), a.id.clone())).collect::<Vec<_>>(),
+        accounts
+            .iter()
+            .map(|a| Opt::new(format!("{} ({})", a.username, a.server_url), a.id.clone()))
+            .collect::<Vec<_>>(),
     )
 }
 
 fn calendar_options(cals: &[(String, String)]) -> SearchableVec<Opt> {
-    SearchableVec::new(cals.iter().map(|(href, name)| Opt::new(name.clone(), href.clone())).collect::<Vec<_>>())
+    SearchableVec::new(
+        cals.iter()
+            .map(|(href, name)| Opt::new(name.clone(), href.clone()))
+            .collect::<Vec<_>>(),
+    )
 }
 
 struct Snapshot {
@@ -150,11 +179,20 @@ fn snapshot(ctx: &CalDavCtx) -> Snapshot {
     Snapshot {
         accounts: caldav::caldav_list_accounts(ctx).map(|v| {
             v.into_iter()
-                .map(|a| AccountRow { id: a.id, server_url: a.server_url, username: a.username })
+                .map(|a| AccountRow {
+                    id: a.id,
+                    server_url: a.server_url,
+                    username: a.username,
+                })
                 .collect()
         }),
         links: caldav::caldav_list_links(ctx).map(|v| {
-            v.into_iter().map(|l| LinkRow { folder: l.folder_path, calendar: l.calendar_display_name }).collect()
+            v.into_iter()
+                .map(|l| LinkRow {
+                    folder: l.folder_path,
+                    calendar: l.calendar_display_name,
+                })
+                .collect()
         }),
         statuses: caldav::caldav_get_sync_status(ctx).map(|v| {
             v.into_iter()
@@ -177,34 +215,50 @@ impl State {
         subs: &mut Vec<Subscription>,
     ) -> State {
         let server = cx.new(|cx| InputState::new(window, cx).default_value(ICLOUD_URL));
-        let user = cx.new(|cx| InputState::new(window, cx).placeholder(crate::t!(CaldavUsernamePlaceholder)));
+        let user = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(crate::t!(CaldavUsernamePlaceholder))
+        });
         let pass = cx.new(|cx| InputState::new(window, cx).masked(true));
         for input in [&server, &user, &pass] {
-            subs.push(cx.subscribe_in(input, window, |_, _, ev: &InputEvent, _, cx| {
-                if matches!(ev, InputEvent::Change) {
-                    cx.notify();
-                }
-            }));
+            subs.push(
+                cx.subscribe_in(input, window, |_, _, ev: &InputEvent, _, cx| {
+                    if matches!(ev, InputEvent::Change) {
+                        cx.notify();
+                    }
+                }),
+            );
         }
         let account_select = cx.new(|cx| SelectState::new(account_options(&[]), None, window, cx));
-        subs.push(cx.subscribe_in(&account_select, window, |this, _, ev: &SelectEvent<SearchableVec<Opt>>, window, cx| {
-            let SelectEvent::Confirm(Some(v)) = ev else { return };
-            let st = &mut this.caldav;
-            if st.selected_account.as_deref() != Some(v.as_ref()) {
-                st.selected_account = Some(v.to_string());
-                st.calendars.clear();
-                st.selected_calendar = None;
-                st.calendar_select.update(cx, |s, cx| s.set_items(calendar_options(&[]), window, cx));
-            }
-            cx.notify();
-        }));
-        let calendar_select = cx.new(|cx| SelectState::new(calendar_options(&[]), None, window, cx));
-        subs.push(cx.subscribe_in(&calendar_select, window, |this, _, ev: &SelectEvent<SearchableVec<Opt>>, _, cx| {
-            if let SelectEvent::Confirm(Some(v)) = ev {
-                this.caldav.selected_calendar = Some(v.to_string());
+        subs.push(cx.subscribe_in(
+            &account_select,
+            window,
+            |this, _, ev: &SelectEvent<SearchableVec<Opt>>, window, cx| {
+                let SelectEvent::Confirm(Some(v)) = ev else {
+                    return;
+                };
+                let st = &mut this.caldav;
+                if st.selected_account.as_deref() != Some(v.as_ref()) {
+                    st.selected_account = Some(v.to_string());
+                    st.calendars.clear();
+                    st.selected_calendar = None;
+                    st.calendar_select
+                        .update(cx, |s, cx| s.set_items(calendar_options(&[]), window, cx));
+                }
                 cx.notify();
-            }
-        }));
+            },
+        ));
+        let calendar_select =
+            cx.new(|cx| SelectState::new(calendar_options(&[]), None, window, cx));
+        subs.push(cx.subscribe_in(
+            &calendar_select,
+            window,
+            |this, _, ev: &SelectEvent<SearchableVec<Opt>>, _, cx| {
+                if let SelectEvent::Confirm(Some(v)) = ev {
+                    this.caldav.selected_calendar = Some(v.to_string());
+                    cx.notify();
+                }
+            },
+        ));
         // Background syncs (launch, poll, after save) refresh the status.
         subs.push(bus::subscribe(cx, |this, ev, cx| {
             if let AppEvent::Core(CoreEvent::CaldavSyncComplete { .. }) = ev {
@@ -266,7 +320,9 @@ impl SettingsView {
         work: impl FnOnce(&CalDavCtx) -> T + Send + 'static,
         done: impl FnOnce(&mut Self, T, &mut Context<Self>) + 'static,
     ) {
-        let Some(ctx) = self.caldav.ctx.clone() else { return };
+        let Some(ctx) = self.caldav.ctx.clone() else {
+            return;
+        };
         let task = cx.background_spawn(async move { work(&ctx) });
         cx.spawn(async move |this, cx| {
             let v = task.await;
@@ -297,7 +353,11 @@ impl SettingsView {
                 Err(e) => errors.push(e),
             }
             st.load_error = (!errors.is_empty()).then(|| errors.join("; "));
-            if st.selected_account.as_ref().is_none_or(|id| !st.accounts.iter().any(|a| &a.id == id)) {
+            if st
+                .selected_account
+                .as_ref()
+                .is_none_or(|id| !st.accounts.iter().any(|a| &a.id == id))
+            {
                 st.selected_account = st.accounts.first().map(|a| a.id.clone());
                 st.calendars.clear();
                 st.selected_calendar = None;
@@ -320,20 +380,39 @@ impl SettingsView {
         let (server, user, pass) = self.form_values(cx);
         self.caldav.testing = true;
         self.caldav.form_status = None;
-        self.caldav_async(cx, caldav::caldav_test_connection(server, user, pass), |this, res, _| {
-            this.caldav.testing = false;
-            this.caldav.form_status = Some(match res {
-                Ok(info) => (crate::t!(CaldavConnected, url = info.calendar_home_url), true),
-                Err(e) => (e, false),
-            });
-        });
+        self.caldav_async(
+            cx,
+            caldav::caldav_test_connection(server, user, pass),
+            |this, res, _| {
+                this.caldav.testing = false;
+                this.caldav.form_status = Some(match res {
+                    Ok(info) => (
+                        crate::t!(CaldavConnected, url = info.calendar_home_url),
+                        true,
+                    ),
+                    Err(e) => (e, false),
+                });
+            },
+        );
     }
 
     fn save_account(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(ctx) = self.caldav.ctx.clone() else { return };
+        let Some(ctx) = self.caldav.ctx.clone() else {
+            return;
+        };
         let (server_url, username, password) = self.form_values(cx);
         self.caldav.saving = true;
-        let fut = async move { caldav::caldav_save_account(&ctx, AccountInput { server_url, username, password }).await };
+        let fut = async move {
+            caldav::caldav_save_account(
+                &ctx,
+                AccountInput {
+                    server_url,
+                    username,
+                    password,
+                },
+            )
+            .await
+        };
         let (user, pass) = (self.caldav.user.clone(), self.caldav.pass.clone());
         let handle = fuchico_core::runtime::spawn(fut);
         cx.spawn_in(window, async move |this, cx| {
@@ -357,20 +436,33 @@ impl SettingsView {
     }
 
     fn remove_account(&mut self, id: String, cx: &mut Context<Self>) {
-        self.caldav_bg(cx, move |ctx| caldav::caldav_remove_account(ctx, id), |this, res, cx| {
-            this.caldav.load_error = res.err();
-            this.refresh_caldav(cx);
-        });
+        self.caldav_bg(
+            cx,
+            move |ctx| caldav::caldav_remove_account(ctx, id),
+            |this, res, cx| {
+                this.caldav.load_error = res.err();
+                this.refresh_caldav(cx);
+            },
+        );
     }
 
     fn discover_calendars(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(ctx), Some(id)) = (self.caldav.ctx.clone(), self.caldav.selected_account.clone()) else { return };
+        let (Some(ctx), Some(id)) = (
+            self.caldav.ctx.clone(),
+            self.caldav.selected_account.clone(),
+        ) else {
+            return;
+        };
         self.caldav.discovering = true;
         self.caldav.link_error = None;
         let handle = fuchico_core::runtime::spawn(async move {
             caldav::caldav_discover_calendars_for_account(&ctx, id)
                 .await
-                .map(|v| v.into_iter().map(|c| (c.href, c.display_name)).collect::<Vec<_>>())
+                .map(|v| {
+                    v.into_iter()
+                        .map(|c| (c.href, c.display_name))
+                        .collect::<Vec<_>>()
+                })
         });
         cx.spawn_in(window, async move |this, cx| {
             let Ok(res) = handle.await else { return };
@@ -407,8 +499,12 @@ impl SettingsView {
             prompt: Some(crate::t!(CaldavChooseFolder).into()),
         });
         cx.spawn(async move |this, cx| {
-            let Ok(Ok(Some(paths))) = picked.await else { return };
-            let Some(p) = paths.into_iter().next() else { return };
+            let Ok(Ok(Some(paths))) = picked.await else {
+                return;
+            };
+            let Some(p) = paths.into_iter().next() else {
+                return;
+            };
             this.update(cx, |this, cx| {
                 this.caldav.folder = Some(p.to_string_lossy().to_string());
                 cx.notify();
@@ -420,28 +516,45 @@ impl SettingsView {
 
     fn link_folder(&mut self, cx: &mut Context<Self>) {
         let st = &self.caldav;
-        let (Some(account), Some(href), Some(folder)) =
-            (st.selected_account.clone(), st.selected_calendar.clone(), st.folder.clone())
-        else {
+        let (Some(account), Some(href), Some(folder)) = (
+            st.selected_account.clone(),
+            st.selected_calendar.clone(),
+            st.folder.clone(),
+        ) else {
             return;
         };
-        let name = st.calendars.iter().find(|c| c.0 == href).map(|c| c.1.clone()).unwrap_or_else(|| href.clone());
+        let name = st
+            .calendars
+            .iter()
+            .find(|c| c.0 == href)
+            .map(|c| c.1.clone())
+            .unwrap_or_else(|| href.clone());
         self.caldav.link_error = None;
-        self.caldav_bg(cx, move |ctx| caldav::caldav_link_folder(ctx, account, href, name, folder), |this, res, cx| {
-            this.caldav.link_error = res.err();
-            this.refresh_caldav(cx);
-        });
+        self.caldav_bg(
+            cx,
+            move |ctx| caldav::caldav_link_folder(ctx, account, href, name, folder),
+            |this, res, cx| {
+                this.caldav.link_error = res.err();
+                this.refresh_caldav(cx);
+            },
+        );
     }
 
     fn unlink_folder(&mut self, folder: String, cx: &mut Context<Self>) {
-        self.caldav_bg(cx, move |ctx| caldav::caldav_unlink_folder(ctx, folder), |this, res, cx| {
-            this.caldav.link_error = res.err();
-            this.refresh_caldav(cx);
-        });
+        self.caldav_bg(
+            cx,
+            move |ctx| caldav::caldav_unlink_folder(ctx, folder),
+            |this, res, cx| {
+                this.caldav.link_error = res.err();
+                this.refresh_caldav(cx);
+            },
+        );
     }
 
     fn sync_now(&mut self, folder: Option<String>, cx: &mut Context<Self>) {
-        let Some(ctx) = self.caldav.ctx.clone() else { return };
+        let Some(ctx) = self.caldav.ctx.clone() else {
+            return;
+        };
         if self.caldav.syncing {
             return;
         }
@@ -472,7 +585,11 @@ impl SettingsView {
         });
     }
 
-    pub(super) fn integrations_sections(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Vec<Section> {
+    pub(super) fn integrations_sections(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Vec<Section> {
         if std::mem::take(&mut self.caldav.accounts_dirty) {
             let st = &self.caldav;
             let (items, selected) = (account_options(&st.accounts), st.selected_account.clone());
@@ -488,7 +605,12 @@ impl SettingsView {
         if let Some(e) = self.caldav.load_error.clone() {
             head = head.other(status(e, false, cx));
         }
-        vec![head, self.accounts_section(cx), self.links_section(cx), self.sync_section(cx)]
+        vec![
+            head,
+            self.accounts_section(cx),
+            self.links_section(cx),
+            self.sync_section(cx),
+        ]
     }
 
     fn accounts_section(&mut self, cx: &mut Context<Self>) -> Section {
@@ -502,8 +624,19 @@ impl SettingsView {
                     move || format!("caldav-account-{id}")
                 })
                 .text_size(u(12.))
-                .child(div().font_weight(FontWeight::MEDIUM).child(a.username.clone()))
-                .child(div().flex_1().min_w_0().truncate().text_color(th.colors.muted_foreground).child(a.server_url.clone()))
+                .child(
+                    div()
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(a.username.clone()),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .text_color(th.colors.muted_foreground)
+                        .child(a.server_url.clone()),
+                )
                 .child(icon_button(
                     gpui_kit::SharedString::from(format!("caldav-remove-{}", a.id)),
                     AppIcon::Trash,
@@ -520,12 +653,21 @@ impl SettingsView {
         let pass_set = !self.caldav.pass.read(cx).value().trim().is_empty();
         let can_submit = !server.is_empty() && !user.is_empty() && pass_set;
         let st = &self.caldav;
-        let (l_server, l_user, l_pass) =
-            (crate::t!(CaldavServerUrl), crate::t!(CaldavUsername), crate::t!(CaldavPassword));
+        let (l_server, l_user, l_pass) = (
+            crate::t!(CaldavServerUrl),
+            crate::t!(CaldavUsername),
+            crate::t!(CaldavPassword),
+        );
         sec = sec
-            .field(l_server.clone(), field(&l_server, text_input(&st.server), cx))
+            .field(
+                l_server.clone(),
+                field(&l_server, text_input(&st.server), cx),
+            )
             .field(l_user.clone(), field(&l_user, text_input(&st.user), cx))
-            .field(l_pass.clone(), field(&l_pass, text_input(&st.pass).mask_toggle(), cx));
+            .field(
+                l_pass.clone(),
+                field(&l_pass, text_input(&st.pass).mask_toggle(), cx),
+            );
         if server.contains("icloud.com") {
             let link = div()
                 .id("caldav-icloud-link")
@@ -535,7 +677,11 @@ impl SettingsView {
                 .on_click(|_, _, cx| cx.open_url(APPLE_APP_PASSWORD_URL))
                 .child(crate::t!(CaldavIcloudLink));
             sec = sec.field(
-                format!("{} {}", crate::t!(CaldavIcloudHint), crate::t!(CaldavIcloudLink)),
+                format!(
+                    "{} {}",
+                    crate::t!(CaldavIcloudHint),
+                    crate::t!(CaldavIcloudLink)
+                ),
                 hint(cx).child(crate::t!(CaldavIcloudHint)).child(link),
             );
         }
@@ -545,7 +691,11 @@ impl SettingsView {
             .gap(u(8.))
             .child(btn(
                 "caldav-test",
-                if st.testing { crate::t!(CaldavTesting) } else { crate::t!(CaldavTestConnection) },
+                if st.testing {
+                    crate::t!(CaldavTesting)
+                } else {
+                    crate::t!(CaldavTestConnection)
+                },
                 BtnKind::Secondary,
                 None,
                 !can_submit || st.testing,
@@ -554,14 +704,25 @@ impl SettingsView {
             ))
             .child(btn(
                 "caldav-save",
-                if st.saving { crate::t!(CaldavSaving) } else { crate::t!(CaldavSaveAccount) },
+                if st.saving {
+                    crate::t!(CaldavSaving)
+                } else {
+                    crate::t!(CaldavSaveAccount)
+                },
                 BtnKind::Primary,
                 None,
                 !can_submit || st.saving || st.ctx.is_none(),
                 cx,
                 cx.listener(|this, _, window, cx| this.save_account(window, cx)),
             ));
-        sec = sec.field(format!("{} {}", crate::t!(CaldavTestConnection), crate::t!(CaldavSaveAccount)), actions);
+        sec = sec.field(
+            format!(
+                "{} {}",
+                crate::t!(CaldavTestConnection),
+                crate::t!(CaldavSaveAccount)
+            ),
+            actions,
+        );
         if let Some((text, ok)) = st.form_status.clone() {
             sec = sec.other(status(text, ok, cx));
         }
@@ -579,13 +740,21 @@ impl SettingsView {
         let l_account = crate::t!(CaldavAccount);
         sec = sec.field(
             l_account.clone(),
-            field(&l_account, Select::new(&st.account_select).placeholder(l_account.clone()), cx),
+            field(
+                &l_account,
+                Select::new(&st.account_select).placeholder(l_account.clone()),
+                cx,
+            ),
         );
         sec = sec.field(
             crate::t!(CaldavDiscoverCalendars),
             div().flex().child(btn(
                 "caldav-discover",
-                if st.discovering { crate::t!(CaldavDiscovering) } else { crate::t!(CaldavDiscoverCalendars) },
+                if st.discovering {
+                    crate::t!(CaldavDiscovering)
+                } else {
+                    crate::t!(CaldavDiscoverCalendars)
+                },
                 BtnKind::Secondary,
                 Some(AppIcon::RefreshCw),
                 st.selected_account.is_none() || st.discovering,
@@ -598,7 +767,10 @@ impl SettingsView {
             sec = sec.field(l.clone(), field(&l, Select::new(&st.calendar_select), cx));
         }
         let l_folder = crate::t!(CaldavFolder);
-        let folder_text = st.folder.clone().unwrap_or_else(|| crate::t!(CaldavNoFolder));
+        let folder_text = st
+            .folder
+            .clone()
+            .unwrap_or_else(|| crate::t!(CaldavNoFolder));
         let picker = div()
             .flex()
             .items_center()
@@ -622,8 +794,12 @@ impl SettingsView {
                 cx,
                 cx.listener(|this, _, _, cx| this.pick_folder(cx)),
             ));
-        sec = sec.field(format!("{l_folder} {folder_text}"), field(&l_folder, picker, cx));
-        let can_link = st.selected_account.is_some() && st.selected_calendar.is_some() && st.folder.is_some();
+        sec = sec.field(
+            format!("{l_folder} {folder_text}"),
+            field(&l_folder, picker, cx),
+        );
+        let can_link =
+            st.selected_account.is_some() && st.selected_calendar.is_some() && st.folder.is_some();
         sec = sec.field(
             crate::t!(CaldavLinkFolder),
             div().flex().child(btn(
@@ -653,9 +829,23 @@ impl SettingsView {
                         .flex_col()
                         .flex_1()
                         .min_w_0()
-                        .child(div().font_weight(FontWeight::MEDIUM).truncate().child(basename(&link.folder)))
-                        .child(div().text_color(th.colors.muted_foreground).child(link.calendar.clone()))
-                        .child(div().text_size(u(11.)).text_color(th.colors.muted_foreground).child(meta)),
+                        .child(
+                            div()
+                                .font_weight(FontWeight::MEDIUM)
+                                .truncate()
+                                .child(basename(&link.folder)),
+                        )
+                        .child(
+                            div()
+                                .text_color(th.colors.muted_foreground)
+                                .child(link.calendar.clone()),
+                        )
+                        .child(
+                            div()
+                                .text_size(u(11.))
+                                .text_color(th.colors.muted_foreground)
+                                .child(meta),
+                        ),
                 )
                 .child(icon_button(
                     gpui_kit::SharedString::from(format!("caldav-sync-{}", link.folder)),
@@ -690,7 +880,11 @@ impl SettingsView {
             crate::t!(CaldavSyncNow),
             div().flex().child(btn(
                 "caldav-sync-now",
-                if st.syncing { crate::t!(CaldavSyncing) } else { crate::t!(CaldavSyncNow) },
+                if st.syncing {
+                    crate::t!(CaldavSyncing)
+                } else {
+                    crate::t!(CaldavSyncNow)
+                },
                 BtnKind::Primary,
                 Some(AppIcon::RefreshCw),
                 st.syncing || st.ctx.is_none(),
@@ -702,20 +896,36 @@ impl SettingsView {
             sec = sec.other(status(e, false, cx));
         }
         if let Some(reports) = st.reports.clone() {
-            let log = div().flex().flex_col().gap(u(4.)).children(reports.into_iter().map(|r| {
-                row_box(cx)
-                    .flex_col()
-                    .items_start()
-                    .text_size(u(12.))
-                    .child(
-                        div()
-                            .flex()
-                            .gap(u(8.))
-                            .child(div().font_weight(FontWeight::MEDIUM).child(basename(&r.folder)))
-                            .child(div().text_color(th.colors.muted_foreground).child(report_summary(locale, &r))),
-                    )
-                    .children(r.errors.iter().map(|e| status(e.clone(), false, cx).mt(u(0.))))
-            }));
+            let log = div()
+                .flex()
+                .flex_col()
+                .gap(u(4.))
+                .children(reports.into_iter().map(|r| {
+                    row_box(cx)
+                        .flex_col()
+                        .items_start()
+                        .text_size(u(12.))
+                        .child(
+                            div()
+                                .flex()
+                                .gap(u(8.))
+                                .child(
+                                    div()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .child(basename(&r.folder)),
+                                )
+                                .child(
+                                    div()
+                                        .text_color(th.colors.muted_foreground)
+                                        .child(report_summary(locale, &r)),
+                                ),
+                        )
+                        .children(
+                            r.errors
+                                .iter()
+                                .map(|e| status(e.clone(), false, cx).mt(u(0.))),
+                        )
+                }));
             sec = sec.other(log);
         }
         sec
@@ -728,19 +938,43 @@ mod tests {
 
     #[test]
     fn summary_en_and_pt() {
-        let r = ReportRow { pushed_new: 1, pushed_updated: 2, pulled_updated: 3, pulled_new: 4, ..Default::default() };
-        assert_eq!(report_summary(Locale::En, &r), "+1 new, 2 pushed, 3 pulled, 4 from server");
-        let r = ReportRow { errors: vec!["x".into(), "y".into()], ..r };
+        let r = ReportRow {
+            pushed_new: 1,
+            pushed_updated: 2,
+            pulled_updated: 3,
+            pulled_new: 4,
+            ..Default::default()
+        };
+        assert_eq!(
+            report_summary(Locale::En, &r),
+            "+1 new, 2 pushed, 3 pulled, 4 from server"
+        );
+        let r = ReportRow {
+            errors: vec!["x".into(), "y".into()],
+            ..r
+        };
         assert!(report_summary(Locale::En, &r).ends_with(", 2 error(s)"));
-        assert_ne!(report_summary(Locale::PtBr, &r), report_summary(Locale::En, &r));
+        assert_ne!(
+            report_summary(Locale::PtBr, &r),
+            report_summary(Locale::En, &r)
+        );
     }
 
     #[test]
     fn meta_lines() {
         assert_eq!(link_meta(Locale::En, None), "Never synced");
-        let st = StatusRow { folder: "/a".into(), last_synced: None, task_count: 5, pending: 0 };
+        let st = StatusRow {
+            folder: "/a".into(),
+            last_synced: None,
+            task_count: 5,
+            pending: 0,
+        };
         assert_eq!(link_meta(Locale::En, Some(&st)), "5 tasks");
-        let st = StatusRow { pending: 2, last_synced: Some(Utc::now()), ..st };
+        let st = StatusRow {
+            pending: 2,
+            last_synced: Some(Utc::now()),
+            ..st
+        };
         let m = link_meta(Locale::En, Some(&st));
         assert!(m.starts_with("5 tasks, 2 pending delete · synced "), "{m}");
     }

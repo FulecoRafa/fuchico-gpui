@@ -44,9 +44,13 @@ pub fn set_test_dir(dir: impl Into<PathBuf>) {
 /// fresh scratch dir per test thread.
 #[cfg(test)]
 fn dir() -> Option<PathBuf> {
-    TEST_DIR
-        .with(|d| d.borrow().clone())
-        .or_else(|| Some(std::env::temp_dir().join(format!("fuchico-test-config-{}-{:?}", std::process::id(), std::thread::current().id()))))
+    TEST_DIR.with(|d| d.borrow().clone()).or_else(|| {
+        Some(std::env::temp_dir().join(format!(
+            "fuchico-test-config-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        )))
+    })
 }
 
 #[cfg(not(test))]

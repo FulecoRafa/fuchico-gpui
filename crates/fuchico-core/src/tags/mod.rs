@@ -35,9 +35,10 @@ fn walk_markdown_files(dir: &Path, out: &mut Vec<PathBuf>) {
             walk_markdown_files(&path, out);
         } else if ft.is_file()
             && let Some(ext) = path.extension().and_then(|e| e.to_str())
-                && (ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")) {
-                    out.push(path);
-                }
+            && (ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"))
+        {
+            out.push(path);
+        }
     }
 }
 
@@ -297,7 +298,11 @@ mod tests {
     #[test]
     fn parses_block_list_frontmatter() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("a.md"), "---\ntags:\n  - one\n  - two\n---\n").unwrap();
+        std::fs::write(
+            dir.path().join("a.md"),
+            "---\ntags:\n  - one\n  - two\n---\n",
+        )
+        .unwrap();
         let entries = tags_scan(dir.path().to_string_lossy().into_owned()).unwrap();
         assert_eq!(entries.len(), 2);
         assert!(entries.iter().any(|e| e.tag == "one"));

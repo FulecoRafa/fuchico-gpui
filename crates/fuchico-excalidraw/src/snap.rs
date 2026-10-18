@@ -14,7 +14,10 @@ pub fn snap_to_grid(p: P, size: f64) -> P {
 pub type Guide = [P; 2];
 
 fn stops(b: [f64; 4]) -> ([f64; 3], [f64; 3]) {
-    ([b[0], (b[0] + b[2]) / 2.0, b[2]], [b[1], (b[1] + b[3]) / 2.0, b[3]])
+    (
+        [b[0], (b[0] + b[2]) / 2.0, b[2]],
+        [b[1], (b[1] + b[3]) / 2.0, b[3]],
+    )
 }
 
 /// Offset to add to a moving box so one of its x/y stops (min, centre,
@@ -43,8 +46,16 @@ pub fn snap_box(moving: [f64; 4], others: &[[f64; 4]], tol: f64) -> ([f64; 2], V
             }
         }
     }
-    let off = [best_x.map(|b| b.0).unwrap_or(0.0), best_y.map(|b| b.0).unwrap_or(0.0)];
-    let moved = [moving[0] + off[0], moving[1] + off[1], moving[2] + off[0], moving[3] + off[1]];
+    let off = [
+        best_x.map(|b| b.0).unwrap_or(0.0),
+        best_y.map(|b| b.0).unwrap_or(0.0),
+    ];
+    let moved = [
+        moving[0] + off[0],
+        moving[1] + off[1],
+        moving[2] + off[0],
+        moving[3] + off[1],
+    ];
     let mut guides = Vec::new();
     if let Some((_, x)) = best_x {
         let (mut y0, mut y1) = (moved[1], moved[3]);
@@ -83,7 +94,11 @@ mod tests {
 
     #[test]
     fn snaps_edges_and_centres() {
-        let (off, g) = snap_box([103.0, 0.0, 153.0, 50.0], &[[0.0, 200.0, 100.0, 300.0]], 5.0);
+        let (off, g) = snap_box(
+            [103.0, 0.0, 153.0, 50.0],
+            &[[0.0, 200.0, 100.0, 300.0]],
+            5.0,
+        );
         assert_eq!(off, [-3.0, 0.0]);
         assert_eq!(g.len(), 1);
         assert_eq!(snap_to_grid([29.0, 11.0], 20.0), [20.0, 20.0]);
