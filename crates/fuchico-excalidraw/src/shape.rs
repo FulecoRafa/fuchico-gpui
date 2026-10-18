@@ -152,12 +152,11 @@ fn rough_options(el: &Element, continuous_path: bool) -> Options {
                 o.curve_fitting = Some(1.0);
             }
         }
-        "line" | "freedraw" => {
-            if is_path_a_loop(&el.points()) && filled {
+        "line" | "freedraw"
+            if is_path_a_loop(&el.points()) && filled => {
                 o.fill_style = Some(fill_style(el.fill_style()));
                 o.fill = Some(PLACEHOLDER);
             }
-        }
         _ => {}
     }
     o

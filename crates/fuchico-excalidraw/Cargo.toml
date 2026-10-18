@@ -20,6 +20,16 @@ base64.workspace = true
 sha2.workspace = true
 rand.workspace = true
 indexmap.workspace = true
+resvg.workspace = true
+png.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.9", features = ["test-support"] }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+objc.workspace = true
+raw-window-handle.workspace = true
 
 [[example]]
 name = "viewer"

@@ -269,6 +269,107 @@ pub fn outline_toward_center(el: &Element, from: P) -> P {
     to_world(el, [lc[0] + ux * t, lc[1] + uy * t])
 }
 
+/// First intersection (world) of the ray `from + t·(toward − from)`, t ≥ 0,
+/// with the element's outline.
+pub fn ray_outline(el: &Element, from: P, toward: P) -> Option<P> {
+    let f = to_local(el, from);
+    let t = to_local(el, toward);
+    let (w, h) = (el.width().abs(), el.height().abs());
+    let d = [t[0] - f[0], t[1] - f[1]];
+    if d[0].abs() < 1e-12 && d[1].abs() < 1e-12 {
+        return None;
+    }
+    let best = match el.kind.as_str() {
+        "ellipse" => {
+            let (rx, ry) = (w / 2.0, h / 2.0);
+            if rx <= 0.0 || ry <= 0.0 {
+                return None;
+            }
+            let (ox, oy) = ((f[0] - rx) / rx, (f[1] - ry) / ry);
+            let (dx, dy) = (d[0] / rx, d[1] / ry);
+            let a = dx * dx + dy * dy;
+            let b = 2.0 * (ox * dx + oy * dy);
+            let c = ox * ox + oy * oy - 1.0;
+            let disc = b * b - 4.0 * a * c;
+            if disc < 0.0 {
+                return None;
+            }
+            let s = disc.sqrt();
+            [(-b - s) / (2.0 * a), (-b + s) / (2.0 * a)].into_iter().filter(|t| *t >= 0.0).reduce(f64::min)
+        }
+        _ => {
+            let poly: Vec<P> = if el.kind == "diamond" {
+                vec![[w / 2.0, 0.0], [w, h / 2.0], [w / 2.0, h], [0.0, h / 2.0]]
+            } else {
+                vec![[0.0, 0.0], [w, 0.0], [w, h], [0.0, h]]
+            };
+            let mut best: Option<f64> = None;
+            for i in 0..poly.len() {
+                let (a, b) = (poly[i], poly[(i + 1) % poly.len()]);
+                let e = [b[0] - a[0], b[1] - a[1]];
+                let den = d[0] * e[1] - d[1] * e[0];
+                if den.abs() < 1e-12 {
+                    continue;
+                }
+                let q = [a[0] - f[0], a[1] - f[1]];
+                let tt = (q[0] * e[1] - q[1] * e[0]) / den;
+                let u = (q[0] * d[1] - q[1] * d[0]) / den;
+                if tt >= 0.0 && (-1e-9..=1.0 + 1e-9).contains(&u) && best.map(|b| tt < b).unwrap_or(true) {
+                    best = Some(tt);
+                }
+            }
+            best
+        }
+    }?;
+    Some(to_world(el, [f[0] + d[0] * best, f[1] + d[1] * best]))
+}
+
+/// Excalidraw-style focus of a binding: the signed offset of the line
+/// `adj → end` from the target's centre, as a fraction of the target's
+/// half-extent across that line (−1..1; 0 aims at the centre).
+pub fn focus_of(el: &Element, adj: P, end: P) -> f64 {
+    let c = center(el);
+    let d = [end[0] - adj[0], end[1] - adj[1]];
+    let len = (d[0] * d[0] + d[1] * d[1]).sqrt();
+    if len < 1e-9 {
+        return 0.0;
+    }
+    // Signed distance of the centre from the line, along the normal of
+    // the centre direction (so focus_point inverts it).
+    let dc = [c[0] - adj[0], c[1] - adj[1]];
+    let lc = (dc[0] * dc[0] + dc[1] * dc[1]).sqrt();
+    if lc < 1e-9 {
+        return 0.0;
+    }
+    let n = [-dc[1] / lc, dc[0] / lc];
+    // Where the line passes the centre's depth.
+    let along = (dc[0] * d[0] + dc[1] * d[1]) / len;
+    let hit = [adj[0] + d[0] / len * along, adj[1] + d[1] / len * along];
+    let off = (hit[0] - c[0]) * n[0] + (hit[1] - c[1]) * n[1];
+    let half = half_extent(el, n);
+    if half < 1e-9 { 0.0 } else { (off / half).clamp(-1.0, 1.0) }
+}
+
+/// Point the binding with `focus` aims at, seen from `adj`.
+pub fn focus_point(el: &Element, adj: P, focus: f64) -> P {
+    let c = center(el);
+    let d = [c[0] - adj[0], c[1] - adj[1]];
+    let len = (d[0] * d[0] + d[1] * d[1]).sqrt();
+    if len < 1e-9 || focus == 0.0 {
+        return c;
+    }
+    let n = [-d[1] / len, d[0] / len];
+    let half = half_extent(el, n);
+    [c[0] + n[0] * focus * half, c[1] + n[1] * focus * half]
+}
+
+fn half_extent(el: &Element, n: P) -> f64 {
+    // Support function of the rotated box along n.
+    let (w, h) = (el.width().abs() / 2.0, el.height().abs() / 2.0);
+    let (s, c) = el.angle().sin_cos();
+    w * (c * n[0] + s * n[1]).abs() + h * (-s * n[0] + c * n[1]).abs()
+}
+
 pub fn is_bindable(el: &Element) -> bool {
     matches!(
         el.kind.as_str(),
