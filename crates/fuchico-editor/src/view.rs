@@ -630,7 +630,9 @@ impl EditorView {
             (r.to(), r.to())
         };
         let end = from + text.chars().count();
-        let fx = self.engine.apply_changes(vec![Change::new(from, to, text)]);
+        let fx = self
+            .engine
+            .apply_host_edit(vec![Change::new(from, to, text)], None);
         self.apply_effects(fx, cx);
         let fx = self.engine.set_selection(Selection::single(end, end));
         self.apply_effects(fx, cx);
@@ -711,7 +713,7 @@ impl EditorView {
             .collect()
     }
 
-    /// Applies a byte-offset command edit (not undoable: engine host edit).
+    /// Applies a byte-offset command edit as one undo step.
     fn apply_command_edit(&mut self, e: CommandEdit, cx: &mut Context<Self>) {
         let changes: Vec<Change> = e
             .changes
@@ -719,7 +721,7 @@ impl EditorView {
             .map(|(r, s)| Change::new(self.char_of(r.start), self.char_of(r.end), s.clone()))
             .collect();
         if !changes.is_empty() {
-            let fx = self.engine.apply_changes(changes);
+            let fx = self.engine.apply_host_edit(changes, None);
             self.apply_effects(fx, cx);
         }
         if !e.selection.is_empty() {
@@ -733,14 +735,28 @@ impl EditorView {
         }
     }
 
-    fn apply_md_edit(&mut self, e: &MdEdit, cx: &mut Context<Self>) {
-        let ch = Change::new(
+    /// Applies a markdown edit as an undo step (`group` coalesces runs of
+    /// edits, e.g. typing in one table cell).
+    fn apply_md_edit(&mut self, e: &MdEdit, group: Option<&str>, cx: &mut Context<Self>) {
+        let ch = self.md_change(e);
+        let fx = self.engine.apply_host_edit(vec![ch], group);
+        self.apply_effects(fx, cx);
+    }
+
+    /// Applies a markdown edit inside the running insert session (completion
+    /// accept), without an undo step of its own.
+    fn apply_md_edit_unrecorded(&mut self, e: &MdEdit, cx: &mut Context<Self>) {
+        let ch = self.md_change(e);
+        let fx = self.engine.apply_changes(vec![ch]);
+        self.apply_effects(fx, cx);
+    }
+
+    fn md_change(&self, e: &MdEdit) -> Change {
+        Change::new(
             self.char_of(e.range.start),
             self.char_of(e.range.end),
             e.insert.clone(),
-        );
-        let fx = self.engine.apply_changes(vec![ch]);
-        self.apply_effects(fx, cx);
+        )
     }
 
     // ---- effects --------------------------------------------------------------
@@ -1354,7 +1370,7 @@ impl EditorView {
             return;
         };
         self.suppress_completion = opt.picked;
-        self.apply_md_edit(&opt.edit, cx);
+        self.apply_md_edit_unrecorded(&opt.edit, cx);
         let cur = self.char_of(opt.cursor);
         let fx = self.engine.set_selection(Selection::single(cur, cur));
         self.apply_effects(fx, cx);
@@ -1402,7 +1418,7 @@ impl EditorView {
     fn apply_table_outcome(&mut self, out: TableOutcome, cx: &mut Context<Self>) {
         self.suppress_completion = true;
         if let Some(e) = &out.edit {
-            self.apply_md_edit(e, cx);
+            self.apply_md_edit(e, None, cx);
         }
         let sel = self.char_of(out.selection);
         let fx = self.engine.set_selection(Selection::single(sel, sel));
@@ -1523,7 +1539,8 @@ impl EditorView {
         self.suppress_completion = true;
         self.table = Some(t.clone());
         if let Some(e) = edit {
-            self.apply_md_edit(&e, cx);
+            let group = format!("table:{}:{}:{}", t.state.anchor, t.state.row, t.state.col);
+            self.apply_md_edit(&e, Some(&group), cx);
         }
         self.table = Some(t);
         self.suppress_completion = false;
@@ -1571,7 +1588,7 @@ impl EditorView {
         };
         if let Some(lang) = menu.toolbar.options.get(ix) {
             let e = menu.toolbar.set_language(lang);
-            self.apply_md_edit(&e, cx);
+            self.apply_md_edit(&e, None, cx);
         }
         cx.notify();
     }
@@ -1799,7 +1816,7 @@ impl EditorView {
             .iter()
             .map(|r| Change::new(r.from(), r.to(), ""))
             .collect();
-        let fx = self.engine.apply_changes(changes);
+        let fx = self.engine.apply_host_edit(changes, None);
         self.apply_effects(fx, cx);
     }
     fn act_paste(&mut self, _: &Paste, _: &mut Window, cx: &mut Context<Self>) {
@@ -1827,7 +1844,7 @@ impl EditorView {
                 .iter()
                 .map(|r| Change::new(r.from(), r.to(), text.clone()))
                 .collect();
-            let fx = self.engine.apply_changes(changes);
+            let fx = self.engine.apply_host_edit(changes, None);
             self.apply_effects(fx, cx);
         }
     }
@@ -1914,7 +1931,7 @@ impl EditorView {
 
     fn on_hit(&mut self, hit: Hit, at: Point<Pixels>, cx: &mut Context<Self>) {
         match hit {
-            Hit::Checkbox(edit) => self.apply_md_edit(&edit, cx),
+            Hit::Checkbox(edit) => self.apply_md_edit(&edit, None, cx),
             Hit::Link(url) => cx.emit(EditorEvent::OpenLink(url)),
             Hit::Wikilink { target, resolved } => {
                 cx.emit(EditorEvent::OpenWikilink { target, resolved })

@@ -320,3 +320,45 @@ async fn host_command_and_external_effects(cx: &mut TestAppContext) {
         "{ev:?}"
     );
 }
+
+#[gpui_kit::test]
+async fn host_edits_are_undoable(cx: &mut TestAppContext) {
+    let mut ui = open(
+        cx,
+        "title\n- [ ] task one\nplain\n",
+        EditorOptions::default(),
+    );
+    // Checkbox click: `u` undoes it, `U` redoes, Cmd-Z undoes again.
+    let p = ui.hit("Checkbox(");
+    ui.click(p, Modifiers::none());
+    assert_eq!(ui.text(), "title\n- [x] task one\nplain\n");
+    ui.press("escape");
+    ui.press("u");
+    assert_eq!(ui.text(), "title\n- [ ] task one\nplain\n");
+    ui.press("U");
+    assert_eq!(ui.text(), "title\n- [x] task one\nplain\n");
+    ui.press("cmd-z");
+    assert_eq!(ui.text(), "title\n- [ ] task one\nplain\n");
+    // Normal-mode clipboard paste is one undo step.
+    ui.update(|v, _, cx| v.set_selection(0, 0, cx));
+    ui.cx.write_to_clipboard(ClipboardItem::new_string("XY".into()));
+    ui.press("cmd-v");
+    assert!(ui.text().contains("XY"), "{:?}", ui.text());
+    ui.press("u");
+    assert_eq!(ui.text(), "title\n- [ ] task one\nplain\n");
+}
+
+#[gpui_kit::test]
+async fn table_typing_undoes_per_cell(cx: &mut TestAppContext) {
+    let mut ui = open(cx, "\n", EditorOptions::default());
+    ui.press("cmd-alt-t");
+    let fresh = ui.text();
+    ui.type_text("Name");
+    assert!(ui.text().contains("Name"));
+    ui.press("escape");
+    ui.press("escape");
+    ui.press("u");
+    assert_eq!(ui.text(), fresh);
+    ui.press("u");
+    assert_eq!(ui.text(), "\n");
+}

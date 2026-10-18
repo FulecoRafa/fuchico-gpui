@@ -96,6 +96,8 @@ pub struct Editor {
     effects: Vec<Effect>,
     edits: Vec<Effect>,
     pub(crate) dispatched: bool,
+    /// Last [`Editor::apply_host_edit`] group and the document it left.
+    host_group: Option<(String, Text)>,
 }
 
 impl std::fmt::Debug for Editor {
@@ -145,6 +147,7 @@ impl Editor {
             effects: Vec::new(),
             edits: Vec::new(),
             dispatched: false,
+            host_group: None,
         }
     }
 
@@ -256,6 +259,47 @@ impl Editor {
     pub fn apply_changes(&mut self, changes: Vec<Change>) -> Vec<Effect> {
         let snap = self.snapshot();
         self.dispatch(Tr::changes(ChangeSet::new(changes)));
+        self.finish(snap)
+    }
+
+    /// Apply an edit made by the host (checkbox toggle, table cell, paste,
+    /// inserted date...) as its own undo step, as CodeMirror's history
+    /// recorded it in the original. Consecutive edits with the same `group`
+    /// and nothing in between coalesce into one step (typing in a table
+    /// cell). In insert mode the running insert session is committed first
+    /// and a new one starts after the edit.
+    pub fn apply_host_edit(&mut self, changes: Vec<Change>, group: Option<&str>) -> Vec<Effect> {
+        let snap = self.snapshot();
+        let set = ChangeSet::new(changes);
+        if set.is_empty() {
+            return self.finish(snap);
+        }
+        let coalesce = group.is_some()
+            && self.history.cursor == -1
+            && self
+                .host_group
+                .as_ref()
+                .is_some_and(|(g, doc)| Some(g.as_str()) == group && *doc == self.doc);
+        let insert = self.mode.ty == ModeType::Insert;
+        if !coalesce {
+            if insert {
+                self.history.commit(&self.doc);
+            }
+            let before = Checkpoint {
+                doc: self.doc.clone(),
+                selection: self.sel.clone(),
+            };
+            self.history.add(before, false);
+        }
+        self.dispatch(Tr::changes(set));
+        if insert && !coalesce {
+            let after = Checkpoint {
+                doc: self.doc.clone(),
+                selection: self.sel.clone(),
+            };
+            self.history.add(after, true);
+        }
+        self.host_group = group.map(|g| (g.to_string(), self.doc.clone()));
         self.finish(snap)
     }
 
