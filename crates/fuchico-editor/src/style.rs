@@ -203,17 +203,27 @@ impl EditorStyle {
     pub fn selection_secondary(&self) -> Hsla {
         mix(self.primary, 0.20)
     }
-    /// `.cm-fat-cursor` background (focused): foreground 45%.
+    /// Helix block cursor: codemirror-helix's
+    /// `.cm-hx-block-cursor .cm-hx-cursor { background: #ccc }`, the same for
+    /// every selection head, focused or not (the app's `.cm-fat-cursor` rule
+    /// only applies to vim mode).
     pub fn block_cursor(&self) -> Hsla {
-        mix(self.foreground, 0.45)
+        Rgba {
+            r: 0.8,
+            g: 0.8,
+            b: 0.8,
+            a: 1.,
+        }
+        .into()
     }
-    /// `.cm-fat-cursor` outline (focused 65%, unfocused 40%).
-    pub fn block_cursor_outline(&self, focused: bool) -> Hsla {
-        mix(self.foreground, if focused { 0.65 } else { 0.40 })
-    }
-    /// Secondary block cursors.
+    /// Secondary block cursors: identical to the primary in the original.
     pub fn block_cursor_secondary(&self) -> Hsla {
-        mix(self.foreground, 0.28)
+        self.block_cursor()
+    }
+    /// Bar cursor (`.cm-cursor { border-left: 1.2px var(--foreground) }`),
+    /// primary and secondary alike.
+    pub fn bar_cursor(&self) -> Hsla {
+        self.foreground
     }
     /// `.cm-searchMatch` (30%) and the selected match (55%).
     pub fn search_match(&self, selected: bool) -> Hsla {

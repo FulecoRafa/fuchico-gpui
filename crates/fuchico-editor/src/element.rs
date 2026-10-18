@@ -6,6 +6,7 @@
 
 use std::ops::Range;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use fuchico_helix::{ModeType, Scroll, ScrollAlign};
 use fuchico_markdown::{
@@ -13,12 +14,15 @@ use fuchico_markdown::{
     TableModel, TextEdit as MdEdit,
 };
 use gpui_kit::{
-    App, BorderStyle, Bounds, Context, CursorStyle, Element, ElementId, ElementInputHandler,
-    Entity, EntityInputHandler, Font, FontFeatures, FontStyle, FontWeight, GlobalElementId, Hitbox,
-    HitboxBehavior, Hsla, InspectorElementId, IntoElement, LayoutId, PaintQuad, PathBuilder,
-    Pixels, Point, ShapedLine, SharedString, StrikethroughStyle, Style, TextAlign, TextRun,
-    UTF16Selection, UnderlineStyle, Window, WrappedLine, fill, point, px, quad, relative, size,
+    App, BorderStyle, Bounds, Context, Corners, CursorStyle, Element, ElementId,
+    ElementInputHandler, Entity, EntityInputHandler, Font, FontFeatures, FontStyle, FontWeight,
+    GlobalElementId, Hitbox, HitboxBehavior, Hsla, ImgResourceLoader, InspectorElementId,
+    IntoElement, LayoutId, PaintQuad, PathBuilder, Pixels, Point, RenderImage, Resource,
+    ShapedLine, SharedString, StrikethroughStyle, Style, TextAlign, TextRun, UTF16Selection,
+    UnderlineStyle, Window, WrappedLine, fill, point, px, quad, relative, size,
 };
+
+use crate::images::{IMAGE_PAD, ImageContext, fit};
 
 use crate::display::{DisplayLine, SpanStyle, WidgetKind};
 use crate::style::{EditorStyle, mix};
@@ -83,6 +87,10 @@ pub(crate) enum Prim {
         origin: Point<Pixels>,
         width: Pixels,
         style: UnderlineStyle,
+    },
+    Image {
+        bounds: Bounds<Pixels>,
+        data: Arc<RenderImage>,
     },
 }
 
@@ -162,12 +170,14 @@ pub(crate) struct Frame {
     pub prims: Vec<Prim>,
     /// Bottom-left of the main cursor (completion popup anchor).
     pub cursor_anchor: Option<Point<Pixels>>,
-    /// Painted cursors: (bounds, primary).
-    pub cursors: Vec<(Bounds<Pixels>, bool)>,
+    /// Painted cursors: (bounds, primary, fill colour).
+    pub cursors: Vec<(Bounds<Pixels>, bool, Hsla)>,
     /// Gutter labels: (0-based line, text).
     pub gutter: Vec<(usize, String)>,
     /// Window x of each painted ruler.
     pub rulers: Vec<Pixels>,
+    /// Inline image previews: (0-based line, bounds).
+    pub images: Vec<(usize, Bounds<Pixels>)>,
 }
 
 impl Frame {
@@ -372,6 +382,8 @@ fn chevron(x: Pixels, y: Pixels, open: bool) -> Vec<Point<Pixels>> {
 }
 
 const TABLE_PAD: f32 = 6.;
+/// CodeMirror's `.cm-content { padding: 4px 0 }`.
+pub(crate) const CONTENT_PAD: f32 = 4.;
 
 fn table_cell_h(body: f32) -> f32 {
     body + 8.
@@ -427,7 +439,53 @@ impl EditorView {
         }
     }
 
+    /// Re-scans the document for image embeds (one per line).
+    fn rescan_images(&mut self) {
+        self.image_lines.clear();
+        if !self.options.inline_images {
+            return;
+        }
+        let ictx = ImageContext {
+            vault_root: self.options.vault_root.as_deref(),
+            note_path: self.options.path.as_deref(),
+            vault_files: &self.options.vault_files,
+        };
+        let text = self.model.text();
+        let code = &self.model.parsed().code_ranges;
+        for l in 0..self.model.line_count() {
+            let r = self.model.line_range(l);
+            let line = &text[r.clone()];
+            if !line.contains("![") {
+                continue;
+            }
+            // Inside a fenced / indented code block (a code range that spans
+            // past this line).
+            let i = code.partition_point(|c| c.end <= r.start);
+            if code
+                .get(i)
+                .is_some_and(|c| c.start <= r.start && c.end > r.end)
+            {
+                continue;
+            }
+            if let Some(p) = ictx.first_image(line) {
+                self.image_lines.insert(l, p);
+            }
+        }
+    }
+
+    /// Preview size of the image on `line`, once loaded.
+    pub(crate) fn image_size(&self, line: usize) -> Option<(f32, f32)> {
+        let nat = self.image_natural.get(self.image_lines.get(&line)?)?;
+        let w = if self.viewport.0 > 0. {
+            self.viewport.0
+        } else {
+            800.
+        };
+        Some(fit(*nat, w - 120.))
+    }
+
     fn recompute_offsets(&mut self, char_w: f32) {
+        self.rescan_images();
         let hidden = self.hidden_lines();
         let n = hidden.len();
         let body = f32::from(self.style.line_height_px());
@@ -437,8 +495,8 @@ impl EditorView {
             table_first.insert(t.first_line, t.last_line - t.first_line);
         }
         let mut off = Vec::with_capacity(n + 1);
-        let mut y = 0.;
-        off.push(0.);
+        let mut y = CONTENT_PAD;
+        off.push(y);
         for (l, &hid) in hidden.iter().enumerate() {
             let h = if hid {
                 0.
@@ -453,7 +511,8 @@ impl EditorView {
                     }
                     _ => 1,
                 };
-                self.row_h_of(l) * rows as f32
+                let img = self.image_size(l).map_or(0., |(_, h)| h + 2. * IMAGE_PAD);
+                self.row_h_of(l) * rows as f32 + img
             };
             y += h;
             off.push(y);
@@ -510,13 +569,10 @@ impl EditorView {
                 Scroll::RestorePromptStart => self.scroll_y = self.prompt_scroll_start,
             }
         }
-        let max = (total - vh * 0.5).max(0.).max(total - vh);
-        let max = if total <= vh {
-            0.
-        } else {
-            max.min(total - vh * 0.25)
-        };
-        self.scroll_y = self.scroll_y.clamp(0., max.max(0.));
+        // No scrollPastEnd in the original: the last line (+ bottom padding)
+        // can reach the bottom edge, no further.
+        let max = (total + CONTENT_PAD - vh).max(0.);
+        self.scroll_y = self.scroll_y.clamp(0., max);
     }
 
     pub(crate) fn layout_frame(
@@ -692,7 +748,7 @@ impl EditorView {
         }
 
         let mut prims: Vec<Prim> = Vec::new();
-        let mut cursors: Vec<(Bounds<Pixels>, bool)> = Vec::new();
+        let mut cursors: Vec<(Bounds<Pixels>, bool, Hsla)> = Vec::new();
         let mut gutter: Vec<(usize, String)> = Vec::new();
         let mut rulers: Vec<Pixels> = Vec::new();
         let mut hits: Vec<(Bounds<Pixels>, Hit)> = Vec::new();
@@ -1131,11 +1187,41 @@ impl EditorView {
             self.paint_table(window, &st, fl, model, *edit, char_w, &mut prims, &mut hits);
         }
 
+        // ---- inline images -------------------------------------------------------
+        let mut images: Vec<(usize, Bounds<Pixels>)> = Vec::new();
+        let mut image_new: Vec<(std::path::PathBuf, (f32, f32))> = Vec::new();
+        for fl in lines.iter().filter(|fl| !fl.table) {
+            let Some(path) = self.image_lines.get(&fl.line).cloned() else {
+                continue;
+            };
+            let src = Resource::Path(Arc::from(path.as_path()));
+            let Some(Ok(data)) = window.use_asset::<ImgResourceLoader>(&src, cx) else {
+                continue;
+            };
+            let sz = data.size(0);
+            let nat = (sz.width.0 as f32, sz.height.0 as f32);
+            if self.image_natural.get(&path) != Some(&nat) {
+                image_new.push((path, nat)); // height known now: relayout next frame
+                continue;
+            }
+            let Some((w, h)) = self.image_size(fl.line) else {
+                continue;
+            };
+            let rows = fl.row_starts.len() as f32;
+            let b = Bounds {
+                origin: point(fl.x, fl.top + fl.row_h * rows + px(IMAGE_PAD)),
+                size: size(px(w), px(h)),
+            };
+            images.push((fl.line, b));
+            prims.push(Prim::Image { bounds: b, data });
+        }
         // ---- gutter -------------------------------------------------------------
         for fl in &lines {
             let y = fl.top;
             let lh = fl.row_h.min(fl.height);
-            if self.options.line_numbers != LineNumbers::Off {
+            // A table is a block-replace widget in the original: CodeMirror's
+            // gutters give block widgets no line number (widgetMarker -> null).
+            if self.options.line_numbers != LineNumbers::Off && !fl.table {
                 let num = match self.options.line_numbers {
                     LineNumbers::Relative if fl.line != cursor_line => {
                         fl.line.abs_diff(cursor_line)
@@ -1245,40 +1331,23 @@ impl EditorView {
                         origin,
                         size: size(w, fl.row_h),
                     };
-                    cursors.push((b, primary));
-                    if primary {
-                        prims.push(Prim::Quad(quad(
-                            b,
-                            px(1.),
-                            if focused {
-                                st.block_cursor()
-                            } else {
-                                gpui_kit::transparent_black()
-                            },
-                            px(1.),
-                            st.block_cursor_outline(focused),
-                            BorderStyle::Solid,
-                        )));
-                    } else {
-                        prims.push(Prim::Quad(fill(b, st.block_cursor_secondary())));
-                    }
-                } else {
-                    let color = if primary {
-                        st.foreground
-                    } else {
-                        mix(st.foreground, 0.5)
-                    };
+                    cursors.push((b, primary, st.block_cursor()));
+                    prims.push(Prim::Quad(fill(b, st.block_cursor())));
+                } else if focused {
+                    // `.cm-cursorLayer` is only shown while focused.
+                    let color = st.bar_cursor();
                     cursors.push((
                         Bounds {
                             origin,
-                            size: size(px(2.), fl.row_h),
+                            size: size(px(1.2), fl.row_h),
                         },
                         primary,
+                        color,
                     ));
                     prims.push(Prim::Quad(fill(
                         Bounds {
                             origin,
-                            size: size(px(2.), fl.row_h),
+                            size: size(px(1.2), fl.row_h),
                         },
                         color,
                     )));
@@ -1288,8 +1357,13 @@ impl EditorView {
                 }
             }
         }
-        let _ = (cx, &sans);
+        let _ = &sans;
 
+        if !image_new.is_empty() {
+            self.image_natural.extend(image_new);
+            self.layout_dirty = true;
+            cx.notify();
+        }
         Rc::new(Frame {
             bounds,
             char_w,
@@ -1300,6 +1374,7 @@ impl EditorView {
             cursors,
             gutter,
             rulers,
+            images,
         })
     }
 
@@ -1574,6 +1649,16 @@ impl Element for EditorElement {
                         width,
                         style,
                     } => window.paint_underline(*origin, *width, style),
+                    Prim::Image { bounds, data } => {
+                        let _ = window.paint_image(
+                            *bounds,
+                            *bounds,
+                            Corners::all(px(4.)),
+                            data.clone(),
+                            0,
+                            false,
+                        );
+                    }
                 }
             }
         });

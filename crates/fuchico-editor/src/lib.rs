@@ -18,6 +18,7 @@ pub mod commands;
 pub mod display;
 mod element;
 mod host;
+mod images;
 pub mod style;
 mod view;
 

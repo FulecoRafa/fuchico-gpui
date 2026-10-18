@@ -73,7 +73,12 @@ pub struct EditorOptions {
     pub command_line_via_host: bool,
     pub fold_start_marker: String,
     pub fold_end_marker: String,
+    /// Draw image embeds (`![](x.png)`, `![[x.png]]`) below their line.
+    /// Not in the original (which shows them as text): off by default.
     pub inline_images: bool,
+    /// Absolute vault directory; image paths resolve against it (and the
+    /// note's directory, from `path`).
+    pub vault_root: Option<std::path::PathBuf>,
     /// Draw the mode chip (bottom-left).
     pub mode_chip: bool,
     /// Helix "external" commands the host implements (`Space f`, `Space b`,
@@ -96,6 +101,7 @@ impl Default for EditorOptions {
             fold_start_marker: ":::fold".into(),
             fold_end_marker: ":::endfold".into(),
             inline_images: false,
+            vault_root: None,
             mode_chip: true,
             externals: Default::default(),
         }
@@ -243,6 +249,10 @@ pub struct EditorView {
     /// Measured visual rows of wrapped lines (0-based line → rows).
     pub(crate) wrap_rows: HashMap<usize, usize>,
     pub(crate) wrap_width: Option<f32>,
+    /// Inline images: 0-based line → resolved file (first embed per line).
+    pub(crate) image_lines: HashMap<usize, std::path::PathBuf>,
+    /// Natural sizes of loaded images.
+    pub(crate) image_natural: HashMap<std::path::PathBuf, (f32, f32)>,
     pub(crate) viewport: (f32, f32),
     pub(crate) frame: Option<Rc<Frame>>,
 
@@ -324,6 +334,8 @@ impl EditorView {
             layout_dirty: true,
             offsets: Vec::new(),
             wrap_rows: HashMap::new(),
+            image_lines: HashMap::new(),
+            image_natural: HashMap::new(),
             wrap_width: None,
             viewport: (0., 0.),
             frame: None,
@@ -1836,8 +1848,9 @@ impl EditorView {
         })
     }
 
-    /// Painted cursors of the last frame: (window bounds, primary).
-    pub fn debug_cursors(&self) -> Vec<(gpui_kit::Bounds<Pixels>, bool)> {
+    /// Painted cursors of the last frame: (window bounds, primary, fill
+    /// colour).
+    pub fn debug_cursors(&self) -> Vec<(gpui_kit::Bounds<Pixels>, bool, gpui_kit::Hsla)> {
         self.frame
             .as_ref()
             .map_or_else(Vec::new, |f| f.cursors.clone())
@@ -1856,6 +1869,14 @@ impl EditorView {
         self.frame
             .as_ref()
             .map_or_else(|| (Vec::new(), px(0.)), |f| (f.rulers.clone(), f.char_w))
+    }
+
+    /// Inline image previews painted in the last frame: (0-based line,
+    /// bounds).
+    pub fn debug_images(&self) -> Vec<(usize, gpui_kit::Bounds<Pixels>)> {
+        self.frame
+            .as_ref()
+            .map_or_else(Vec::new, |f| f.images.clone())
     }
 
     /// 0-based lines laid out in the last frame (only visible ones).
@@ -2149,15 +2170,25 @@ impl Render for EditorView {
                 div()
                     .id("fuchico-editor-mode-chip")
                     .absolute()
-                    .left(px(6.))
-                    .bottom(px(4.))
-                    .px(px(6.))
-                    .rounded(px(4.))
+                    // `.helix-mode-chip`: bottom/left 12px, padding 2px 7px,
+                    // radius-md (8px), sans 10px semibold, uppercase.
+                    .left(px(12.))
+                    .bottom(px(12.))
+                    .px(px(7.))
+                    .py(px(2.))
+                    .rounded(px(8.))
+                    .shadow(vec![gpui_kit::BoxShadow {
+                        color: st.foreground.opacity(0.08),
+                        offset: gpui_kit::point(px(0.), px(1.)),
+                        blur_radius: px(2.),
+                        spread_radius: px(0.),
+                        inset: false,
+                    }])
                     .border_1()
                     .border_color(st.chip_border())
                     .bg(st.chip_background())
                     .text_color(st.chip_text())
-                    .font_family(mono.clone())
+                    .font_family(st.sans_family.clone())
                     .text_size(px(10.))
                     .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .child(format!("{}{}", self.chip_label(), {
