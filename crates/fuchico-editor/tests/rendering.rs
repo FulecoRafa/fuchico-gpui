@@ -244,3 +244,79 @@ async fn live_preview_hits_and_hidden_syntax(cx: &mut TestAppContext) {
         "markers shown on the cursor line"
     );
 }
+
+/// A real PNG (`w`×`h`, two-colour) in a fresh temp vault at `att/pic.png`.
+fn temp_vault_with_png(tag: &str, w: u32, h: u32) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "fuchico-editor-{tag}-{}-{}",
+        std::process::id(),
+        Instant::now().elapsed().as_nanos()
+    ));
+    std::fs::create_dir_all(dir.join("att")).unwrap();
+    let img = image::RgbaImage::from_fn(w, h, |x, _| {
+        if x < w / 2 {
+            image::Rgba([230, 120, 40, 255])
+        } else {
+            image::Rgba([40, 120, 230, 255])
+        }
+    });
+    img.save(dir.join("att/pic.png")).unwrap();
+    dir
+}
+
+#[gpui_kit::test]
+async fn inline_images_load_from_vault(cx: &mut TestAppContext) {
+    let vault = temp_vault_with_png("img", 120, 60);
+    let options = EditorOptions {
+        inline_images: true,
+        vault_root: Some(vault.clone()),
+        vault_files: vec!["att/pic.png".into(), "note.md".into()],
+        path: Some("note.md".into()),
+        ..EditorOptions::default()
+    };
+    let text = "intro\n![[pic.png]]\nmiddle\n![alt](att/pic.png)\n`![[pic.png]]` in code\nend\n";
+    let mut ui = open(cx, text, options);
+    // The decode runs on the background executor: wait, then relayout.
+    for _ in 0..3 {
+        ui.cx.run_until_parked();
+        ui.frame();
+    }
+    let imgs = ui.read(|v, _| v.debug_images());
+    let lines: Vec<_> = imgs.iter().map(|i| i.0).collect();
+    assert_eq!(lines, vec![1, 3], "both syntaxes, not in code: {imgs:?}");
+    for (_, b) in &imgs {
+        assert_eq!((b.size.width, b.size.height), (px(120.), px(60.)));
+    }
+    // The preview sits below its source line and pushes the next line down.
+    let src = ui.char_point(text.find("![[").unwrap()).y;
+    let next = ui.char_point(text.find("middle").unwrap()).y;
+    assert!(imgs[0].1.origin.y > src);
+    assert!(next >= imgs[0].1.origin.y + px(60.), "{next:?} vs {imgs:?}");
+
+    // Off by default (parity: the original editor shows no inline images).
+    ui.update(|v, _, cx| {
+        let mut o = v.options().clone();
+        o.inline_images = false;
+        v.set_options(o, cx);
+    });
+    ui.frame();
+    assert!(ui.read(|v, _| v.debug_images()).is_empty());
+    let _ = std::fs::remove_dir_all(vault);
+}
+
+#[gpui_kit::test]
+async fn table_block_has_no_line_numbers(cx: &mut TestAppContext) {
+    let text = "intro\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\nafter\n";
+    let mut ui = open(cx, text, EditorOptions::default());
+    let g = ui.read(|v, _| v.debug_gutter());
+    let lines: Vec<_> = g.iter().map(|(l, _)| *l).collect();
+    // CodeMirror's lineNumbers widgetMarker returns null for block
+    // widgets: the replaced table lines (2..=4) get no number, and the
+    // following lines keep their real numbers.
+    assert!(lines.contains(&0) && lines.contains(&1));
+    for l in 2..=4 {
+        assert!(!lines.contains(&l), "table line {l} numbered: {g:?}");
+    }
+    let after = g.iter().find(|(l, _)| *l == 6).expect("line 7 numbered");
+    assert_eq!(after.1, "7");
+}

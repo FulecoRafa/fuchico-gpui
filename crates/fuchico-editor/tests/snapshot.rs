@@ -59,8 +59,10 @@ fn snapshot(
             cx.new(|cx| gpui_kit::base::Root::new(view, window, cx))
         })
         .expect("open headless window");
-    cx.run_until_parked();
-    for _ in 0..2 {
+    // Three passes, parking in between: inline images decode on the
+    // background executor and relayout once their size is known.
+    for _ in 0..3 {
+        cx.run_until_parked();
         cx.update_window(handle.into(), |_, window, cx| {
             window.refresh();
             window.draw(cx).clear(cx);
@@ -109,5 +111,36 @@ fn snapshot_widgets_and_prompt() {
             v.handle_keys(":", cx); // opens the prompt (later keys would bypass overlays)
         },
     );
+    assert!(p.exists());
+}
+
+#[test]
+fn snapshot_inline_images() {
+    let vault = std::env::temp_dir().join(format!("fuchico-editor-snap-{}", std::process::id()));
+    std::fs::create_dir_all(vault.join("att")).unwrap();
+    let img = image::RgbaImage::from_fn(320, 160, |x, y| {
+        let t = (x as f32 / 320.) * 255.;
+        if (x / 40 + y / 40) % 2 == 0 {
+            image::Rgba([t as u8, 140, 220, 255])
+        } else {
+            image::Rgba([240, 180, 60, 255])
+        }
+    });
+    img.save(vault.join("att/pic.png")).unwrap();
+    let root = vault.clone();
+    let p = snapshot(
+        "editor-images-ayu-dark",
+        EditorStyle::ayu_dark(),
+        "# Images\n\nAn embed:\n![[pic.png]]\nA markdown image:\n![alt](att/pic.png)\nAfter the images.\n".into(),
+        move |v, cx| {
+            let mut o = v.options().clone();
+            o.inline_images = true;
+            o.vault_root = Some(root);
+            o.vault_files = vec!["att/pic.png".into()];
+            o.path = Some("note.md".into());
+            v.set_options(o, cx);
+        },
+    );
+    let _ = std::fs::remove_dir_all(vault);
     assert!(p.exists());
 }

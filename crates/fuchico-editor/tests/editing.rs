@@ -155,3 +155,108 @@ async fn set_text_keeps_selection_and_marks_saved(cx: &mut TestAppContext) {
             .any(|e| matches!(e, EditorEvent::DirtyChanged(false)))
     );
 }
+
+#[gpui_kit::test]
+async fn ime_mark_then_unmark_keeps_composition(cx: &mut TestAppContext) {
+    let mut ui = open(cx, "ab\n", EditorOptions::default());
+    ui.press("i"); // insert before `a`
+    ui.update(|v, w, cx| v.replace_and_mark_text_in_range(None, "k", None, w, cx));
+    assert_eq!(ui.read(|v, _| v.marked_range()), Some(0..1));
+    // The composition grows in place: the marked range is replaced.
+    ui.update(|v, w, cx| v.replace_and_mark_text_in_range(None, "かn", Some(2..2), w, cx));
+    assert_eq!(ui.text(), "かnab\n");
+    assert_eq!(ui.read(|v, _| v.marked_range()), Some(0..2));
+    // `unmark_text` commits whatever is composed.
+    ui.update(|v, w, cx| v.unmark_text(w, cx));
+    assert_eq!(ui.read(|v, _| v.marked_range()), None);
+    let mr = ui.update(|v, w, cx| v.marked_text_range(w, cx));
+    assert_eq!(mr, None);
+    // Further input inserts at the cursor instead of replacing.
+    ui.update(|v, w, cx| v.replace_text_in_range(None, "!", w, cx));
+    assert_eq!(ui.text(), "かn!ab\n");
+}
+
+#[gpui_kit::test]
+async fn cursor_shapes_and_colours_match_helix(cx: &mut TestAppContext) {
+    let mut ui = open(cx, "one\ntwo\nthree\n", EditorOptions::default());
+    ui.press("shift-c");
+    let (fg, block) = ui.read(|v, _| (v.style().foreground, v.style().block_cursor()));
+    // codemirror-helix: `.cm-hx-cursor { background: #ccc }` on every head.
+    let c = ui.read(|v, _| v.debug_cursors());
+    assert_eq!(c.len(), 2);
+    let primary = c.iter().find(|c| c.1).unwrap();
+    let secondary = c.iter().find(|c| !c.1).unwrap();
+    assert_eq!(primary.2, block);
+    assert_eq!(secondary.2, block, "secondary block cursor = primary");
+    let rgb = gpui_kit::Rgba::from(block);
+    assert!((rgb.r - 0.8).abs() < 0.01 && (rgb.g - 0.8).abs() < 0.01);
+    for c in &c {
+        assert!(c.0.size.width > px(4.), "block: {c:?}");
+    }
+    // Insert mode: thin `.cm-cursor` bars in the foreground colour, both.
+    ui.press("i");
+    let c = ui.read(|v, _| v.debug_cursors());
+    assert_eq!(c.len(), 2);
+    for c in &c {
+        assert!(c.0.size.width <= px(1.5), "bar: {c:?}");
+        assert_eq!(c.2, fg);
+    }
+    assert_eq!(c.iter().filter(|c| c.1).count(), 1);
+}
+
+#[gpui_kit::test]
+async fn select_regex_draws_every_cursor(cx: &mut TestAppContext) {
+    let mut ui = open(cx, "foo bar foo\nbaz foo\n", EditorOptions::default());
+    ui.press("%");
+    ui.press("s");
+    ui.type_text("foo");
+    ui.press("enter");
+    let ranges = ui.read(|v, _| {
+        v.selection()
+            .ranges()
+            .iter()
+            .map(|r| (r.from(), r.to()))
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(ranges, vec![(0, 3), (8, 11), (16, 19)]);
+    let c = ui.read(|v, _| v.debug_cursors());
+    assert_eq!(c.len(), 3, "every selection head is drawn: {c:?}");
+    assert_eq!(c.iter().filter(|c| c.1).count(), 1);
+    // Each cursor sits on its own head (distinct positions, right rows).
+    let mut ys: Vec<_> = c.iter().map(|c| c.0.origin.y).collect();
+    ys.dedup();
+    assert_eq!(ys.len(), 2, "two on line 1, one on line 2");
+    let mut xs: Vec<_> = c.iter().map(|c| (c.0.origin.x, c.0.origin.y)).collect();
+    xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    xs.dedup();
+    assert_eq!(xs.len(), 3);
+    // Typing affects all three.
+    ui.press("c");
+    ui.type_text("X");
+    assert_eq!(ui.text(), "X bar X\nbaz X\n");
+}
+
+#[gpui_kit::test]
+async fn drag_across_lines_selects_range(cx: &mut TestAppContext) {
+    let mut ui = open(
+        cx,
+        "alpha beta\ngamma delta\nend\n",
+        EditorOptions::default(),
+    );
+    let (from, to) = (ui.char_point(6), ui.char_point(17));
+    ui.drag(from, to);
+    let (a, h) = ui.sel();
+    assert_eq!(a, 6, "anchor at the press");
+    assert!((17..=18).contains(&h), "head follows the pointer: {h}");
+    assert_eq!(ui.read(|v, _| v.selection().ranges().len()), 1);
+    // The head cursor is drawn on the second line.
+    let c = ui.read(|v, _| v.debug_cursors());
+    assert_eq!(c.len(), 1);
+    assert!(c[0].0.origin.y > from.y);
+    // Dragging backwards reverses the selection.
+    let (from, to) = (ui.char_point(15), ui.char_point(2));
+    ui.drag(from, to);
+    let (a, h) = ui.sel();
+    assert!(h < a, "{a}..{h}");
+    assert!((2..=3).contains(&h));
+}
