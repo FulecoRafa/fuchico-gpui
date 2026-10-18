@@ -214,6 +214,9 @@ impl Workspace {
         push(&self.search, &root, cx);
         push(&self.tags, &root, cx);
         push(&self.settings, &root, cx);
+        if let Some(Dock::Backlinks(b)) = &self.dock {
+            b.update(cx, |b, cx| b.set_root(root.clone(), cx));
+        }
         cx.notify();
     }
 
@@ -461,7 +464,7 @@ impl Workspace {
             self.dock_subs.clear();
         } else {
             let target = backlinks_target(self.tabs.active.as_deref());
-            let pane = cx.new(|cx| BacklinksPane::new(target, window, cx));
+            let pane = cx.new(|cx| BacklinksPane::new(self.root.clone(), target, window, cx));
             let open = cx.subscribe_in(&pane, window, |this, _, ev: &ViewEvent, window, cx| {
                 this.on_view_event(ev, window, cx)
             });
