@@ -31,6 +31,8 @@ mod settings_view;
 #[cfg(test)]
 mod snapshot;
 mod tags;
+#[cfg(test)]
+mod test_ui;
 mod theme;
 mod ui;
 mod windows;

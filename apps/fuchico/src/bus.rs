@@ -23,10 +23,10 @@ pub enum AppEvent {
     Core(CoreEvent),
     /// `mermaid:update {blockKey, text|null}` — editor → diagram dock.
     MermaidUpdate { block_key: String, text: Option<String> },
-    /// `mermaid:request` — diagram window asks editors to re-send.
-    MermaidRequest,
-    /// `mermaid:closed` — the detached diagram window went away.
-    MermaidClosed,
+    /// `mermaid:request {blockKey}` — a diagram view asks the editor to re-send.
+    MermaidRequest { block_key: String },
+    /// `mermaid:closed {blockKey}` — the diagram dock/window went away.
+    MermaidClosed { block_key: String },
     /// `mermaid:dock-request {blockKey, label}` — detached diagram → dock.
     MermaidDockRequest { block_key: String, label: String },
     /// `export:request {key}`.
@@ -45,8 +45,8 @@ impl AppEvent {
         match self {
             AppEvent::Core(e) => e.name(),
             AppEvent::MermaidUpdate { .. } => "mermaid:update",
-            AppEvent::MermaidRequest => "mermaid:request",
-            AppEvent::MermaidClosed => "mermaid:closed",
+            AppEvent::MermaidRequest { .. } => "mermaid:request",
+            AppEvent::MermaidClosed { .. } => "mermaid:closed",
             AppEvent::MermaidDockRequest { .. } => "mermaid:dock-request",
             AppEvent::ExportRequest { .. } => "export:request",
             AppEvent::ExportHtml { .. } => "export:html",
@@ -67,32 +67,33 @@ impl Global for BusGlobal {}
 #[cfg(not(test))]
 static TX: OnceLock<UnboundedSender<AppEvent>> = OnceLock::new();
 
-// Tests run many gpui apps in one process, one per libtest thread; a process
-// global would route one test's events into another test's scheduler.
-#[cfg(test)]
-thread_local! {
-    static TEST_TX: std::cell::RefCell<Option<UnboundedSender<AppEvent>>> = const { std::cell::RefCell::new(None) };
-}
-
 #[cfg(not(test))]
-fn set_tx(tx: UnboundedSender<AppEvent>) -> bool {
+fn bind_sender(tx: UnboundedSender<AppEvent>) -> bool {
     TX.set(tx).is_ok()
 }
 
-#[cfg(test)]
-fn set_tx(tx: UnboundedSender<AppEvent>) -> bool {
-    TEST_TX.with(|t| *t.borrow_mut() = Some(tx));
-    true
-}
-
 #[cfg(not(test))]
-fn tx() -> Option<UnboundedSender<AppEvent>> {
+fn sender() -> Option<UnboundedSender<AppEvent>> {
     TX.get().cloned()
 }
 
+// Tests: one sender per test thread, so every `#[gpui_kit::test]` (whose
+// executor runs foreground and background tasks on its own thread) gets
+// its own bus instead of the first test's.
 #[cfg(test)]
-fn tx() -> Option<UnboundedSender<AppEvent>> {
-    TEST_TX.with(|t| t.borrow().clone())
+thread_local! {
+    static TX: std::cell::RefCell<Option<UnboundedSender<AppEvent>>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn bind_sender(tx: UnboundedSender<AppEvent>) -> bool {
+    TX.with(|t| *t.borrow_mut() = Some(tx));
+    true
+}
+
+#[cfg(test)]
+fn sender() -> Option<UnboundedSender<AppEvent>> {
+    TX.with(|t| t.borrow().clone())
 }
 
 /// Creates the bus and starts the main-thread pump. Call once at startup.
@@ -100,7 +101,7 @@ pub fn init(cx: &mut App) {
     let bus = cx.new(|_| EventBus);
     cx.set_global(BusGlobal(bus));
     let (tx, mut rx) = unbounded::<AppEvent>();
-    if !set_tx(tx) {
+    if !bind_sender(tx) {
         log::warn!("bus::init called twice");
         return;
     }
@@ -121,7 +122,7 @@ pub fn emit(cx: &mut App, ev: AppEvent) {
 
 /// Queues `ev` from any thread.
 pub fn send(ev: AppEvent) {
-    match tx() {
+    match sender() {
         Some(tx) => {
             let _ = tx.unbounded_send(ev);
         }

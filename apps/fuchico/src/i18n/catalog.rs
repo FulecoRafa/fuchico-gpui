@@ -688,6 +688,34 @@ pub enum Msg {
     ShortcutsResetTitle,
     /// `settings.theme.ignoredCss`
     SettingsThemeIgnoredCss,
+    /// `excalidraw.notValid`
+    ExcalidrawNotValid,
+    /// `excalidraw.malformed`
+    ExcalidrawMalformed,
+    /// `excalidraw.saveFailed`
+    ExcalidrawSaveFailed,
+    /// `mermaid.removed`
+    MermaidRemoved,
+    /// `mermaid.zoomOut`
+    MermaidZoomOut,
+    /// `mermaid.zoomIn`
+    MermaidZoomIn,
+    /// `mermaid.resetView`
+    MermaidResetView,
+    /// `mermaid.openInWindow`
+    MermaidOpenInWindow,
+    /// `mermaid.closePreview`
+    MermaidClosePreview,
+    /// `mermaid.dockTooltip`
+    MermaidDockTooltip,
+    /// `mermaid.dock`
+    MermaidDock,
+    /// `export.notMarkdown`
+    ExportNotMarkdown,
+    /// `export.exporting`
+    ExportExporting,
+    /// `export.printFailed`
+    ExportPrintFailed,
 }
 
 impl Msg {
@@ -1033,6 +1061,20 @@ impl Msg {
         Msg::ShortcutsReset,
         Msg::ShortcutsResetTitle,
         Msg::SettingsThemeIgnoredCss,
+        Msg::ExcalidrawNotValid,
+        Msg::ExcalidrawMalformed,
+        Msg::ExcalidrawSaveFailed,
+        Msg::MermaidRemoved,
+        Msg::MermaidZoomOut,
+        Msg::MermaidZoomIn,
+        Msg::MermaidResetView,
+        Msg::MermaidOpenInWindow,
+        Msg::MermaidClosePreview,
+        Msg::MermaidDockTooltip,
+        Msg::MermaidDock,
+        Msg::ExportNotMarkdown,
+        Msg::ExportExporting,
+        Msg::ExportPrintFailed,
     ];
 
     /// The original dotted key, e.g. `"common.loading"`.
@@ -1378,6 +1420,20 @@ impl Msg {
             Msg::ShortcutsReset => "shortcuts.reset",
             Msg::ShortcutsResetTitle => "shortcuts.resetTitle",
             Msg::SettingsThemeIgnoredCss => "settings.theme.ignoredCss",
+            Msg::ExcalidrawNotValid => "excalidraw.notValid",
+            Msg::ExcalidrawMalformed => "excalidraw.malformed",
+            Msg::ExcalidrawSaveFailed => "excalidraw.saveFailed",
+            Msg::MermaidRemoved => "mermaid.removed",
+            Msg::MermaidZoomOut => "mermaid.zoomOut",
+            Msg::MermaidZoomIn => "mermaid.zoomIn",
+            Msg::MermaidResetView => "mermaid.resetView",
+            Msg::MermaidOpenInWindow => "mermaid.openInWindow",
+            Msg::MermaidClosePreview => "mermaid.closePreview",
+            Msg::MermaidDockTooltip => "mermaid.dockTooltip",
+            Msg::MermaidDock => "mermaid.dock",
+            Msg::ExportNotMarkdown => "export.notMarkdown",
+            Msg::ExportExporting => "export.exporting",
+            Msg::ExportPrintFailed => "export.printFailed",
         }
     }
 }
@@ -1725,6 +1781,20 @@ pub fn en(m: Msg) -> &'static str {
         Msg::ShortcutsReset => "Reset",
         Msg::ShortcutsResetTitle => "Restore the default binding ({binding})",
         Msg::SettingsThemeIgnoredCss => "Not understood (ignored): {items}",
+        Msg::ExcalidrawNotValid => "Not a valid drawing file",
+        Msg::ExcalidrawMalformed => "Malformed drawing file",
+        Msg::ExcalidrawSaveFailed => "Could not save drawing: {message}",
+        Msg::MermaidRemoved => "Source block no longer available",
+        Msg::MermaidZoomOut => "Zoom out",
+        Msg::MermaidZoomIn => "Zoom in",
+        Msg::MermaidResetView => "Reset view",
+        Msg::MermaidOpenInWindow => "Open in new window",
+        Msg::MermaidClosePreview => "Close preview",
+        Msg::MermaidDockTooltip => "Dock back into main window",
+        Msg::MermaidDock => "Dock",
+        Msg::ExportNotMarkdown => "Open a Markdown note to export it.",
+        Msg::ExportExporting => "Exporting…",
+        Msg::ExportPrintFailed => "Could not open the PDF for printing: {message}",
     }
 }
 
@@ -2071,5 +2141,19 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ShortcutsReset => "Restaurar",
         Msg::ShortcutsResetTitle => "Restaurar o atalho padrão ({binding})",
         Msg::SettingsThemeIgnoredCss => "Não reconhecido (ignorado): {items}",
+        Msg::ExcalidrawNotValid => "Não é um arquivo de desenho válido",
+        Msg::ExcalidrawMalformed => "Arquivo de desenho malformado",
+        Msg::ExcalidrawSaveFailed => "Não foi possível salvar o desenho: {message}",
+        Msg::MermaidRemoved => "O bloco de origem não está mais disponível",
+        Msg::MermaidZoomOut => "Diminuir zoom",
+        Msg::MermaidZoomIn => "Aumentar zoom",
+        Msg::MermaidResetView => "Redefinir visualização",
+        Msg::MermaidOpenInWindow => "Abrir em nova janela",
+        Msg::MermaidClosePreview => "Fechar pré-visualização",
+        Msg::MermaidDockTooltip => "Encaixar de volta na janela principal",
+        Msg::MermaidDock => "Encaixar",
+        Msg::ExportNotMarkdown => "Abra uma nota Markdown para exportá-la.",
+        Msg::ExportExporting => "Exportando…",
+        Msg::ExportPrintFailed => "Não foi possível abrir o PDF para impressão: {message}",
     }
 }

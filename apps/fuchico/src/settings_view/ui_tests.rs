@@ -79,8 +79,7 @@ async fn settings_nav_search_toggles_rulers_themes_and_caldav(cx: &mut TestAppCo
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     let dir = std::env::temp_dir().join(format!("fuchico-settings-test-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    // SAFETY: set before any thread reads it (persist / caldav dirs).
-    unsafe { std::env::set_var("FUCHICO_CONFIG_DIR", &dir) };
+    crate::persist::set_test_dir(dir.clone());
 
     cx.update(|cx| {
         gpui_kit::init(cx);

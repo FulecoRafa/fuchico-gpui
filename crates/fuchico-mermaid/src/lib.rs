@@ -14,4 +14,4 @@ pub use panzoom::{DragState, PanZoom};
 pub use raster::{Raster, rasterize, rasterize_cached};
 pub use render::{MermaidError, render_svg};
 pub use theme::MermaidTheme;
-pub use view::{BlockStatus, Chrome, MermaidEvent, MermaidView};
+pub use view::{BlockStatus, Chrome, MermaidEvent, MermaidStrings, MermaidView};

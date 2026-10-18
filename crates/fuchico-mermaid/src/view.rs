@@ -41,8 +41,40 @@ pub enum MermaidEvent {
     Dock,
 }
 
+/// User-visible strings, so the host can localise the view. Defaults are
+/// the original's (English) texts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MermaidStrings {
+    pub loading: SharedString,
+    pub removed: SharedString,
+    pub zoom_out: SharedString,
+    pub zoom_in: SharedString,
+    pub reset_view: SharedString,
+    pub open_in_window: SharedString,
+    pub close_preview: SharedString,
+    pub dock_tooltip: SharedString,
+    pub dock: SharedString,
+}
+
+impl Default for MermaidStrings {
+    fn default() -> Self {
+        Self {
+            loading: "Loading…".into(),
+            removed: "Source block no longer available".into(),
+            zoom_out: "Zoom out".into(),
+            zoom_in: "Zoom in".into(),
+            reset_view: "Reset view".into(),
+            open_in_window: "Open in new window".into(),
+            close_preview: "Close preview".into(),
+            dock_tooltip: "Dock back into main window".into(),
+            dock: "Dock".into(),
+        }
+    }
+}
+
 pub struct MermaidView {
     label: SharedString,
+    strings: MermaidStrings,
     chrome: Chrome,
     theme: MermaidTheme,
     status: BlockStatus,
@@ -70,6 +102,7 @@ impl MermaidView {
     pub fn new(label: impl Into<SharedString>, chrome: Chrome, theme: MermaidTheme, _cx: &mut Context<Self>) -> Self {
         Self {
             label: label.into(),
+            strings: MermaidStrings::default(),
             chrome,
             theme,
             status: BlockStatus::Loading,
@@ -168,6 +201,14 @@ impl MermaidView {
     pub fn set_label(&mut self, label: impl Into<SharedString>, cx: &mut Context<Self>) {
         self.label = label.into();
         cx.notify();
+    }
+
+    /// Replaces the view's UI strings (localisation).
+    pub fn set_strings(&mut self, strings: MermaidStrings, cx: &mut Context<Self>) {
+        if self.strings != strings {
+            self.strings = strings;
+            cx.notify();
+        }
     }
 
     pub fn set_chrome(&mut self, chrome: Chrome, cx: &mut Context<Self>) {
@@ -338,8 +379,9 @@ impl Render for MermaidView {
         let radius_sm = px(t.radius_sm as f32);
         let radius_md = px(t.radius_sm as f32 * 8.0 / 6.0);
         let entity = cx.entity();
+        let strings = self.strings.clone();
 
-        let make_btn = |this: &mut Self, id: &'static str, icon: Icon, tip: &'static str, on: fn(&mut Self, &mut Context<Self>)| {
+        let make_btn = |this: &mut Self, id: &'static str, icon: Icon, tip: SharedString, on: fn(&mut Self, &mut Context<Self>)| {
             let img = this.icon(icon, muted, 14.0, dpr);
             div()
                 .id(id)
@@ -350,7 +392,7 @@ impl Render for MermaidView {
                 .rounded(radius_sm)
                 .cursor_pointer()
                 .hover(move |s| s.bg(hsla(accent, 0.14)))
-                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
+                .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
                 .when_some(img, |d, img| d.child(gpui_kit::img(ImageSource::Render(img)).size(px(14.0))))
                 .on_click(cx.listener(move |this, _, _, cx| on(this, cx)))
         };
@@ -366,9 +408,9 @@ impl Render for MermaidView {
             .border_color(hsla(border, 0.6))
             .rounded(radius_md)
             .bg(hsla(card, 0.85))
-            .child(make_btn(self, "mm-zoom-out", Icon::ZoomOut, "Zoom out", |t, cx| t.zoom_out(cx)))
-            .child(make_btn(self, "mm-zoom-in", Icon::ZoomIn, "Zoom in", |t, cx| t.zoom_in(cx)))
-            .child(make_btn(self, "mm-reset", Icon::Reset, "Reset view", |t, cx| t.reset(cx)));
+            .child(make_btn(self, "mm-zoom-out", Icon::ZoomOut, strings.zoom_out.clone(), |t, cx| t.zoom_out(cx)))
+            .child(make_btn(self, "mm-zoom-in", Icon::ZoomIn, strings.zoom_in.clone(), |t, cx| t.zoom_in(cx)))
+            .child(make_btn(self, "mm-reset", Icon::Reset, strings.reset_view.clone(), |t, cx| t.reset(cx)));
 
         let banner = |text: String, color: Srgb, border_c: Srgb, alpha: f32| {
             div()
@@ -389,10 +431,10 @@ impl Render for MermaidView {
 
         let mut banners = div();
         if self.status == BlockStatus::Loading && self.svg.is_none() {
-            banners = banners.child(banner("Loading…".into(), muted, border, 0.6));
+            banners = banners.child(banner(strings.loading.to_string(), muted, border, 0.6));
         }
         if self.status == BlockStatus::Removed {
-            banners = banners.child(banner("Source block no longer available".into(), muted, border, 0.6));
+            banners = banners.child(banner(strings.removed.to_string(), muted, border, 0.6));
         }
         if let Some(err) = &self.error {
             banners = banners.child(banner(err.clone(), destructive, destructive, 0.4));
@@ -430,6 +472,7 @@ impl Render for MermaidView {
                 if chrome == Chrome::Pane {
                     let pop = self.icon(Icon::ExternalLink, muted, 14.0, dpr);
                     let close = self.icon(Icon::Close, muted, 14.0, dpr);
+                    let (tip_pop, tip_close) = (strings.open_in_window.clone(), strings.close_preview.clone());
                     row = row
                         .child(
                             div()
@@ -441,23 +484,24 @@ impl Render for MermaidView {
                         )
                         .child(
                             btn_base("mm-popout")
-                                .tooltip(move |window, cx| Tooltip::new("Open in new window").build(window, cx))
+                                .tooltip(move |window, cx| Tooltip::new(tip_pop.clone()).build(window, cx))
                                 .when_some(pop, |d, i| d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0))))
                                 .on_click(cx.listener(|_, _, _, cx| cx.emit(MermaidEvent::PopOut))),
                         )
                         .child(
                             btn_base("mm-close")
-                                .tooltip(move |window, cx| Tooltip::new("Close preview").build(window, cx))
+                                .tooltip(move |window, cx| Tooltip::new(tip_close.clone()).build(window, cx))
                                 .when_some(close, |d, i| d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0))))
                                 .on_click(cx.listener(|_, _, _, cx| cx.emit(MermaidEvent::Close))),
                         );
                 } else {
                     let dock = self.icon(Icon::PanelRightOpen, muted, 14.0, dpr);
+                    let tip_dock = strings.dock_tooltip.clone();
                     row = row.child(
                         btn_base("mm-dock")
-                            .tooltip(move |window, cx| Tooltip::new("Dock back into main window").build(window, cx))
+                            .tooltip(move |window, cx| Tooltip::new(tip_dock.clone()).build(window, cx))
                             .when_some(dock, |d, i| d.child(gpui_kit::img(ImageSource::Render(i)).size(px(14.0))))
-                            .child("Dock")
+                            .child(strings.dock.clone())
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(MermaidEvent::Dock))),
                     );
                 }

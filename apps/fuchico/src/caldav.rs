@@ -21,6 +21,12 @@ impl Global for CaldavGlobal {}
 
 /// Where `config.json` lives: `FUCHICO_CONFIG_DIR` when set (so dev and
 /// automated runs never touch the real accounts), else the Tauri app data dir.
+#[cfg(test)]
+pub fn data_dir() -> Option<PathBuf> {
+    crate::persist::config_dir()
+}
+
+#[cfg(not(test))]
 pub fn data_dir() -> Option<PathBuf> {
     match std::env::var_os("FUCHICO_CONFIG_DIR") {
         Some(dir) => Some(PathBuf::from(dir)),

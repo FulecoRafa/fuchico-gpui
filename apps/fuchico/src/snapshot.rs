@@ -12,7 +12,7 @@
 //! ```
 
 use std::path::PathBuf;
-use std::sync::{Arc, Once};
+use std::sync::Arc;
 
 use gpui_kit::{App, AppContext, Entity, HeadlessAppContext, Pixels, Render, Size, Window};
 
@@ -53,13 +53,9 @@ pub fn snapshot_dir() -> PathBuf {
 /// Points `persist` at a scratch config dir before anything reads it, so
 /// snapshots never touch (or depend on) the user's real settings.
 fn isolate_config() {
-    static ONCE: Once = Once::new();
-    ONCE.call_once(|| {
-        let dir = snapshot_dir().join(".config");
-        let _ = std::fs::create_dir_all(&dir);
-        // SAFETY: set once, before the persist layer first reads it.
-        unsafe { std::env::set_var("FUCHICO_CONFIG_DIR", dir) };
-    });
+    let dir = snapshot_dir().join(".config");
+    let _ = std::fs::create_dir_all(&dir);
+    crate::persist::set_test_dir(dir);
 }
 
 /// App globals the views expect (same order as `main`), with `theme`

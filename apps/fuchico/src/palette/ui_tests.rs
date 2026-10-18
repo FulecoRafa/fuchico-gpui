@@ -98,8 +98,7 @@ async fn palette_and_switcher_end_to_end(cx: &mut TestAppContext) {
     let vault = temp_vault();
     // Outside the vault, so settings writes don't wake the vault watcher.
     let config = vault.with_extension("config");
-    // SAFETY: set before anything reads it (persist caches it once).
-    unsafe { std::env::set_var("FUCHICO_CONFIG_DIR", &config) };
+    crate::persist::set_test_dir(config.clone());
     let root = vault.to_string_lossy().to_string();
     let launch = format!("{root}/project-launch.md");
 

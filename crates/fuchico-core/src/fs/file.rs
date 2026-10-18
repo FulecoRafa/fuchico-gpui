@@ -110,6 +110,27 @@ pub fn fs_write_file(
     Ok(())
 }
 
+/// [`fs_write_file`] for binary content (e.g. an exported PDF): same
+/// atomic write, permission keeping and `fs:file-written` event.
+pub fn fs_write_bytes(
+    path: String,
+    content: &[u8],
+    source: Option<String>,
+    sink: &dyn EventSink,
+) -> Result<(), String> {
+    let target = PathBuf::from(&path);
+    let original_permissions = fs::metadata(&target).ok().map(|m| m.permissions());
+    write_atomic(&target, content).map_err(|e| {
+        log::warn!("fs_write_bytes({}) failed: {e}", target.display());
+        e.to_string()
+    })?;
+    if let Some(perms) = original_permissions {
+        let _ = fs::set_permissions(&target, perms);
+    }
+    sink.emit(CoreEvent::FileWritten { path, source });
+    Ok(())
+}
+
 pub fn fs_canonicalize(path: String) -> Result<String, String> {
     let p = PathBuf::from(&path);
     let canon = std::fs::canonicalize(&p).map_err(|e| e.to_string())?;
