@@ -1,0 +1,26 @@
+[package]
+name = "fuchico-excalidraw"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+description = "Native .excalidraw model, hand-drawn renderer and editor view for Fuchico (GPUI)"
+
+[dependencies]
+gpui-kit.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
+anyhow.workspace = true
+log.workspace = true
+roughr.workspace = true
+euclid.workspace = true
+palette.workspace = true
+ttf-parser.workspace = true
+image.workspace = true
+base64.workspace = true
+sha2.workspace = true
+rand.workspace = true
+indexmap.workspace = true
+
+[[example]]
+name = "viewer"
+path = "examples/viewer.rs"

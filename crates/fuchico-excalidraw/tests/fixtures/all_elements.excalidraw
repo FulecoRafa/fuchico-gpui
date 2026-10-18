@@ -1,0 +1,483 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    {
+      "id": "frame1",
+      "type": "frame",
+      "x": -50,
+      "y": -50,
+      "width": 900,
+      "height": 700,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a0",
+      "roundness": null,
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "name": "Main frame"
+    },
+    {
+      "id": "rect1",
+      "type": "rectangle",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#a5d8ff",
+      "fillStyle": "hachure",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "frame1",
+      "index": "a1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "text1",
+          "type": "text"
+        },
+        {
+          "id": "arrow1",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "customPluginField": {
+        "keep": [
+          1,
+          2.5,
+          "x"
+        ]
+      }
+    },
+    {
+      "id": "text1",
+      "type": "text",
+      "x": 50,
+      "y": 37.5,
+      "width": 100,
+      "height": 25,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "frame1",
+      "index": "a2",
+      "roundness": null,
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "text": "Hello",
+      "originalText": "Hello",
+      "fontSize": 20,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "rect1",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "dia1",
+      "type": "diamond",
+      "x": 400,
+      "y": 0,
+      "width": 150,
+      "height": 150,
+      "angle": 0.3,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#ffc9c9",
+      "fillStyle": "cross-hatch",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a3",
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "arrow1",
+          "type": "arrow"
+        }
+      ],
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "ell1",
+      "type": "ellipse",
+      "x": 0,
+      "y": 300,
+      "width": 180,
+      "height": 120,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dotted",
+      "roughness": 2,
+      "opacity": 60,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a4",
+      "roundness": null,
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "arrow1",
+      "type": "arrow",
+      "x": 205,
+      "y": 50,
+      "width": 190,
+      "height": 25,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a5",
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          95,
+          -20
+        ],
+        [
+          190,
+          25
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "triangle",
+      "elbowed": false,
+      "startBinding": {
+        "elementId": "rect1",
+        "focus": 0.1,
+        "gap": 5
+      },
+      "endBinding": {
+        "elementId": "dia1",
+        "focus": -0.2,
+        "gap": 4.5,
+        "fixedPoint": null
+      }
+    },
+    {
+      "id": "line1",
+      "type": "line",
+      "x": 300,
+      "y": 300,
+      "width": 100,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a6",
+      "roundness": null,
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          100,
+          0
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "polygon": true
+    },
+    {
+      "id": "draw1",
+      "type": "freedraw",
+      "x": 500,
+      "y": 300,
+      "width": 60,
+      "height": 40,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a7",
+      "roundness": null,
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          30,
+          20
+        ],
+        [
+          60,
+          40
+        ]
+      ],
+      "pressures": [
+        0.5,
+        0.6,
+        0.7,
+        0.4
+      ],
+      "simulatePressure": false,
+      "lastCommittedPoint": [
+        60,
+        40
+      ]
+    },
+    {
+      "id": "text2",
+      "type": "text",
+      "x": 0,
+      "y": 500,
+      "width": 160,
+      "height": 50,
+      "angle": 0.1,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a8",
+      "roundness": null,
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "text": "Two\nlines",
+      "originalText": "Two\nlines",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "img1",
+      "type": "image",
+      "x": 600,
+      "y": 0,
+      "width": 64,
+      "height": 64,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "g1"
+      ],
+      "frameId": null,
+      "index": "a9",
+      "roundness": null,
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "status": "saved",
+      "fileId": "fileA",
+      "scale": [
+        1,
+        1
+      ],
+      "crop": null
+    },
+    {
+      "id": "gone",
+      "type": "rectangle",
+      "x": 0,
+      "y": 0,
+      "width": 10,
+      "height": 10,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "aA",
+      "roundness": null,
+      "seed": 1234,
+      "version": 3,
+      "versionNonce": 987654,
+      "isDeleted": true,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "future1",
+      "type": "embeddable",
+      "x": 700,
+      "y": 400,
+      "width": 100,
+      "height": 80,
+      "someNewThing": true,
+      "index": "aB"
+    },
+    "not-an-object"
+  ],
+  "appState": {
+    "gridSize": 20,
+    "viewBackgroundColor": "#ffffff",
+    "scrollX": 10,
+    "scrollY": -5,
+    "zoom": {
+      "value": 1
+    }
+  },
+  "files": {
+    "fileA": {
+      "mimeType": "image/png",
+      "id": "fileA",
+      "dataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAAD0eNT6AAAAFUlEQVR4nGP4z8DwHwQY/jMwDAMA+ecL9bixwqUAAAAASUVORK5CYII=",
+      "created": 1700000000000,
+      "lastRetrieved": 1700000000001,
+      "extraFileField": 7
+    }
+  },
+  "topLevelUnknown": {
+    "a": 1
+  }
+}
