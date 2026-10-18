@@ -151,3 +151,90 @@ mod markdown_files_tests {
         assert!(files.iter().any(|f| f.ends_with("sub/b.markdown")));
     }
 }
+
+#[cfg(test)]
+mod read_dir_tests {
+    use super::*;
+
+    fn names(entries: &[DirEntry]) -> Vec<(&str, &'static str)> {
+        entries
+            .iter()
+            .map(|e| {
+                let k = match e.kind {
+                    EntryKind::Dir => "dir",
+                    EntryKind::Symlink => "symlink",
+                    EntryKind::File => "file",
+                };
+                (e.name.as_str(), k)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn sorts_dirs_then_files_case_insensitively_and_hides_dot_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        std::fs::write(p.join("b.md"), "bb").unwrap();
+        std::fs::write(p.join("A.md"), "a").unwrap();
+        std::fs::write(p.join("c.txt"), "").unwrap();
+        std::fs::create_dir(p.join("zeta")).unwrap();
+        std::fs::create_dir(p.join("Alpha")).unwrap();
+        std::fs::write(p.join("Alpha/inner.md"), "").unwrap();
+        std::fs::write(p.join(".hidden.md"), "").unwrap();
+        std::fs::create_dir(p.join(".git")).unwrap();
+
+        let root = p.to_string_lossy().into_owned();
+        let entries = fs_read_dir(root.clone(), false).unwrap();
+        assert_eq!(
+            names(&entries),
+            vec![("Alpha", "dir"), ("zeta", "dir"), ("A.md", "file"), ("b.md", "file"), ("c.txt", "file")]
+        );
+        // Non-recursive; sizes and mtimes come from metadata.
+        let b = entries.iter().find(|e| e.name == "b.md").unwrap();
+        assert_eq!(b.size, 2);
+        assert!(b.mtime > 0);
+
+        let all = fs_read_dir(root, true).unwrap();
+        assert_eq!(
+            names(&all),
+            vec![
+                (".git", "dir"),
+                ("Alpha", "dir"),
+                ("zeta", "dir"),
+                (".hidden.md", "file"),
+                ("A.md", "file"),
+                ("b.md", "file"),
+                ("c.txt", "file"),
+            ]
+        );
+        let json = serde_json::to_value(&all[0]).unwrap();
+        assert_eq!(json["kind"], "dir");
+        assert_eq!(json["name"], ".git");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinks_are_followed_and_broken_ones_listed_as_symlink() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        std::fs::create_dir(p.join("real")).unwrap();
+        std::fs::write(p.join("file.md"), "xyz").unwrap();
+        symlink(p.join("real"), p.join("dirlink")).unwrap();
+        symlink(p.join("file.md"), p.join("filelink")).unwrap();
+        symlink(p.join("missing"), p.join("broken")).unwrap();
+
+        let entries = fs_read_dir(p.to_string_lossy().into_owned(), false).unwrap();
+        assert_eq!(
+            names(&entries),
+            vec![("dirlink", "dir"), ("real", "dir"), ("broken", "symlink"), ("file.md", "file"), ("filelink", "file")]
+        );
+        assert_eq!(entries.iter().find(|e| e.name == "filelink").unwrap().size, 3);
+    }
+
+    #[test]
+    fn missing_dir_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(fs_read_dir(dir.path().join("nope").to_string_lossy().into_owned(), false).is_err());
+    }
+}

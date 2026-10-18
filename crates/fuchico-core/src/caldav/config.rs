@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(all(not(target_os = "linux"), not(test)))]
 use keyring::{Entry as KeyringEntry, Error as KeyringError};
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", not(test)))]
 use keyring_core::{api::CredentialStoreApi, Entry as KeyringEntry, Error as KeyringError};
 
 use crate::fs::file::write_atomic;
@@ -12,6 +12,7 @@ use crate::fs::file::write_atomic;
 /// Matches `tauri.conf.json`'s `identifier` -- the keyring service name
 /// under which every account's app-specific password is stored, keyed by
 /// that account's `id`.
+#[cfg_attr(test, allow(dead_code))]
 const KEYRING_SERVICE: &str = "dev.fuleco.fuchico";
 
 /// A saved CalDAV account. Never carries a password -- that lives in the OS
@@ -76,7 +77,7 @@ pub fn save(data_dir: &Path, config: &Config) -> Result<(), String> {
 /// to plain strings for Tauri IPC. Linux uses the kernel keyring directly, so
 /// it works without a running Secret Service; other platforms use their native
 /// store through `keyring`'s compatibility API.
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", not(test)))]
 fn keyring_entry(account_id: &str) -> Result<KeyringEntry, String> {
     let store = linux_keyutils_keyring_store::Store::new()
         .map_err(|e| format!("kernel keyring unavailable: {e}"))?;
@@ -85,18 +86,30 @@ fn keyring_entry(account_id: &str) -> Result<KeyringEntry, String> {
         .map_err(|e| format!("kernel keyring unavailable: {e}"))
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(all(not(target_os = "linux"), not(test)))]
 fn keyring_entry(account_id: &str) -> Result<KeyringEntry, String> {
     KeyringEntry::new(KEYRING_SERVICE, account_id).map_err(|e| format!("keyring unavailable: {e}"))
 }
 
 pub fn save_password(account_id: &str, password: &str) -> Result<(), String> {
+    #[cfg(test)]
+    {
+        test_keyring::set(account_id, password);
+        Ok(())
+    }
+    #[cfg(not(test))]
     keyring_entry(account_id)?
         .set_password(password)
         .map_err(|e| format!("failed to save password to keyring: {e}"))
 }
 
 pub fn load_password(account_id: &str) -> Result<String, String> {
+    #[cfg(test)]
+    {
+        test_keyring::get(account_id)
+            .ok_or_else(|| "failed to read password from keyring: No matching entry found in secure storage".to_string())
+    }
+    #[cfg(not(test))]
     keyring_entry(account_id)?
         .get_password()
         .map_err(|e| format!("failed to read password from keyring: {e}"))
@@ -106,10 +119,42 @@ pub fn load_password(account_id: &str) -> Result<String, String> {
 /// password lookup already failed (e.g. keyring was cleared out-of-band)
 /// should still succeed in removing the account record.
 pub fn delete_password(account_id: &str) -> Result<(), String> {
+    #[cfg(test)]
+    {
+        test_keyring::remove(account_id);
+        Ok(())
+    }
+    #[cfg(not(test))]
     match keyring_entry(account_id)?.delete_credential() {
         Ok(()) => Ok(()),
         Err(KeyringError::NoEntry) => Ok(()),
         Err(e) => Err(format!("failed to delete password from keyring: {e}")),
+    }
+}
+
+/// Unit tests must never touch the user's real OS keychain, so test builds
+/// keep passwords in a process-wide map instead. Account ids are fresh
+/// UUIDs, so parallel tests don't collide.
+#[cfg(test)]
+pub(crate) mod test_keyring {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+
+    fn store() -> &'static Mutex<HashMap<String, String>> {
+        static S: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+        S.get_or_init(Default::default)
+    }
+
+    pub fn set(id: &str, pw: &str) {
+        store().lock().unwrap().insert(id.to_string(), pw.to_string());
+    }
+
+    pub fn get(id: &str) -> Option<String> {
+        store().lock().unwrap().get(id).cloned()
+    }
+
+    pub fn remove(id: &str) {
+        store().lock().unwrap().remove(id);
     }
 }
 

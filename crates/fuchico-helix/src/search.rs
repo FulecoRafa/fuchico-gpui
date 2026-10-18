@@ -2,10 +2,11 @@
 //! `RegExpCursor`): multiline (`^`/`$` match at line boundaries), case
 //! sensitive iff the query contains an ASCII uppercase letter.
 //!
-//! The pattern is compiled with the Rust `regex` crate, so JavaScript-only
-//! syntax (look-around, back-references) is reported as an invalid regex.
+//! cm-helix compiles the pattern as a JavaScript `RegExp`, so the engine uses
+//! `fancy-regex`: on top of the `regex` crate syntax it supports look-ahead,
+//! look-behind and back-references, as JS does.
 
-use regex::Regex;
+use fancy_regex::Regex;
 
 use crate::text::Text;
 
@@ -60,7 +61,8 @@ impl SearchQuery {
         let mut byte = doc.char_to_byte(from);
         let mut prev_to = 0usize;
         while byte <= hay.len() {
-            let Some(m) = re.find_at(&hay, byte) else {
+            // A runtime error (backtrack limit) ends the scan like "no match".
+            let Ok(Some(m)) = re.find_from_pos(&hay, byte) else {
                 break;
             };
             let mf = doc.byte_to_char(m.start());
@@ -101,4 +103,41 @@ pub fn escape_regex(text: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn all(pattern: &str, doc: &str) -> Vec<(usize, usize)> {
+        let t = Text::new(doc);
+        SearchQuery::new(pattern).matches(&t, 0, t.len())
+    }
+
+    #[test]
+    fn js_lookaround_and_backreferences_work() {
+        // Look-ahead / negative look-ahead.
+        assert_eq!(all(r"foo(?=bar)", "foobar foobaz"), vec![(0, 3)]);
+        assert_eq!(all(r"foo(?!bar)", "foobar foobaz"), vec![(7, 10)]);
+        // Look-behind / negative look-behind.
+        assert_eq!(all(r"(?<=\$)\d+", "a $12 b 34"), vec![(3, 5)]);
+        assert_eq!(all(r"(?<!\$)\b\d+", "a $12 b 34"), vec![(8, 10)]);
+        // Back-reference.
+        assert_eq!(all(r"(\w)\1", "abba cd"), vec![(1, 3)]);
+    }
+
+    #[test]
+    fn lookbehind_sees_text_before_the_scan_start() {
+        let t = Text::new("xab ab");
+        let q = SearchQuery::new(r"(?<=x)ab");
+        assert_eq!(q.matches(&t, 1, t.len()), vec![(1, 3)]);
+    }
+
+    #[test]
+    fn multiline_smart_case_and_char_offsets_still_hold() {
+        assert_eq!(all(r"^b", "a\nb\nB"), vec![(2, 3), (4, 5)]);
+        assert_eq!(all(r"^B", "a\nb\nB"), vec![(4, 5)]);
+        assert_eq!(all(r"é(?=x)", "éx éy"), vec![(0, 1)]);
+        assert!(!SearchQuery::new("a(").is_valid());
+    }
 }

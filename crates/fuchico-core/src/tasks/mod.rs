@@ -292,3 +292,48 @@ mod scan_tests {
         assert_eq!(content, "- [x] one\n- [ ] two\n");
     }
 }
+
+#[cfg(test)]
+mod toggle_tests {
+    use super::*;
+
+    #[test]
+    fn toggle_flips_both_ways_with_lowercase_x() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("t.md");
+        std::fs::write(&f, "- [ ] a\n  * [X] b\n").unwrap();
+        let path = f.to_string_lossy().into_owned();
+        tasks_toggle(path.clone(), 1).unwrap();
+        tasks_toggle(path.clone(), 2).unwrap();
+        assert_eq!(std::fs::read_to_string(&f).unwrap(), "- [x] a\n  * [ ] b\n");
+        tasks_toggle(path, 2).unwrap();
+        assert_eq!(std::fs::read_to_string(&f).unwrap(), "- [x] a\n  * [x] b\n");
+    }
+
+    #[test]
+    fn toggle_normalises_crlf_and_keeps_missing_trailing_newline() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("t.md");
+        std::fs::write(&f, "x\r\n- [ ] a\r\n").unwrap();
+        tasks_toggle(f.to_string_lossy().into_owned(), 2).unwrap();
+        assert_eq!(std::fs::read_to_string(&f).unwrap(), "x\n- [x] a\n");
+
+        let g = dir.path().join("u.md");
+        std::fs::write(&g, "- [x] a").unwrap();
+        tasks_toggle(g.to_string_lossy().into_owned(), 1).unwrap();
+        assert_eq!(std::fs::read_to_string(&g).unwrap(), "- [ ] a");
+    }
+
+    #[test]
+    fn toggle_error_strings() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("t.md");
+        std::fs::write(&f, "plain\n- [ ] a\n").unwrap();
+        let path = f.to_string_lossy().into_owned();
+        assert_eq!(tasks_toggle(path.clone(), 0).unwrap_err(), "line out of range");
+        assert_eq!(tasks_toggle(path.clone(), 3).unwrap_err(), "line out of range");
+        assert_eq!(tasks_toggle(path, 1).unwrap_err(), "line is not a checkbox");
+        assert_eq!(std::fs::read_to_string(&f).unwrap(), "plain\n- [ ] a\n");
+        assert!(tasks_toggle(dir.path().join("missing.md").to_string_lossy().into_owned(), 1).is_err());
+    }
+}

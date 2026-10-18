@@ -355,9 +355,11 @@ facility:**
 
 - **Typing a bare number on the command line.** cm-helix errors on accept. The
   engine moves to the line silently, as the preview already did.
-- **JS regular expressions.** Search uses the Rust `regex` crate, so
-  lookaround and backreferences are unsupported. `*` escapes with
-  `regex::escape` instead of `RegExp.escape`. Invalid patterns report
+- **JS regular expressions.** Search uses `fancy-regex`, which covers
+  lookaround and backreferences like JS `RegExp`; remaining dialect
+  differences (for example Unicode-aware `\d`/`\w`, JS-only escapes) are
+  not reproduced. `*` escapes with the engine's own `escape_regex` instead
+  of `RegExp.escape`. Invalid patterns report
   `Invalid regex /…/: <regex error>`.
 - **Syntax-tree bracket matching.** `mm`, `ma(` and `mi(` use a plain-text
   scan, so brackets inside strings and comments are not skipped. Syntax

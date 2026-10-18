@@ -7,5 +7,5 @@ description = "UI-agnostic Helix modal editing engine (port of codemirror-helix 
 
 [dependencies]
 ropey.workspace = true
-regex.workspace = true
+fancy-regex = "0.16"
 unicode-segmentation.workspace = true
