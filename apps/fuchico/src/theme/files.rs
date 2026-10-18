@@ -43,6 +43,18 @@ pub fn theme_file_name(name: &str) -> String {
 }
 
 /// File stem with `.fuchico-theme.css` or `.css` removed (case-insensitive).
+/// The original's dialogs filtered on `{ name: "CSS", extensions: ["css"] }`;
+/// gpui's path prompts take no filters, so the import checks the pick
+/// instead.
+pub fn is_css_path(path: &str) -> bool {
+    std::path::Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case("css"))
+}
+
+/// A save target typed without an extension gets `.css`.
+pub fn with_css_extension(p: std::path::PathBuf) -> std::path::PathBuf {
+    if p.extension().is_some() { p } else { p.with_extension("css") }
+}
+
 pub fn theme_stem(path: &str) -> String {
     let base = path.rsplit(['/', '\\']).next().unwrap_or(path);
     let lower = base.to_ascii_lowercase();
@@ -93,5 +105,15 @@ mod tests {
         let names = ["My theme", "My theme 2"];
         assert_eq!(unique_name("My theme", names.iter().copied()), "My theme 3");
         assert_eq!(unique_name("Other", names.iter().copied()), "Other");
+    }
+
+    #[test]
+    fn css_filter_stand_ins() {
+        assert!(is_css_path("/t/Dark.fuchico-theme.css"));
+        assert!(is_css_path("/t/x.CSS"));
+        assert!(!is_css_path("/t/x.md"));
+        assert!(!is_css_path("/t/css"));
+        assert_eq!(with_css_extension("/t/mine".into()), std::path::PathBuf::from("/t/mine.css"));
+        assert_eq!(with_css_extension("/t/a.css".into()), std::path::PathBuf::from("/t/a.css"));
     }
 }

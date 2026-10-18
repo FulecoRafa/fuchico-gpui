@@ -228,12 +228,14 @@ pub fn build_commands(ctx: &CommandContext, settings: &Settings) -> Vec<AppComma
             ..cmd(
                 "export-pdf",
                 t(Msg::CommandExportPdf),
-                kw(&["export", "pdf", "share"]),
+                kw(&["export", "pdf", "print", "share"]),
                 A::ExportPdf(path.clone()),
             )
         });
-        // Native split of the original's `:pdf`/`:print` row: `:print` hands
-        // the rendered PDF to the system viewer's print dialog.
+        // Native split of the original's `:pdf`/`:print` row (which ran the
+        // webview's print dialog): `:print` hands the rendered PDF to the
+        // system viewer's print dialog; `export-pdf` keeps the "print"
+        // keyword so the search still finds both.
         out.push(AppCommand {
             aliases: &[":print"],
             ..cmd("print-pdf", t(Msg::ExportPrint), kw(&["print", "pdf", "printer"]), A::PrintPdf(path.clone()))
@@ -428,7 +430,7 @@ mod tests {
         assert!(!ids.contains(&"export-html".to_string()));
         let ctx = CommandContext { active_path: Some("/v/A.MARKDOWN".into()), ..ctx_full() };
         let cmds = build_commands(&ctx, &Settings::default());
-        assert!(cmds.iter().any(|c| c.id == "export-pdf" && c.aliases == [":pdf"]));
+        assert!(cmds.iter().any(|c| c.id == "export-pdf" && c.aliases == [":pdf"] && c.keywords.iter().any(|k| k == "print")));
         assert!(cmds.iter().any(|c| c.id == "print-pdf" && c.aliases == [":print"]));
         assert!(cmds.iter().any(|c| c.id == "export-html" && c.aliases == [":export"]));
         let ctx = CommandContext { backlinks_open: true, ..ctx_full() };

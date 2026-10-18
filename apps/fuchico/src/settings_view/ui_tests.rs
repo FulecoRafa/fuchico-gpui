@@ -92,7 +92,7 @@ async fn settings_nav_search_toggles_rulers_themes_and_caldav(cx: &mut TestAppCo
     });
     let root = dir.to_string_lossy().to_string();
     let (handle, _view): (AnyWindowHandle, Entity<SettingsView>) = cx.update(|cx| {
-        let bounds = Bounds { origin: Point::default(), size: size(px(1100.), px(900.)) };
+        let bounds = Bounds { origin: Point::default(), size: size(px(1100.), px(1300.)) }; // room for the 360px CSS editor
         gpui_kit::open_window(
             WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() },
             cx,

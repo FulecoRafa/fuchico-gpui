@@ -85,6 +85,9 @@ pub struct Workspace {
     dock_drag: Option<DockDrag>,
     watcher: Option<VaultWatcher>,
     focus: FocusHandle,
+    /// One focus handle per open tab (tabs are tab stops, as the original's
+    /// `role="tab" tabIndex={0}`), keyed by path, pruned on render.
+    tab_focus: std::collections::HashMap<String, FocusHandle>,
     _subs: Vec<Subscription>,
     /// Command palette / quick switcher overlays.
     pub palette: palette::PaletteHost,
@@ -126,6 +129,7 @@ impl Workspace {
             dock_drag: None,
             watcher: None,
             focus,
+            tab_focus: Default::default(),
             _subs: subs,
             palette: Default::default(),
         };
@@ -690,6 +694,7 @@ impl Workspace {
         let (border, bg, hover) = (th.colors.border, th.panel_bg(), crate::theme::alpha(th.colors.accent, 0.3));
         let handle = div()
             .id("dock-resizer")
+            .debug_selector(|| "dock-resizer".into())
             .absolute()
             .left_0()
             .top_0()
@@ -841,3 +846,5 @@ mod tests {
 
 #[cfg(test)]
 mod snapshot_tests;
+#[cfg(test)]
+mod ui_tests;

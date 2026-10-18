@@ -581,10 +581,10 @@ impl AgendaView {
                 list = list.child(rich_status(
                     vec![
                         Part::Text(crate::t!(AgendaNoTasksPrefix)),
-                        Part::Code("- [ ] …".into()),
-                        Part::Text(",".into()),
-                        Part::Code("TODO: …".into()),
-                        Part::Text(format!(", {}", crate::t!(AgendaOr))),
+                        // `<code>- [ ] …</code>,` — the comma hugs the chip.
+                        Part::CodeThen("- [ ] …".into(), ",".into()),
+                        Part::CodeThen("TODO: …".into(), ",".into()),
+                        Part::Text(crate::t!(AgendaOr)),
                         Part::Code("📅 YYYY-MM-DD …".into()),
                         Part::Text(crate::t!(AgendaNoTasksSuffix)),
                     ],
@@ -732,6 +732,8 @@ fn status(text: String, color: Hsla) -> gpui_kit::Div {
 enum Part {
     Text(String),
     Code(String),
+    /// A chip followed by punctuation with no space between.
+    CodeThen(String, String),
 }
 
 /// `.agenda-status` with inline `<code>` chips.
@@ -745,16 +747,22 @@ fn rich_status(parts: Vec<Part>, th: &AppTheme) -> gpui_kit::Div {
         .gap_y(u(2.))
         .text_size(u(12.))
         .text_color(th.colors.muted_foreground)
-        .children(parts.into_iter().map(|p| match p {
-            Part::Text(t) => div().child(t),
-            Part::Code(c) => div()
-                .font_family(th.mono_font.clone())
-                .text_size(u(11.))
-                .bg(th.colors.secondary)
-                .rounded(u(th.radius.sm))
-                .px(u(4.))
-                .py(u(1.))
-                .child(c),
+        .children(parts.into_iter().map(|p| {
+            let chip = |c: String| {
+                div()
+                    .font_family(th.mono_font.clone())
+                    .text_size(u(11.))
+                    .bg(th.colors.secondary)
+                    .rounded(u(th.radius.sm))
+                    .px(u(4.))
+                    .py(u(1.))
+                    .child(c)
+            };
+            match p {
+                Part::Text(t) => div().child(t),
+                Part::Code(c) => chip(c),
+                Part::CodeThen(c, then) => div().flex().items_center().child(chip(c)).child(then),
+            }
         }))
 }
 

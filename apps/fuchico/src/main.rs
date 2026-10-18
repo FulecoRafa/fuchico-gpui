@@ -22,6 +22,7 @@ mod explorer;
 mod export;
 mod i18n;
 mod keymap;
+mod logging;
 mod mermaid;
 mod palette;
 mod persist;
@@ -51,6 +52,9 @@ fn main() {
         Instance::Forwarded => return,
         Instance::Primary(l) => l,
     };
+    // After the single-instance check, like the original's plugin order
+    // (a forwarding second launch never logs).
+    logging::init();
 
     let settings = SettingsStore::load();
     let ui_state = UiState::load();

@@ -57,15 +57,13 @@ impl SettingsView {
         let (prefix, and, images) =
             (crate::t!(SettingsVaultDescPrefix), crate::t!(SettingsVaultAnd), crate::t!(SettingsVaultDescImages));
         let desc = format!("{prefix} {{{{date}}}}, {{{{time}}}}, {{{{title}}}} {and} {{{{date:YYYY-MM-DD}}}}{images} attachments/.");
+        // The original's markup: the placeholders are plain text, only
+        // `attachments/` is a `<code>` span, followed by the period.
+        let lead = desc.strip_suffix(" attachments/.").unwrap_or(&desc).to_string();
+        // One run per word so the flex row wraps like prose (the gap is the space).
         let desc_el = hint(cx)
-            .child(prefix)
-            .child(code("{{date}}", cx))
-            .child(code("{{time}}", cx))
-            .child(code("{{title}}", cx))
-            .child(and)
-            .child(code("{{date:YYYY-MM-DD}}", cx))
-            .child(images)
-            .child(code("attachments/", cx));
+            .children(lead.split_whitespace().map(str::to_string).collect::<Vec<_>>())
+            .child(gpui_kit::div().flex().child(code("attachments/", cx)).child("."));
         let (daily_l, tpl_l, ext_l) = (
             crate::t!(SettingsVaultDailyNotesFolder),
             crate::t!(SettingsVaultTemplatesFolder),

@@ -1,10 +1,13 @@
 //! Windows: the main window, single-file editor windows, geometry, the app
 //! menu, single-instance forwarding and the OS open-file queue.
 
+pub mod edit_menu;
 pub mod editor_window;
 pub mod geometry;
 pub mod menu;
 pub mod single_instance;
+#[cfg(test)]
+mod ui_tests;
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -174,6 +177,7 @@ pub fn register_global_actions(cx: &mut App) {
     cx.on_action(|_: &Minimize, cx| with_active(cx, |w, _| w.minimize_window()));
     cx.on_action(|_: &Zoom, cx| with_active(cx, |w, _| w.zoom_window()));
     cx.on_action(|_: &CloseWindow, cx| with_active(cx, |w, _| w.remove_window()));
+    edit_menu::register(cx);
     cx.on_action(|_: &About, cx| {
         with_active(cx, |w, cx| {
             crate::ui::toast_info(w, cx, format!("Fuchico {}", env!("CARGO_PKG_VERSION")))
@@ -236,5 +240,21 @@ mod tests {
         assert_eq!(percent_decode("/v/%C3%A9.md"), "/v/é.md");
         assert_eq!(percent_decode("/v/100%"), "/v/100%");
         assert!(paths_from_urls(&["https://x".into(), "file:///definitely/missing.md".into()]).is_empty());
+    }
+
+    /// Finder "Open With" / double-click on a `.md` (CFBundleDocumentTypes):
+    /// AppKit hands the files to `application:openURLs:` as `file://` URLs,
+    /// which `main` routes through `paths_from_urls` → `push_open_requests`.
+    #[test]
+    fn finder_open_urls_reach_the_open_queue() {
+        let dir = crate::test_ui::temp_dir("open-urls");
+        let note = dir.join("my note.md");
+        std::fs::write(&note, "# hi\n").unwrap();
+        let url = format!("file://{}", note.to_string_lossy().replace(' ', "%20"));
+        let paths = paths_from_urls(&[url, format!("file://{}", dir.to_string_lossy())]);
+        assert_eq!(paths, vec![note.to_string_lossy().into_owned()]);
+        let queue = OpenRequests::default();
+        queue.push(&*crate::bus::sink(), paths.clone());
+        assert_eq!(queue.take(), paths);
     }
 }
