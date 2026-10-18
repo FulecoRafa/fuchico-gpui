@@ -53,37 +53,12 @@ gpui_kit::actions!(
 // handle one, e.g. a drawing, makes it a no-op, as in the original).
 // `Editor*` map 1:1 to `SHORTCUT_ACTIONS` ids, see [`editor_action_for`];
 // saving reuses [`Save`].
-gpui_kit::actions!(
-    fuchico,
-    [
-        /// `openOutline`
-        EditorOpenOutline,
-        /// `toggleCheckboxAtCursor`
-        EditorToggleCheckbox,
-        /// `insertDate`
-        EditorInsertDate,
-        /// `insertDateTime`
-        EditorInsertDateTime,
-        /// `insertRegion`
-        EditorInsertRegion,
-        /// `insertTable`
-        EditorInsertTable,
-        /// `toggleTaskLine`
-        EditorToggleTaskLine,
-        /// `pickDueDate`
-        EditorPickDueDate,
-        /// `pickRecurrence`
-        EditorPickRecurrence,
-    ]
-);
-
-/// Palette `:<n>`: move the active editor's cursor to 1-based line `line`
-/// (the original's `editorRef.current?.goToLine(n)`).
-#[derive(Clone, Debug, PartialEq, gpui_kit::Action)]
-#[action(namespace = fuchico, no_json)]
-pub struct GoToLine {
-    pub line: u32,
-}
+// Defined by the editor crate (same `fuchico::` names); re-exported so the
+// palette and the editor view share one action type.
+pub use fuchico_editor::{
+    EditorInsertDate, EditorInsertDateTime, EditorInsertRegion, EditorInsertTable, EditorOpenOutline,
+    EditorPickDueDate, EditorPickRecurrence, EditorToggleCheckbox, EditorToggleTaskLine, GoToLine,
+};
 
 /// The editor action for a `SHORTCUT_ACTIONS` id (`"insertDate"`, ...).
 pub fn editor_action_for(id: &str) -> Option<Box<dyn gpui_kit::Action>> {

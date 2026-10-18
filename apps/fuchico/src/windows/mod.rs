@@ -207,7 +207,7 @@ fn with_active(cx: &mut App, f: impl FnOnce(&mut gpui_kit::Window, &mut App)) {
     }
 }
 
-fn zoom_font(cx: &mut App, delta: Option<f32>) {
+pub(crate) fn zoom_font(cx: &mut App, delta: Option<f32>) {
     SettingsStore::update(cx, |s| {
         s.editor_font_size = match delta {
             Some(d) => clamp_editor_font_size(s.editor_font_size + d),

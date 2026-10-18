@@ -325,7 +325,7 @@ impl Workspace {
         let current = self.pane.as_ref().map(|p| p.path.clone());
         if active != current {
             self.pane = active.as_ref().map(|path| {
-                let pcx = PaneContext { root: self.root.clone() };
+                let pcx = PaneContext { root: self.root.clone(), ..Default::default() };
                 let handle = open_pane(path, pcx, window, cx, |this: &mut Workspace, ev, window, cx| {
                     this.on_pane_event(ev, window, cx)
                 });
@@ -359,6 +359,18 @@ impl Workspace {
             }
             PaneEvent::OpenCommandPalette(q) => palette::open(self, PaletteKind::Commands { query: q.clone() }, window, cx),
             PaneEvent::Close => self.close_tab(&path, window, cx),
+            PaneEvent::QuickOpen => palette::open(self, PaletteKind::QuickOpen, window, cx),
+            PaneEvent::CycleTab(delta) => {
+                self.tabs.cycle(*delta);
+                self.sync_pane(window, cx);
+                cx.notify();
+            }
+            PaneEvent::GlobalSearch(q) => {
+                self.set_view(MainViewKind::Search, window, cx);
+                if let Some(s) = self.search.clone() {
+                    s.update(cx, |s, cx| s.set_query(q, window, cx));
+                }
+            }
         }
     }
 

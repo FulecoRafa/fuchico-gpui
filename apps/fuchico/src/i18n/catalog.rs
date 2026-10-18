@@ -720,6 +720,18 @@ pub enum Msg {
     ExplorerOpenWithFailed,
     /// `explorer.theDefaultApp` (native port; the original hardcoded it)
     ExplorerTheDefaultApp,
+    /// `editor.conflict` (native port; the original hardcoded it)
+    EditorConflict,
+    /// `editor.reloadFromDisk` (native port; the original hardcoded it)
+    EditorReloadFromDisk,
+    /// `editor.keepMine` (native port; the original hardcoded it)
+    EditorKeepMine,
+    /// `editor.binaryFile` (native port; the original hardcoded it)
+    EditorBinaryFile,
+    /// `editor.tooLarge` (native port; the original hardcoded it)
+    EditorTooLarge,
+    /// `editor.saveFailed` (native port; the original hardcoded it)
+    EditorSaveFailed,
 }
 
 impl Msg {
@@ -1081,6 +1093,12 @@ impl Msg {
         Msg::ExportPrintFailed,
         Msg::ExplorerOpenWithFailed,
         Msg::ExplorerTheDefaultApp,
+        Msg::EditorConflict,
+        Msg::EditorReloadFromDisk,
+        Msg::EditorKeepMine,
+        Msg::EditorBinaryFile,
+        Msg::EditorTooLarge,
+        Msg::EditorSaveFailed,
     ];
 
     /// The original dotted key, e.g. `"common.loading"`.
@@ -1442,6 +1460,12 @@ impl Msg {
             Msg::ExportPrintFailed => "export.printFailed",
             Msg::ExplorerOpenWithFailed => "explorer.openWithFailed",
             Msg::ExplorerTheDefaultApp => "explorer.theDefaultApp",
+            Msg::EditorConflict => "editor.conflict",
+            Msg::EditorReloadFromDisk => "editor.reloadFromDisk",
+            Msg::EditorKeepMine => "editor.keepMine",
+            Msg::EditorBinaryFile => "editor.binaryFile",
+            Msg::EditorTooLarge => "editor.tooLarge",
+            Msg::EditorSaveFailed => "editor.saveFailed",
         }
     }
 }
@@ -1805,6 +1829,12 @@ pub fn en(m: Msg) -> &'static str {
         Msg::ExportPrintFailed => "Could not open the PDF for printing: {message}",
         Msg::ExplorerOpenWithFailed => "Could not open with {app}: {error}",
         Msg::ExplorerTheDefaultApp => "the default app",
+        Msg::EditorConflict => "This file was modified elsewhere while you have unsaved changes.",
+        Msg::EditorReloadFromDisk => "Reload from disk",
+        Msg::EditorKeepMine => "Keep my version",
+        Msg::EditorBinaryFile => "Binary file · {size}",
+        Msg::EditorTooLarge => "File too large · {size}",
+        Msg::EditorSaveFailed => "Couldn't save {name}: {error}",
     }
 }
 
@@ -2167,5 +2197,11 @@ pub fn pt_br(m: Msg) -> &'static str {
         Msg::ExportPrintFailed => "Não foi possível abrir o PDF para impressão: {message}",
         Msg::ExplorerOpenWithFailed => "Não foi possível abrir com {app}: {error}",
         Msg::ExplorerTheDefaultApp => "o app padrão",
+        Msg::EditorConflict => "Este arquivo foi modificado em outro lugar enquanto você tem alterações não salvas.",
+        Msg::EditorReloadFromDisk => "Recarregar do disco",
+        Msg::EditorKeepMine => "Manter minha versão",
+        Msg::EditorBinaryFile => "Arquivo binário · {size}",
+        Msg::EditorTooLarge => "Arquivo grande demais · {size}",
+        Msg::EditorSaveFailed => "Não foi possível salvar {name}: {error}",
     }
 }

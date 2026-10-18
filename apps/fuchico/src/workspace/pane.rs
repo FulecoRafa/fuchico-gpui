@@ -27,6 +27,12 @@ pub enum PaneEvent {
     OpenCommandPalette(String),
     /// `onClose` (e.g. Helix `:q`): close the tab / window.
     Close,
+    /// Helix `Space f` / `Space b`: the quick switcher.
+    QuickOpen,
+    /// Helix `gn` / `gp`: next (+1) / previous (-1) tab.
+    CycleTab(isize),
+    /// Helix `Space /`: the search view, pre-filled with the query.
+    GlobalSearch(String),
 }
 
 /// Construction context shared by every pane.
@@ -34,6 +40,8 @@ pub enum PaneEvent {
 pub struct PaneContext {
     /// Vault root (`None` in an editor window opened outside a vault).
     pub root: Option<String>,
+    /// Hosted by a single-file editor window (no palette, tabs or dock).
+    pub in_window: bool,
 }
 
 /// A view that can live in a tab.
