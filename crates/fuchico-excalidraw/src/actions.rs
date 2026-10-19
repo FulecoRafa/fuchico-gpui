@@ -103,6 +103,7 @@ pub enum Action {
     Stats,
     Find,
     Link,
+    Crop,
 }
 
 impl Action {
@@ -138,6 +139,7 @@ impl Action {
             Action::Stats => "stats",
             Action::Find => "find",
             Action::Link => "link",
+            Action::Crop => "crop",
         }
     }
 }
@@ -221,6 +223,9 @@ impl ExcalidrawView {
             };
             v.push(e(Action::Link, label, "⌘K"));
         }
+        if list.len() == 1 && list[0].kind == "image" {
+            v.push(e(Action::Crop, "Crop image", "↵"));
+        }
         v.push(e(Action::AddToLibrary, "Add to library", ""));
         v.push(None);
         v.push(e(Action::SendBackward, "Send backward", "⌘["));
@@ -298,6 +303,7 @@ impl ExcalidrawView {
             Action::Stats => self.stats_open = !self.stats_open,
             Action::Find => self.open_search(),
             Action::Link => self.start_link_edit(),
+            Action::Crop => self.start_crop(),
         }
         cx.notify();
     }

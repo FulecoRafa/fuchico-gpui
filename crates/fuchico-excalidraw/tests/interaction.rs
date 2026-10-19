@@ -893,3 +893,55 @@ fn element_links(cx: &mut TestAppContext) {
     h.button("link-remove");
     assert_eq!(link(&mut h), Value::Null);
 }
+
+const IMAGE: &str = r#"{"type":"excalidraw","version":2,"source":"test","elements":[{"id":"im","type":"image","x":300,"y":300,"width":200,"height":200,"angle":0,"strokeColor":"transparent","backgroundColor":"transparent","fillStyle":"solid","strokeWidth":2,"strokeStyle":"solid","roughness":1,"opacity":100,"groupIds":[],"seed":1,"version":1,"versionNonce":1,"isDeleted":false,"boundElements":null,"updated":1,"link":null,"locked":false,"status":"saved","fileId":"f","scale":[1,1],"crop":null}],"appState":{"scrollX":0,"scrollY":0,"zoom":{"value":1}},"files":{"f":{"mimeType":"image/png","id":"f","dataURL":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP4z8AAQkC8AEieYPgPAESMCGKJ8LHJAAAAAElFTkSuQmCC","created":1}}}"#;
+
+#[gpui::test]
+fn image_crop_mode(cx: &mut TestAppContext) {
+    let mut h = open(cx, IMAGE);
+    let img = |h: &mut H| h.of("image")[0].clone();
+    // Double-click enters crop mode (no text is created).
+    h.dbl(p(400.0, 400.0));
+    assert!(h.of("text").is_empty());
+    assert_eq!(h.selection(), vec!["im".to_string()]);
+    // Dragging the east handle trims the right half instead of scaling.
+    h.drag(p(504.0, 400.0), p(400.0, 400.0));
+    let i = img(&mut h);
+    assert!((f(&i, "width") - 100.0).abs() < 0.5, "{i}");
+    assert!((f(&i, "height") - 200.0).abs() < 0.5, "{i}");
+    assert!((f(&i, "x") - 300.0).abs() < 0.5, "{i}");
+    let c = &i["crop"];
+    assert!((f(c, "width") - 1.0).abs() < 0.01, "{c}");
+    assert!((f(c, "height") - 2.0).abs() < 0.01, "{c}");
+    assert_eq!(f(c, "x"), 0.0);
+    assert_eq!(f(c, "naturalWidth"), 2.0);
+    // The west handle trims from the left: crop.x moves.
+    h.drag(p(296.0, 400.0), p(350.0, 400.0));
+    let i = img(&mut h);
+    assert!((f(&i, "x") - 350.0).abs() < 0.5, "{i}");
+    assert!((f(&i["crop"], "x") - 0.5).abs() < 0.01, "{i}");
+    // Growing back is clamped to the uncropped image; a full crop is null.
+    h.drag(p(346.0, 400.0), p(100.0, 400.0));
+    h.drag(p(404.0, 400.0), p(900.0, 400.0));
+    let i = img(&mut h);
+    assert!((f(&i, "width") - 200.0).abs() < 0.5, "{i}");
+    assert!((f(&i, "x") - 300.0).abs() < 0.5, "{i}");
+    assert_eq!(i["crop"], Value::Null);
+    // Escape leaves crop mode: the handle scales again.
+    h.press("escape");
+    h.drag(p(504.0, 400.0), p(400.0, 400.0));
+    let i = img(&mut h);
+    assert_eq!(i["crop"], Value::Null);
+    assert!((f(&i, "width") - 100.0).abs() < 0.5, "scaled {i}");
+    // Enter on a selected image (and the context menu) re-enter crop mode.
+    h.press("enter");
+    let i = img(&mut h);
+    let (x, w) = (f(&i, "x"), f(&i, "width"));
+    let (y, hh) = (f(&i, "y"), f(&i, "height"));
+    let mid = (y + hh / 2.0) as f32;
+    h.drag(p((x + w + 4.0) as f32, mid), p((x + w / 2.0) as f32, mid));
+    assert!(img(&mut h)["crop"].is_object());
+    h.press("escape");
+    h.rclick(p((x + w / 4.0) as f32, mid));
+    assert!(h.exists("cm-crop"));
+}

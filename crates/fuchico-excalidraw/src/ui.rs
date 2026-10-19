@@ -738,6 +738,13 @@ fn paint_canvas(
                             window.paint_path(path, pal.canvas.to_hsla());
                         }
                     }
+                    if v.cropping.as_deref() == Some(el.id.as_str())
+                        && let Some(natural) = crate::view::natural_size_in(el, &v.scene, caches)
+                    {
+                        paint_crop_backdrop(
+                            el, natural, &v.scene, caches, cam, origin, pal, window,
+                        );
+                    }
                     render::paint_element(el, &v.scene, caches, cam, origin, pal, alpha, window);
                 };
                 if editing == Some(el.id.as_str()) && el.text().is_empty() {
@@ -900,6 +907,40 @@ fn paint_grid(
             c,
         ));
         j += 1;
+    }
+}
+
+/// Crop mode: the whole uncropped image, dimmed, behind the kept part.
+#[allow(clippy::too_many_arguments)]
+fn paint_crop_backdrop(
+    el: &Element,
+    natural: (f64, f64),
+    scene: &crate::scene::Scene,
+    caches: &mut render::Caches,
+    cam: Camera,
+    origin: Point<Pixels>,
+    pal: Palette,
+    window: &mut Window,
+) {
+    let full = ExcalidrawView::crop_full_extent(el, natural);
+    let c = geom::to_world(el, [(full[0] + full[2]) / 2.0, (full[1] + full[3]) / 2.0]);
+    let (fw, fh) = (full[2] - full[0], full[3] - full[1]);
+    let mut whole = el.clone();
+    whole.f.crop.set_null();
+    whole.f.x.set(crate::model::Num(c[0] - fw / 2.0));
+    whole.f.y.set(crate::model::Num(c[1] - fh / 2.0));
+    whole.f.width.set(crate::model::Num(fw));
+    whole.f.height.set(crate::model::Num(fh));
+    render::paint_element(&whole, scene, caches, cam, origin, pal, 1.0, window);
+    let q = rect_screen(cam, origin, &whole, [0.0, 0.0, fw, fh]);
+    let mut pb = PathBuilder::fill();
+    pb.move_to(q[0]);
+    for p in &q[1..] {
+        pb.line_to(*p);
+    }
+    pb.close();
+    if let Ok(path) = pb.build() {
+        window.paint_path(path, pal.canvas.to_hsla().opacity(0.65));
     }
 }
 

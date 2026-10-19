@@ -123,6 +123,8 @@ pub enum DebugUi {
     /// Gives element `id` the link `url`, selects it, and (when the flag is
     /// set) opens the hyperlink editor.
     Link(&'static str, &'static str, bool),
+    /// Selects image `id` and enters crop mode.
+    Crop(&'static str),
 }
 
 /// Selection-box handles.
@@ -204,6 +206,12 @@ pub(crate) enum Drag {
     },
     Erase,
     Laser,
+    /// Crop mode: a side/corner handle trims the image instead of scaling.
+    Crop {
+        handle: Handle,
+        orig: Box<Element>,
+        natural: (f64, f64),
+    },
 }
 
 /// How long a laser-pointer trail point stays visible (stock: ~1 s decay).
@@ -264,6 +272,8 @@ pub struct ExcalidrawView {
     pub(crate) lib_menu: bool,
     /// Hyperlink editor: (element id, text being typed).
     pub(crate) link_edit: Option<(String, String)>,
+    /// Image being cropped (stock: double-click an image).
+    pub(crate) cropping: Option<String>,
     /// Shape caches for library thumbnails (separate from the canvas).
     pub(crate) lib_caches: Rc<RefCell<Caches>>,
     pub(crate) toast: Option<String>,
@@ -393,6 +403,7 @@ impl ExcalidrawView {
             search_index: 0,
             lib_menu: false,
             link_edit: None,
+            cropping: None,
             lib_caches: Rc::new(RefCell::new(Caches::default())),
             toast: None,
             guides: Vec::new(),
@@ -495,6 +506,10 @@ impl ExcalidrawView {
                     self.start_link_edit();
                 }
             }
+            DebugUi::Crop(id) => {
+                self.selected = std::iter::once(id.to_string()).collect();
+                self.start_crop();
+            }
         }
         cx.notify();
     }
@@ -580,11 +595,13 @@ impl ExcalidrawView {
             self.extra_open = false;
             self.ah_open = None;
             self.link_edit = None;
+            self.cropping = None;
         }
     }
 
     pub fn set_tool(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
         self.extra_open = false;
+        self.cropping = None;
         self.ah_open = None;
         self.finish_multi(cx);
         self.commit_text(cx);
@@ -1067,6 +1084,11 @@ impl ExcalidrawView {
         // Double-click: text editing.
         if ev.click_count >= 2 {
             match self.hit_element(p) {
+                Some(id) if self.scene.get(&id).is_some_and(|e| e.kind == "image") => {
+                    self.selected = std::iter::once(id).collect();
+                    self.start_crop();
+                    return;
+                }
                 Some(id) => {
                     if self.start_text_edit_on(&id, p, cx) {
                         return;
@@ -1094,6 +1116,21 @@ impl ExcalidrawView {
             }
         }
         if let Some(h) = self.hit_handle(p) {
+            if let Some(cid) = self.cropping.clone() {
+                if h == Handle::Rotate {
+                    return;
+                }
+                if let Some(o) = self.scene.get(&cid).cloned()
+                    && let Some(natural) = self.natural_size(&o)
+                {
+                    self.drag = Some(Drag::Crop {
+                        handle: h,
+                        orig: Box::new(o),
+                        natural,
+                    });
+                    return;
+                }
+            }
             let orig: HashMap<String, Element> = self
                 .selection_list()
                 .into_iter()
@@ -1124,6 +1161,9 @@ impl ExcalidrawView {
             return;
         }
         let hit = self.hit_element(p);
+        if self.cropping.is_some() && hit != self.cropping {
+            self.cropping = None;
+        }
         match hit {
             Some(id) => {
                 let group = self.scene.expand_groups(&[id.clone()].into());
@@ -1332,6 +1372,11 @@ impl ExcalidrawView {
             } => {
                 self.resize(handle, &orig, bbox, single.as_deref(), p, ev.modifiers);
             }
+            Drag::Crop {
+                handle,
+                orig,
+                natural,
+            } => self.crop_resize(handle, &orig, natural, p),
             Drag::Rotate {
                 center,
                 start_angle,
@@ -1503,7 +1548,7 @@ impl ExcalidrawView {
                     self.commit(cx);
                 }
             }
-            Drag::Resize { .. } | Drag::Rotate { .. } => self.commit(cx),
+            Drag::Resize { .. } | Drag::Rotate { .. } | Drag::Crop { .. } => self.commit(cx),
             Drag::Create { id, .. } => {
                 let tiny = self
                     .scene
@@ -1707,6 +1752,112 @@ impl ExcalidrawView {
         }
         let set = self.scene.expand_groups(&hits.into_iter().collect());
         self.erasing.extend(set);
+    }
+
+    /// Natural (file) size of an image element: its crop's, else decoded.
+    pub(crate) fn natural_size(&self, el: &Element) -> Option<(f64, f64)> {
+        natural_size_in(el, &self.scene, &mut self.caches.borrow_mut())
+    }
+
+    /// Enters crop mode on the single selected image.
+    pub(crate) fn start_crop(&mut self) {
+        let Some(el) = self.single() else { return };
+        if el.kind != "image" || el.locked() || self.natural_size(el).is_none() {
+            return;
+        }
+        self.cropping = Some(el.id.clone());
+        self.link_edit = None;
+    }
+
+    /// The uncropped image's extent in the element's local coordinates.
+    pub(crate) fn crop_full_extent(el: &Element, natural: (f64, f64)) -> [f64; 4] {
+        let c = crate::export::crop_of(el).unwrap_or(crate::export::Crop {
+            x: 0.0,
+            y: 0.0,
+            width: natural.0,
+            height: natural.1,
+            natural_width: natural.0,
+            natural_height: natural.1,
+        });
+        let (fx, fy) = image_flip(el);
+        let (w, h) = (el.width(), el.height());
+        let axis = |len: f64, off: f64, size: f64, nat: f64, flip: bool| {
+            let k = len / size;
+            if flip {
+                [len - (nat - off) * k, len + off * k]
+            } else {
+                [-off * k, (nat - off) * k]
+            }
+        };
+        let x = axis(w, c.x, c.width, c.natural_width, fx);
+        let y = axis(h, c.y, c.height, c.natural_height, fy);
+        [x[0], y[0], x[1], y[1]]
+    }
+
+    /// Crop-mode handle drag: moves the dragged edges within the uncropped
+    /// image and updates `crop` (natural pixels) and the element box.
+    fn crop_resize(&mut self, handle: Handle, o: &Element, natural: (f64, f64), p: P) {
+        let full = Self::crop_full_extent(o, natural);
+        let (w, h) = (o.width(), o.height());
+        if w <= 0.0 || h <= 0.0 {
+            return;
+        }
+        let q = geom::to_local(o, p);
+        let (sx, sy) = handle.sides();
+        let min = 8.0 / self.cam.zoom;
+        let (mut x0, mut y0, mut x1, mut y1) = (0.0, 0.0, w, h);
+        if sx < 0 {
+            x0 = q[0].clamp(full[0], (x1 - min).max(full[0]));
+        }
+        if sx > 0 {
+            x1 = q[0].clamp((x0 + min).min(full[2]), full[2]);
+        }
+        if sy < 0 {
+            y0 = q[1].clamp(full[1], (y1 - min).max(full[1]));
+        }
+        if sy > 0 {
+            y1 = q[1].clamp((y0 + min).min(full[3]), full[3]);
+        }
+        // Local → natural pixels (flip mirrors the axis).
+        let (fx, fy) = image_flip(o);
+        let kx = natural.0 / (full[2] - full[0]);
+        let ky = natural.1 / (full[3] - full[1]);
+        let nx = if fx {
+            (full[2] - x1) * kx
+        } else {
+            (x0 - full[0]) * kx
+        };
+        let ny = if fy {
+            (full[3] - y1) * ky
+        } else {
+            (y0 - full[1]) * ky
+        };
+        let (nw, nh) = ((x1 - x0) * kx, (y1 - y0) * ky);
+        let c = geom::to_world(o, [(x0 + x1) / 2.0, (y0 + y1) / 2.0]);
+        let mut el = o.clone();
+        el.f.x.set(Num(c[0] - (x1 - x0) / 2.0));
+        el.f.y.set(Num(c[1] - (y1 - y0) / 2.0));
+        el.f.width.set(Num(x1 - x0));
+        el.f.height.set(Num(y1 - y0));
+        let whole = nx.abs() < 1e-6
+            && ny.abs() < 1e-6
+            && (nw - natural.0).abs() < 1e-6
+            && (nh - natural.1).abs() < 1e-6;
+        if whole {
+            el.f.crop.set_null();
+        } else {
+            el.f.crop.set(serde_json::json!({
+                "x": nx,
+                "y": ny,
+                "width": nw,
+                "height": nh,
+                "naturalWidth": natural.0,
+                "naturalHeight": natural.1,
+            }));
+        }
+        if let Some(t) = self.scene.get_mut(&o.id) {
+            *t = el;
+        }
     }
 
     fn resize(
@@ -2343,6 +2494,12 @@ impl ExcalidrawView {
         let primary = m.platform || m.control;
         let key = ks.key.as_str();
         let mut handled = true;
+        if self.cropping.is_some() && matches!(key, "escape" | "enter") {
+            self.cropping = None;
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
         if self.link_key(ks, cx) {
             cx.stop_propagation();
             cx.notify();
@@ -2521,6 +2678,8 @@ impl ExcalidrawView {
             (false, _, "enter") => {
                 if self.multi.is_some() {
                     self.finish_multi(cx);
+                } else if self.single().is_some_and(|e| e.kind == "image") {
+                    self.start_crop();
                 } else if let Some(el) = self.single().cloned() {
                     let c = geom::center(&el);
                     self.start_text_edit_on(&el.id, c, cx);
@@ -3331,6 +3490,27 @@ fn tool_for_key(k: &str) -> Option<Tool> {
         "k" => Tool::Laser,
         _ => return None,
     })
+}
+
+/// An image element's flips (negative `scale` components).
+pub(crate) fn image_flip(el: &Element) -> (bool, bool) {
+    el.f.scale
+        .get()
+        .map(|s| (s[0].0 < 0.0, s[1].0 < 0.0))
+        .unwrap_or((false, false))
+}
+
+/// Natural (file) size of an image element: its crop's, else decoded.
+pub(crate) fn natural_size_in(
+    el: &Element,
+    scene: &crate::scene::Scene,
+    caches: &mut Caches,
+) -> Option<(f64, f64)> {
+    if let Some(c) = crate::export::crop_of(el) {
+        return Some((c.natural_width, c.natural_height));
+    }
+    let (w, h) = caches.image_size(scene, el.f.file_id.get()?)?;
+    Some((f64::from(w), f64::from(h)))
 }
 
 #[cfg(test)]
