@@ -84,6 +84,9 @@ enum Icon {
     ArrowCurved,
     ArrowElbow,
     Copy,
+    /// Hyperlink (chain).
+    Link,
+    Edit,
 }
 
 fn icon_parts(i: Icon) -> Vec<Part> {
@@ -302,6 +305,43 @@ fn icon_parts(i: Icon) -> Vec<Part> {
             ),
             Poly(&[[12.0, 13.0], [12.0, 20.0]], false),
             Poly(&[[9.0, 20.0], [15.0, 20.0]], false),
+        ],
+        Icon::Link => vec![
+            Poly(
+                &[
+                    [3.9, 15.9],
+                    [8.9, 10.9],
+                    [13.1, 10.9],
+                    [13.1, 15.1],
+                    [8.1, 20.1],
+                    [3.9, 20.1],
+                ],
+                true,
+            ),
+            Poly(
+                &[
+                    [10.9, 8.9],
+                    [15.9, 3.9],
+                    [20.1, 3.9],
+                    [20.1, 8.1],
+                    [15.1, 13.1],
+                    [10.9, 13.1],
+                ],
+                true,
+            ),
+        ],
+        Icon::Edit => vec![
+            Poly(
+                &[
+                    [4.0, 20.0],
+                    [5.0, 15.0],
+                    [16.0, 4.0],
+                    [20.0, 8.0],
+                    [9.0, 19.0],
+                ],
+                true,
+            ),
+            Poly(&[[13.5, 6.5], [17.5, 10.5]], false),
         ],
         Icon::Search => vec![
             Circle([10.5, 10.5], 6.0),
@@ -1386,6 +1426,8 @@ impl Render for ExcalidrawView {
             self.show_properties() && !self.zen && !self.view_mode,
             |d| d.child(self.render_properties(&style, pal, panel_h, cx)),
         )
+        .children(self.render_link_icons(&style, cx))
+        .when_some(self.render_link_popover(&style, cx), |d, p| d.child(p))
         .when(self.stats_open, |d| d.child(self.render_stats(&style, cx)))
         .child(self.render_bottom(&style, cx))
         .when(self.menu_open, |d| {
@@ -2728,6 +2770,16 @@ impl ExcalidrawView {
                         cx,
                     ))
                 })
+                .when(list.len() == 1 && list[0].container_id().is_none(), |r| {
+                    r.child(prop_button(
+                        "a-link".into(),
+                        Icon::Link,
+                        false,
+                        style,
+                        |v, _, _| v.start_link_edit(),
+                        cx,
+                    ))
+                })
                 .child(prop_button(
                     "a-lock".into(),
                     Icon::Lock,
@@ -2748,6 +2800,185 @@ impl ExcalidrawView {
             panel = panel.child(section("Actions", style).child(r));
         }
         div().absolute().top(px(72.0)).left(px(16.0)).child(panel)
+    }
+}
+
+/// The URL a hyperlink opens: scheme-less links are treated as https.
+pub(crate) fn link_url(link: &str) -> String {
+    let l = link.trim();
+    if l.contains("://") || l.starts_with("mailto:") || l.starts_with("tel:") {
+        l.to_string()
+    } else {
+        format!("https://{l}")
+    }
+}
+
+impl ExcalidrawView {
+    /// Screen-space (view-local) bbox of an element.
+    fn screen_bbox(&self, el: &crate::model::Element) -> [f32; 4] {
+        let bb = geom::aabb(el);
+        let c = self.cam;
+        let f = |x: f64, s: f64| ((x + s) * c.zoom) as f32;
+        [
+            f(bb[0], c.scroll_x),
+            f(bb[1], c.scroll_y),
+            f(bb[2], c.scroll_x),
+            f(bb[3], c.scroll_y),
+        ]
+    }
+
+    /// Stock's hyperlink handle: a small chain button above the top-right
+    /// corner of every element that has a link; clicking it opens the URL.
+    fn render_link_icons(
+        &self,
+        style: &ExcalidrawStyle,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
+        let editing = self.editing.as_ref().map(|e| e.id.as_str());
+        self.scene
+            .elements()
+            .filter(|e| !e.link().is_empty() && Some(e.id.as_str()) != editing)
+            .map(|el| {
+                let r = self.screen_bbox(el);
+                let id = format!("link-icon-{}", el.id);
+                let sel = id.clone();
+                let url = link_url(el.link());
+                div()
+                    .id(SharedString::from(id))
+                    .debug_selector(move || sel)
+                    .absolute()
+                    .left(px(r[2] - 4.0))
+                    .top(px(r[1] - 26.0))
+                    .size(px(22.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(4.0))
+                    .bg(style.island_bg)
+                    .border_1()
+                    .border_color(style.island_border)
+                    .cursor_pointer()
+                    .hover(|s| s.bg(style.hover_bg))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.open_url(&url)))
+                    .child(icon(Icon::Link, 14.0, style.selection))
+                    .into_any_element()
+            })
+            .collect()
+    }
+
+    /// The hyperlink editor (when open) or the link preview for a single
+    /// selected element that has a link.
+    fn render_link_popover(
+        &self,
+        style: &ExcalidrawStyle,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        if self.view_mode || self.dialog.is_some() {
+            return None;
+        }
+        let (id, editing_text) = match &self.link_edit {
+            Some((id, t)) => (id.clone(), Some(t.clone())),
+            None => {
+                if self.selected.len() != 1 || self.drag.is_some() || self.editing.is_some() {
+                    return None;
+                }
+                let id = self.selected.iter().next()?.clone();
+                if self.scene.get(&id)?.link().is_empty() {
+                    return None;
+                }
+                (id, None)
+            }
+        };
+        let el = self.scene.get(&id)?;
+        let r = self.screen_bbox(el);
+        let link = el.link().to_string();
+        let w = 320.0;
+        let b = self.bounds.get();
+        let x = r[0].min(f32::from(b.size.width) - w - 8.0).max(8.0);
+        let y = (r[1] - 80.0).max(8.0);
+        let rid = id.clone();
+        let remove = prop_button(
+            "link-remove".into(),
+            Icon::Trash,
+            false,
+            style,
+            move |v, _, cx| {
+                v.link_edit = None;
+                v.set_link(&rid, "", cx);
+            },
+            cx,
+        );
+        let mut row = island(style)
+            .id("link-popover")
+            .debug_selector(|| "link-popover".into())
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .w(px(w))
+            .p(px(6.0))
+            .gap(px(4.0));
+        row = match editing_text {
+            Some(t) => {
+                let empty = t.is_empty();
+                row.child(
+                    div()
+                        .id("link-input")
+                        .debug_selector(|| "link-input".into())
+                        .flex_1()
+                        .min_w_0()
+                        .h(px(32.0))
+                        .px(px(8.0))
+                        .flex()
+                        .items_center()
+                        .overflow_hidden()
+                        .rounded(px(6.0))
+                        .border_1()
+                        .border_color(style.selection)
+                        .text_size(px(13.0))
+                        .text_color(if empty { style.muted } else { style.fg })
+                        .child(if empty {
+                            "Type or paste your link here".to_string()
+                        } else {
+                            format!("{t}|")
+                        }),
+                )
+            }
+            None => {
+                let url = link_url(&link);
+                row.child(
+                    div()
+                        .id("link-open")
+                        .debug_selector(|| "link-open".into())
+                        .flex_1()
+                        .min_w_0()
+                        .px(px(8.0))
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .text_size(px(13.0))
+                        .text_color(style.selection)
+                        .cursor_pointer()
+                        .hover(|s| s.underline())
+                        .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.open_url(&url)))
+                        .child(link),
+                )
+                .child(prop_button(
+                    "link-edit".into(),
+                    Icon::Edit,
+                    false,
+                    style,
+                    |v, _, _| v.start_link_edit(),
+                    cx,
+                ))
+            }
+        };
+        Some(
+            div()
+                .absolute()
+                .left(px(x))
+                .top(px(y))
+                .child(row.child(remove))
+                .into_any_element(),
+        )
     }
 }
 

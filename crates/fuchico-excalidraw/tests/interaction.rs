@@ -842,3 +842,54 @@ fn align_font_size_and_layer_shortcuts(cx: &mut TestAppContext) {
     h.press("cmd-alt-[");
     assert_eq!(h.json()["elements"][0]["id"], "el5");
 }
+
+#[gpui::test]
+fn element_links(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    let link = |h: &mut H| {
+        h.elements()
+            .into_iter()
+            .find(|e| e["id"] == "el5")
+            .map(|e| e["link"].clone())
+            .unwrap()
+    };
+    // Select the text via search, then ⌘K opens the hyperlink editor.
+    h.press("cmd-f");
+    h.press("f u c h");
+    h.press("escape");
+    assert_eq!(h.selection(), vec!["el5".to_string()]);
+    assert!(!h.exists("link-popover"));
+    h.press("cmd-k");
+    assert!(h.exists("link-input"));
+    h.press("a b c");
+    h.press("enter");
+    assert!(!h.exists("link-input"));
+    assert_eq!(link(&mut h), "abc");
+    // A selected linked element shows the preview; every linked element
+    // gets the chain handle.
+    assert!(h.exists("link-open"));
+    assert!(h.exists("link-icon-el5"));
+    // Edit: clear it and submit — stock stores `null`.
+    h.button("link-edit");
+    h.press("backspace backspace backspace");
+    h.press("enter");
+    assert_eq!(link(&mut h), Value::Null);
+    assert!(!h.exists("link-icon-el5"));
+    // Escape cancels.
+    h.press("cmd-k");
+    h.press("q");
+    h.press("escape");
+    assert!(!h.exists("link-input"));
+    assert_eq!(link(&mut h), Value::Null);
+    // The Actions button opens it too; clicking away submits.
+    h.button("a-link");
+    h.press("x");
+    h.click(p(20.0, 700.0));
+    assert_eq!(link(&mut h), "x");
+    // The trash button removes it.
+    h.press("cmd-f");
+    h.press("enter");
+    h.press("escape");
+    h.button("link-remove");
+    assert_eq!(link(&mut h), Value::Null);
+}

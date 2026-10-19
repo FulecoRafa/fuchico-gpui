@@ -120,6 +120,9 @@ pub enum DebugUi {
     AddSelectionToLibrary,
     /// The library sidebar's ⋮ menu.
     LibraryMenu,
+    /// Gives element `id` the link `url`, selects it, and (when the flag is
+    /// set) opens the hyperlink editor.
+    Link(&'static str, &'static str, bool),
 }
 
 /// Selection-box handles.
@@ -259,6 +262,8 @@ pub struct ExcalidrawView {
     /// Index into the current search matches (Enter cycles).
     pub(crate) search_index: usize,
     pub(crate) lib_menu: bool,
+    /// Hyperlink editor: (element id, text being typed).
+    pub(crate) link_edit: Option<(String, String)>,
     /// Shape caches for library thumbnails (separate from the canvas).
     pub(crate) lib_caches: Rc<RefCell<Caches>>,
     pub(crate) toast: Option<String>,
@@ -387,6 +392,7 @@ impl ExcalidrawView {
             search_focus: false,
             search_index: 0,
             lib_menu: false,
+            link_edit: None,
             lib_caches: Rc::new(RefCell::new(Caches::default())),
             toast: None,
             guides: Vec::new(),
@@ -480,6 +486,15 @@ impl ExcalidrawView {
                 self.sidebar_search = false;
                 self.lib_menu = true;
             }
+            DebugUi::Link(id, url, edit) => {
+                if let Some(e) = self.scene.get_mut(id) {
+                    e.f.link.set(url.to_string());
+                }
+                self.selected = std::iter::once(id.to_string()).collect();
+                if edit {
+                    self.start_link_edit();
+                }
+            }
         }
         cx.notify();
     }
@@ -564,6 +579,7 @@ impl ExcalidrawView {
             self.picker = None;
             self.extra_open = false;
             self.ah_open = None;
+            self.link_edit = None;
         }
     }
 
@@ -886,6 +902,8 @@ impl ExcalidrawView {
         if self.error.is_some() {
             return;
         }
+        // Stock: clicking away from the hyperlink editor submits it.
+        self.apply_link(cx);
         let p = self.world(ev.position);
         self.pointer = Some(ev.position);
         if self.view_mode && ev.button == MouseButton::Right {
@@ -2325,6 +2343,11 @@ impl ExcalidrawView {
         let primary = m.platform || m.control;
         let key = ks.key.as_str();
         let mut handled = true;
+        if self.link_key(ks, cx) {
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
         if self.search_key(ks, cx) {
             cx.stop_propagation();
             cx.notify();
@@ -2396,6 +2419,7 @@ impl ExcalidrawView {
             (false, true, true, "c") => Some(Action::CopyPng),
             (true, true, false, "e") => Some(Action::Export),
             (true, false, false, "f") => Some(Action::Find),
+            (true, false, false, "k") => Some(Action::Link),
             (false, _, false, "?") | (false, true, false, "/") => Some(Action::Help),
             _ => None,
         };

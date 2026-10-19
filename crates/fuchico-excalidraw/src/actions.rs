@@ -102,6 +102,7 @@ pub enum Action {
     ViewMode,
     Stats,
     Find,
+    Link,
 }
 
 impl Action {
@@ -136,6 +137,7 @@ impl Action {
             Action::ViewMode => "view-mode",
             Action::Stats => "stats",
             Action::Find => "find",
+            Action::Link => "link",
         }
     }
 }
@@ -211,6 +213,14 @@ impl ExcalidrawView {
             v.push(e(Action::PasteStyles, "Paste styles", "⌘⌥V"));
         }
         v.push(None);
+        if list.len() == 1 && list[0].container_id().is_none() {
+            let label = if list[0].link().is_empty() {
+                "Add link"
+            } else {
+                "Edit link"
+            };
+            v.push(e(Action::Link, label, "⌘K"));
+        }
         v.push(e(Action::AddToLibrary, "Add to library", ""));
         v.push(None);
         v.push(e(Action::SendBackward, "Send backward", "⌘["));
@@ -287,6 +297,7 @@ impl ExcalidrawView {
             }
             Action::Stats => self.stats_open = !self.stats_open,
             Action::Find => self.open_search(),
+            Action::Link => self.start_link_edit(),
         }
         cx.notify();
     }
@@ -413,6 +424,68 @@ impl ExcalidrawView {
             self.selected.clear();
         }
         self.commit(cx);
+    }
+
+    /// Opens the hyperlink editor for the single selected element.
+    pub(crate) fn start_link_edit(&mut self) {
+        let list = self.selection_list();
+        if list.len() != 1 || list[0].container_id().is_some() {
+            return;
+        }
+        self.link_edit = Some((list[0].id.clone(), list[0].link().to_string()));
+    }
+
+    /// Applies the hyperlink editor's text (empty removes the link).
+    pub(crate) fn apply_link(&mut self, cx: &mut Context<Self>) {
+        let Some((id, text)) = self.link_edit.take() else {
+            return;
+        };
+        self.set_link(&id, text.trim(), cx);
+    }
+
+    pub(crate) fn set_link(&mut self, id: &str, link: &str, cx: &mut Context<Self>) {
+        let Some(e) = self.scene.get_mut(id) else {
+            return;
+        };
+        if e.link() == link {
+            return;
+        }
+        if link.is_empty() {
+            // Stock stores a removed link as `null`.
+            e.f.link.set_null();
+        } else {
+            e.f.link.set(link.to_string());
+        }
+        self.commit(cx);
+    }
+
+    /// Keyboard for the open hyperlink editor. Returns whether consumed.
+    pub(crate) fn link_key(&mut self, ks: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
+        let Some((_, text)) = self.link_edit.as_mut() else {
+            return false;
+        };
+        let m = &ks.modifiers;
+        if m.platform || m.control {
+            if ks.key == "v"
+                && let Some(t) = cx.read_from_clipboard().and_then(|c| c.text())
+            {
+                text.push_str(t.trim());
+                return true;
+            }
+            return false;
+        }
+        match ks.key.as_str() {
+            "escape" => self.link_edit = None,
+            "enter" => self.apply_link(cx),
+            "backspace" => {
+                text.pop();
+            }
+            _ => match ks.key_char.as_deref() {
+                Some(c) if !c.chars().any(char::is_control) => text.push_str(c),
+                _ => return false,
+            },
+        }
+        true
     }
 
     pub(crate) fn unlock_all(&mut self, cx: &mut Context<Self>) {

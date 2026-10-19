@@ -322,6 +322,12 @@ fn snapshots_compare_with_stock() {
         ("search", false, |v, _, cx| {
             v.debug_open(DebugUi::Search("fuchico"), cx)
         }),
+        ("link", false, |v, _, cx| {
+            v.debug_open(DebugUi::Link("el1", "https://excalidraw.com", false), cx)
+        }),
+        ("link-edit", false, |v, _, cx| {
+            v.debug_open(DebugUi::Link("el1", "https://excalidraw.com", true), cx)
+        }),
     ];
     for (name, dark, prep) in cases {
         let prep = *prep;
