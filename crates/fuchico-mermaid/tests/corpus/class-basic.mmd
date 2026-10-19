@@ -1,0 +1,16 @@
+classDiagram
+    class Animal {
+      +String name
+      +int age
+      +eat(food) bool
+    }
+    class Dog {
+      +bark()
+    }
+    class Shape {
+      <<interface>>
+      +area() double
+    }
+    Animal <|-- Dog
+    Animal "1" *-- "many" Leg : has
+    Shape <|.. Circle

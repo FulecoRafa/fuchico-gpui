@@ -1,0 +1,17 @@
+sequenceDiagram
+    autonumber
+    actor Alice
+    participant Bob
+    Alice->>+Bob: Hello Bob, how are you?
+    loop Every minute
+        Bob-->>Alice: Still here
+    end
+    alt is sick
+        Bob->>Alice: Not so good :(
+    else is well
+        Bob->>Alice: Feeling fresh like a daisy
+    end
+    opt Extra response
+        Bob->>-Alice: Thanks for asking
+    end
+    Note right of Bob: A rather long note that explains the thing in detail

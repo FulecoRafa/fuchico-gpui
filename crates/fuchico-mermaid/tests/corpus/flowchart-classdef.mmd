@@ -1,0 +1,8 @@
+flowchart LR
+    classDef hot fill:#f96,stroke:#333,stroke-width:2px,color:#000
+    classDef cold fill:#9cf,stroke:#036
+    A[Hot node]:::hot --> B[Cold node]
+    B --> C[Styled]
+    class B cold
+    style C fill:#bfb,stroke:#060,stroke-width:3px
+    linkStyle 0 stroke:#f00,stroke-width:2px

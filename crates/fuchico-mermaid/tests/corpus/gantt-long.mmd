@@ -1,0 +1,10 @@
+gantt
+    title A longer project plan with excluded weekends
+    dateFormat YYYY-MM-DD
+    excludes weekends
+    section Research and discovery phase
+    Interview users and collect feedback :r1, 2026-03-02, 12d
+    Write the specification document :r2, after r1, 8d
+    section Implementation
+    Build it :i1, after r2, 20d
+    Test it :crit, i2, after i1, 6d

@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant U as User
+    participant A as App
+    participant S as Server
+    U->>A: Open note
+    A->>S: GET /note
+    S-->>A: 200 OK
+    A-->>U: Render
+    Note over U,A: live preview

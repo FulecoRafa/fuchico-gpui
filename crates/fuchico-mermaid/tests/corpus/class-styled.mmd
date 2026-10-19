@@ -1,0 +1,11 @@
+classDiagram
+    class Note {
+      +String title
+      +List~String~ tags
+      +save() Result~void~
+    }
+    class Vault
+    Vault "1" o-- "*" Note : contains
+    classDef important fill:#f9f,stroke:#333
+    class Note:::important
+    note for Vault "Root folder on disk"
