@@ -72,3 +72,13 @@ fn quantized_scale_steps() {
     assert_eq!(raster::quantize_scale(2.01), 2.5);
     assert_eq!(raster::quantize_scale(4.0), 4.0);
 }
+
+#[test]
+fn markdown_strings_render_as_rich_text() {
+    let src = "flowchart LR\n  a[\"`This **is** _Markdown_`\"]\n  b[\"`Line1\nLine 2`\"]\n  a --> b\n";
+    let svg = render_svg(src, &MermaidTheme::dark()).unwrap();
+    assert!(!svg.contains('`') && !svg.contains("**"), "{svg}");
+    assert!(svg.contains(r#"font-weight="bold">is"#), "{svg}");
+    assert!(svg.contains(r#"font-style="italic">Markdown"#), "{svg}");
+    assert!(svg.contains(">Line1<") && svg.contains(">Line 2<"), "{svg}");
+}
