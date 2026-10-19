@@ -390,13 +390,17 @@ fn arrow_type_elbow_routes_orthogonally(cx: &mut TestAppContext) {
     let a = h.of("arrow")[0].clone();
     assert_eq!(a["elbowed"], false);
     assert_eq!(a["roundness"]["type"], 2);
-    // New arrows use the chosen type; every Excalidraw arrowhead is offered.
+    // New arrows use the chosen type; every Excalidraw arrowhead is offered
+    // in the end-arrowhead popover.
+    h.button("ah-end");
+    assert!(h.exists("ah-popover"));
     for k in [
         "None", "Arrow", "Bar", "●", "○", "▲", "△", "◆", "◇", "Cf1", "CfN", "Cf1N",
     ] {
         assert!(h.exists(&format!("ah-false-{k}")), "{k}");
     }
     h.button("ah-false-◇");
+    assert!(!h.exists("ah-popover"));
     assert_eq!(h.of("arrow")[0]["endArrowhead"], "diamond_outline");
 }
 
@@ -444,18 +448,18 @@ fn opacity_slider_drags(cx: &mut TestAppContext) {
     let b = h.bounds("op-slider").unwrap();
     let y = b.center().y;
     h.down(
-        point(b.left() + px(25.0), y),
+        point(b.left() + b.size.width * 0.25, y),
         MouseButton::Left,
         Modifiers::default(),
         1,
     );
     h.mv(
-        point(b.left() + px(60.0), y),
+        point(b.left() + b.size.width * 0.6, y),
         Some(MouseButton::Left),
         Modifiers::default(),
     );
     h.up(
-        point(b.left() + px(60.0), y),
+        point(b.left() + b.size.width * 0.6, y),
         MouseButton::Left,
         Modifiers::default(),
         1,

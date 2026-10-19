@@ -29,6 +29,8 @@ enum Part {
     Circle([f32; 2], f32),
     Dot([f32; 2], f32),
     RoundRect([f32; 4], f32),
+    /// Filled polygon.
+    Solid(&'static [[f32; 2]]),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -61,6 +63,26 @@ enum Icon {
     Search,
     External,
     Download,
+    Trash,
+    Group,
+    Ungroup,
+    FillHachure,
+    FillCross,
+    FillSolid,
+    WidthThin,
+    WidthBold,
+    WidthExtra,
+    StyleSolid,
+    StyleDashed,
+    StyleDotted,
+    RoughArchitect,
+    RoughArtist,
+    RoughCartoonist,
+    EdgeSharp,
+    EdgeRound,
+    ArrowSharp,
+    ArrowCurved,
+    ArrowElbow,
     Copy,
 }
 
@@ -285,6 +307,165 @@ fn icon_parts(i: Icon) -> Vec<Part> {
             Circle([10.5, 10.5], 6.0),
             Poly(&[[15.0, 15.0], [20.0, 20.0]], false),
         ],
+        Icon::FillHachure => vec![
+            RoundRect([4.0, 4.0, 20.0, 20.0], 3.0),
+            Poly(&[[4.5, 11.5], [11.5, 4.5]], false),
+            Poly(&[[5.0, 18.0], [18.0, 5.0]], false),
+            Poly(&[[11.5, 19.5], [19.5, 11.5]], false),
+        ],
+        Icon::FillCross => vec![
+            RoundRect([4.0, 4.0, 20.0, 20.0], 3.0),
+            Poly(&[[4.5, 11.5], [11.5, 4.5]], false),
+            Poly(&[[5.0, 18.0], [18.0, 5.0]], false),
+            Poly(&[[11.5, 19.5], [19.5, 11.5]], false),
+            Poly(&[[12.5, 4.5], [19.5, 11.5]], false),
+            Poly(&[[6.0, 5.0], [19.0, 18.0]], false),
+            Poly(&[[4.5, 12.5], [11.5, 19.5]], false),
+        ],
+        Icon::FillSolid => vec![Solid(&[[5.0, 5.0], [19.0, 5.0], [19.0, 19.0], [5.0, 19.0]])],
+        Icon::WidthThin => vec![Solid(&[
+            [5.0, 11.5],
+            [19.0, 11.5],
+            [19.0, 12.5],
+            [5.0, 12.5],
+        ])],
+        Icon::WidthBold => vec![Solid(&[
+            [5.0, 10.75],
+            [19.0, 10.75],
+            [19.0, 13.25],
+            [5.0, 13.25],
+        ])],
+        Icon::WidthExtra => vec![Solid(&[
+            [5.0, 10.0],
+            [19.0, 10.0],
+            [19.0, 14.0],
+            [5.0, 14.0],
+        ])],
+        Icon::StyleSolid => vec![Poly(&[[5.0, 12.0], [19.0, 12.0]], false)],
+        Icon::StyleDashed => vec![
+            Poly(&[[4.0, 12.0], [8.0, 12.0]], false),
+            Poly(&[[10.0, 12.0], [14.0, 12.0]], false),
+            Poly(&[[16.0, 12.0], [20.0, 12.0]], false),
+        ],
+        Icon::StyleDotted => vec![
+            Dot([5.0, 12.0], 0.9),
+            Dot([9.5, 12.0], 0.9),
+            Dot([14.0, 12.0], 0.9),
+            Dot([18.5, 12.0], 0.9),
+        ],
+        Icon::RoughArchitect => vec![Poly(
+            &[
+                [4.0, 15.0],
+                [7.0, 12.0],
+                [10.0, 10.5],
+                [13.0, 11.0],
+                [16.0, 12.5],
+                [20.0, 10.0],
+            ],
+            false,
+        )],
+        Icon::RoughArtist => vec![
+            Poly(
+                &[
+                    [4.0, 15.0],
+                    [7.0, 11.5],
+                    [10.0, 9.5],
+                    [12.0, 12.0],
+                    [14.5, 14.5],
+                    [17.0, 11.0],
+                    [20.0, 9.0],
+                ],
+                false,
+            ),
+            Poly(
+                &[
+                    [5.0, 14.5],
+                    [8.0, 11.0],
+                    [11.0, 10.5],
+                    [14.0, 13.5],
+                    [20.0, 10.0],
+                ],
+                false,
+            ),
+        ],
+        Icon::RoughCartoonist => vec![
+            Poly(
+                &[
+                    [4.0, 14.0],
+                    [6.0, 10.0],
+                    [8.5, 9.5],
+                    [10.0, 13.0],
+                    [12.0, 15.0],
+                    [14.0, 12.0],
+                    [16.0, 9.0],
+                    [18.0, 10.5],
+                    [20.0, 13.0],
+                ],
+                false,
+            ),
+            Poly(
+                &[
+                    [5.0, 15.0],
+                    [9.0, 10.5],
+                    [13.0, 14.0],
+                    [17.0, 9.5],
+                    [20.0, 11.5],
+                ],
+                false,
+            ),
+        ],
+        Icon::EdgeSharp => vec![Poly(&[[6.0, 19.0], [6.0, 6.0], [19.0, 6.0]], false)],
+        Icon::EdgeRound => vec![Poly(
+            &[
+                [6.0, 19.0],
+                [6.0, 11.0],
+                [7.0, 8.0],
+                [8.5, 6.8],
+                [11.0, 6.0],
+                [19.0, 6.0],
+            ],
+            false,
+        )],
+        Icon::ArrowSharp => vec![
+            Poly(&[[5.0, 19.0], [19.0, 5.0]], false),
+            Poly(&[[12.0, 5.0], [19.0, 5.0], [19.0, 12.0]], false),
+        ],
+        Icon::ArrowCurved => vec![
+            Poly(
+                &[
+                    [5.0, 19.0],
+                    [6.0, 14.0],
+                    [8.5, 9.5],
+                    [12.5, 6.5],
+                    [18.0, 5.0],
+                ],
+                false,
+            ),
+            Poly(&[[14.0, 2.0], [18.0, 5.0], [14.5, 8.5]], false),
+        ],
+        Icon::ArrowElbow => vec![
+            Poly(
+                &[[5.0, 19.0], [12.0, 19.0], [12.0, 6.0], [19.0, 6.0]],
+                false,
+            ),
+            Poly(&[[16.0, 3.0], [19.0, 6.0], [16.0, 9.0]], false),
+        ],
+        Icon::Trash => vec![
+            Poly(&[[4.0, 7.0], [20.0, 7.0]], false),
+            Poly(&[[9.0, 7.0], [9.0, 4.0], [15.0, 4.0], [15.0, 7.0]], false),
+            Poly(&[[6.0, 7.0], [7.0, 20.0], [17.0, 20.0], [18.0, 7.0]], false),
+            Poly(&[[10.0, 11.0], [10.0, 16.0]], false),
+            Poly(&[[14.0, 11.0], [14.0, 16.0]], false),
+        ],
+        Icon::Group => vec![
+            RoundRect([3.0, 3.0, 21.0, 21.0], 2.0),
+            RoundRect([7.0, 7.0, 13.0, 13.0], 1.0),
+            RoundRect([11.0, 11.0, 17.0, 17.0], 1.0),
+        ],
+        Icon::Ungroup => vec![
+            RoundRect([4.0, 4.0, 12.0, 12.0], 1.5),
+            RoundRect([12.0, 12.0, 20.0, 20.0], 1.5),
+        ],
         Icon::Download => vec![
             Poly(&[[12.0, 4.0], [12.0, 15.0]], false),
             Poly(&[[7.0, 10.0], [12.0, 15.0], [17.0, 10.0]], false),
@@ -366,6 +547,7 @@ fn icon(i: Icon, size: f32, color: Hsla) -> impl IntoElement {
                     Part::Circle(c, r) => (circle_pts(c, r), true, false),
                     Part::Dot(c, r) => (circle_pts(c, r), true, true),
                     Part::RoundRect(r, rad) => (round_rect_pts(r, rad), true, false),
+                    Part::Solid(p) => (p.to_vec(), true, true),
                 };
                 let mut pb = if filled {
                     PathBuilder::fill()
@@ -1022,6 +1204,8 @@ fn section(title: &'static str, style: &ExcalidrawStyle) -> Div {
 }
 
 /// Excalidraw's opacity slider (0-100, steps of 10 while dragging).
+const SLIDER_W: f32 = 168.0;
+
 fn opacity_slider(
     op: f64,
     track: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
@@ -1046,7 +1230,7 @@ fn opacity_slider(
         .id("op-slider")
         .debug_selector(|| "op-slider".into())
         .relative()
-        .w(px(100.0))
+        .w(px(SLIDER_W))
         .h(px(20.0))
         .flex()
         .items_center()
@@ -1077,16 +1261,55 @@ fn opacity_slider(
                 .w_full()
                 .h(px(4.0))
                 .rounded(px(2.0))
-                .bg(style.island_border),
+                .bg(style.active_bg),
         )
         .child(
             div()
                 .absolute()
-                .left(px(100.0 * frac - 6.0))
-                .size(px(12.0))
-                .rounded(px(6.0))
-                .bg(style.selection),
+                .left(px(SLIDER_W * frac - 7.0))
+                .size(px(14.0))
+                .rounded(px(7.0))
+                .bg(style.fg),
         )
+}
+
+/// A 32×32 icon option button (stock properties panel).
+fn prop_button(
+    id: SharedString,
+    ic: Icon,
+    active: bool,
+    style: &ExcalidrawStyle,
+    on: impl Fn(&mut ExcalidrawView, &mut Window, &mut Context<ExcalidrawView>) + 'static,
+    cx: &mut Context<ExcalidrawView>,
+) -> Stateful<Div> {
+    let sel = id.to_string();
+    div()
+        .id(id)
+        .debug_selector(move || sel)
+        .size(px(32.0))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(8.0))
+        .when(active, |d| {
+            d.bg(style.active_bg)
+                .border_1()
+                .border_color(style.selection)
+        })
+        .when(!active, |d| {
+            d.bg(style.hover_bg.opacity(0.5))
+                .hover(|s| s.bg(style.hover_bg))
+        })
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+            on(this, window, cx);
+            cx.notify();
+        }))
+        .child(icon(
+            ic,
+            16.0,
+            if active { style.active_fg } else { style.fg },
+        ))
 }
 
 fn row() -> Div {
@@ -1983,11 +2206,11 @@ impl ExcalidrawView {
             if !color::is_transparent(&bgc) {
                 let mut r = row();
                 for (k, label) in [
-                    ("hachure", "Hachure"),
-                    ("cross-hatch", "Cross"),
-                    ("solid", "Solid"),
+                    ("hachure", Icon::FillHachure),
+                    ("cross-hatch", Icon::FillCross),
+                    ("solid", Icon::FillSolid),
                 ] {
-                    r = r.child(text_button(
+                    r = r.child(prop_button(
                         format!("fill-{k}").into(),
                         label,
                         fill_s == k,
@@ -2016,8 +2239,12 @@ impl ExcalidrawView {
             "freedraw",
         ]) {
             let mut r = row();
-            for (w, label) in [(1.0, "Thin"), (2.0, "Bold"), (4.0, "Extra")] {
-                r = r.child(text_button(
+            for (w, label) in [
+                (1.0, Icon::WidthThin),
+                (2.0, Icon::WidthBold),
+                (4.0, Icon::WidthExtra),
+            ] {
+                r = r.child(prop_button(
                     format!("sw-{w}").into(),
                     label,
                     (sw - w).abs() < 0.01,
@@ -2038,9 +2265,12 @@ impl ExcalidrawView {
         }
         if has(&["rectangle", "diamond", "ellipse", "arrow", "line"]) {
             let mut r = row();
-            for (k, label) in [("solid", "───"), ("dashed", "- - -"), ("dotted", "· · ·")]
-            {
-                r = r.child(text_button(
+            for (k, label) in [
+                ("solid", Icon::StyleSolid),
+                ("dashed", Icon::StyleDashed),
+                ("dotted", Icon::StyleDotted),
+            ] {
+                r = r.child(prop_button(
                     format!("ss-{k}").into(),
                     label,
                     ss == k,
@@ -2059,8 +2289,12 @@ impl ExcalidrawView {
             }
             panel = panel.child(section("Stroke style", style).child(r));
             let mut r = row();
-            for (k, label) in [(0.0, "Architect"), (1.0, "Artist"), (2.0, "Cartoonist")] {
-                r = r.child(text_button(
+            for (k, label) in [
+                (0.0, Icon::RoughArchitect),
+                (1.0, Icon::RoughArtist),
+                (2.0, Icon::RoughCartoonist),
+            ] {
+                r = r.child(prop_button(
                     format!("rg-{k}").into(),
                     label,
                     (rough - k).abs() < 0.01,
@@ -2094,8 +2328,12 @@ impl ExcalidrawView {
                 .unwrap_or(d.arrow_type.as_str())
                 .to_string();
             let mut r = row();
-            for (k, label) in [("sharp", "Sharp"), ("round", "Curved"), ("elbow", "Elbow")] {
-                r = r.child(text_button(
+            for (k, label) in [
+                ("sharp", Icon::ArrowSharp),
+                ("round", Icon::ArrowCurved),
+                ("elbow", Icon::ArrowElbow),
+            ] {
+                r = r.child(prop_button(
                     format!("at-{k}").into(),
                     label,
                     cur == k,
@@ -2108,8 +2346,8 @@ impl ExcalidrawView {
         }
         if has(&["rectangle", "diamond", "line"]) {
             let mut r = row();
-            for (k, label) in [(false, "Sharp"), (true, "Round")] {
-                r = r.child(text_button(
+            for (k, label) in [(false, Icon::EdgeSharp), (true, Icon::EdgeRound)] {
+                r = r.child(prop_button(
                     format!("edge-{k}").into(),
                     label,
                     round == k,
@@ -2162,7 +2400,50 @@ impl ExcalidrawView {
                 (Some("crowfoot_many"), "CfN"),
                 (Some("crowfoot_one_or_many"), "Cf1N"),
             ];
-            for (start, title) in [(true, "Start arrowhead"), (false, "End arrowhead")] {
+            let glyph =
+                |k: Option<&str>| heads.iter().find(|h| h.0 == k).map(|h| h.1).unwrap_or("?");
+            let mut buttons = row();
+            let mut popover = None;
+            for start in [true, false] {
+                let cur = if start { sa.clone() } else { ea.clone() };
+                let id = if start { "ah-start" } else { "ah-end" };
+                let label = match glyph(cur.as_deref()) {
+                    "None" => {
+                        if start {
+                            "×—"
+                        } else {
+                            "—×"
+                        }
+                    }
+                    "Arrow" => {
+                        if start {
+                            "←"
+                        } else {
+                            "→"
+                        }
+                    }
+                    g => g,
+                };
+                buttons = buttons.child(
+                    text_button(
+                        id.into(),
+                        label,
+                        self.ah_open == Some(start),
+                        style,
+                        move |v, _, _| {
+                            v.ah_open = if v.ah_open == Some(start) {
+                                None
+                            } else {
+                                Some(start)
+                            }
+                        },
+                        cx,
+                    )
+                    .size(px(32.0))
+                    .rounded(px(8.0)),
+                );
+            }
+            if let Some(start) = self.ah_open {
                 let cur = if start { sa.clone() } else { ea.clone() };
                 let mut r = row();
                 for (k, label) in heads {
@@ -2173,6 +2454,7 @@ impl ExcalidrawView {
                         active,
                         style,
                         move |v, _, cx| {
+                            v.ah_open = None;
                             v.apply(
                                 |e, d| {
                                     let f = if start {
@@ -2198,8 +2480,20 @@ impl ExcalidrawView {
                         cx,
                     ));
                 }
-                panel = panel.child(section(title, style).child(r));
+                popover = Some(
+                    island(style)
+                        .id("ah-popover")
+                        .debug_selector(|| "ah-popover".into())
+                        .w(px(180.0))
+                        .p(px(6.0))
+                        .child(r.w_full()),
+                );
             }
+            panel = panel.child(
+                section("Arrowheads", style)
+                    .child(buttons)
+                    .children(popover),
+            );
         }
         if has(&["text"]) {
             let mut r = row();
@@ -2306,54 +2600,23 @@ impl ExcalidrawView {
                 panel = panel.child(section("Vertical align", style).child(r));
             }
         }
-        // Opacity.
+        // Opacity: stock slider with 0 / 100 under the ends.
         {
-            let r = row()
-                .items_center()
-                .child(text_button(
-                    "op-".into(),
-                    "−",
-                    false,
-                    style,
-                    move |v, _, cx| {
-                        let o = (op - 10.0).max(0.0);
-                        v.apply(
-                            move |e, d| {
-                                e.f.opacity.set(Num(o));
-                                d.opacity = o;
-                            },
-                            cx,
-                        )
-                    },
-                    cx,
-                ))
+            let r = div()
+                .flex()
+                .flex_col()
+                .gap(px(2.0))
                 .child(opacity_slider(op, self.opacity_track.clone(), style, cx))
                 .child(
                     div()
-                        .min_w(px(28.0))
+                        .w(px(SLIDER_W))
                         .flex()
-                        .justify_center()
-                        .text_size(px(12.0))
+                        .justify_between()
+                        .text_size(px(10.0))
                         .text_color(style.fg)
-                        .child(format!("{}", op.round())),
-                )
-                .child(text_button(
-                    "op+".into(),
-                    "+",
-                    false,
-                    style,
-                    move |v, _, cx| {
-                        let o = (op + 10.0).min(100.0);
-                        v.apply(
-                            move |e, d| {
-                                e.f.opacity.set(Num(o));
-                                d.opacity = o;
-                            },
-                            cx,
-                        )
-                    },
-                    cx,
-                ));
+                        .child("0")
+                        .child("100"),
+                );
             panel = panel.child(section("Opacity", style).child(r));
         }
         if !list.is_empty() {
@@ -2418,9 +2681,9 @@ impl ExcalidrawView {
             }
             let grouped = list.iter().any(|e| !e.group_ids().is_empty());
             let r = row()
-                .child(text_button(
+                .child(prop_button(
                     "a-dup".into(),
-                    "Duplicate",
+                    Icon::Copy,
                     false,
                     style,
                     |v, _, cx| {
@@ -2429,18 +2692,18 @@ impl ExcalidrawView {
                     },
                     cx,
                 ))
-                .child(text_button(
+                .child(prop_button(
                     "a-del".into(),
-                    "Delete",
+                    Icon::Trash,
                     false,
                     style,
                     |v, _, cx| v.delete_selection(cx),
                     cx,
                 ))
                 .when(list.len() > 1, |r| {
-                    r.child(text_button(
+                    r.child(prop_button(
                         "a-grp".into(),
-                        "Group",
+                        Icon::Group,
                         false,
                         style,
                         |v, _, cx| {
@@ -2452,9 +2715,9 @@ impl ExcalidrawView {
                     ))
                 })
                 .when(grouped, |r| {
-                    r.child(text_button(
+                    r.child(prop_button(
                         "a-ungrp".into(),
-                        "Ungroup",
+                        Icon::Ungroup,
                         false,
                         style,
                         |v, _, cx| {
@@ -2465,9 +2728,9 @@ impl ExcalidrawView {
                         cx,
                     ))
                 })
-                .child(text_button(
+                .child(prop_button(
                     "a-lock".into(),
-                    "Lock",
+                    Icon::Lock,
                     false,
                     style,
                     |v, _, cx| {

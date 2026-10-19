@@ -276,6 +276,8 @@ pub struct ExcalidrawView {
     pub(crate) stats_open: bool,
     /// The toolbar's "More tools" dropdown.
     pub(crate) extra_open: bool,
+    /// Open arrowhead popover: Some(true) start, Some(false) end.
+    pub(crate) ah_open: Option<bool>,
     /// Laser-pointer trail: (time, world point, starts a new stroke).
     pub(crate) laser: Vec<(std::time::Instant, P, bool)>,
 }
@@ -357,6 +359,7 @@ impl ExcalidrawView {
             view_mode: false,
             stats_open: false,
             extra_open: false,
+            ah_open: None,
             laser: Vec::new(),
             focus: cx.focus_handle(),
             bounds: Rc::new(Cell::new(Bounds::default())),
@@ -560,11 +563,13 @@ impl ExcalidrawView {
             self.context_menu = None;
             self.picker = None;
             self.extra_open = false;
+            self.ah_open = None;
         }
     }
 
     pub fn set_tool(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
         self.extra_open = false;
+        self.ah_open = None;
         self.finish_multi(cx);
         self.commit_text(cx);
         self.tool = tool;
@@ -877,6 +882,7 @@ impl ExcalidrawView {
         window.focus(&self.focus, cx);
         self.menu_open = false;
         self.extra_open = false;
+        self.ah_open = None;
         if self.error.is_some() {
             return;
         }
