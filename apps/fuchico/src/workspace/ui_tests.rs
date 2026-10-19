@@ -154,6 +154,7 @@ async fn vault_restore_adopts_the_last_root(cx: &mut TestAppContext) {
     let (root, _) = vault("ws-restore", &["a.md"]);
     persist::set_test_dir(test_ui::temp_dir("ws-restore-cfg"));
     persist::save(persist::KEY_LAST_ROOT, &root);
+    persist::flush();
     cx.update(test_ui::init_shell);
     let (mut ui, ws) = test_ui::open_workspace(cx);
     let r = root.clone();
@@ -171,6 +172,7 @@ async fn vault_restore_forgets_a_missing_root(cx: &mut TestAppContext) {
         .to_string();
     persist::set_test_dir(test_ui::temp_dir("ws-gone-cfg"));
     persist::save(persist::KEY_LAST_ROOT, &missing);
+    persist::flush();
     cx.update(test_ui::init_shell);
     assert_eq!(
         cx.read(|cx| UiState::get(cx).last_root.clone()),
@@ -185,6 +187,7 @@ async fn vault_restore_forgets_a_missing_root(cx: &mut TestAppContext) {
         None
     );
     assert_eq!(ui.cx.read(|cx| UiState::get(cx).last_root.clone()), None);
+    persist::flush();
     assert_eq!(persist::load::<String>(persist::KEY_LAST_ROOT), None);
 }
 
