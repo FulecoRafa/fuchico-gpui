@@ -252,26 +252,75 @@ fn snapshots_compare_with_stock() {
     let lib = test_ui::temp_dir("excal-cmp-lib").join("library.excalidrawlib");
     // SAFETY: test-only; read once when each view is created.
     unsafe { std::env::set_var(fuchico_excalidraw::library::LIBRARY_ENV, &lib) };
-    type Prep = fn(&mut ExcalidrawView, &mut gpui_kit::Window, &mut gpui_kit::Context<ExcalidrawView>);
+    type Prep =
+        fn(&mut ExcalidrawView, &mut gpui_kit::Window, &mut gpui_kit::Context<ExcalidrawView>);
     let cases: &[(&str, bool, Prep)] = &[
         ("default", false, |_, _, _| {}),
         ("default-dark", true, |_, _, _| {}),
         ("menu", false, |v, _, cx| v.debug_open(DebugUi::Menu, cx)),
-        ("selected-rect", false, |v, _, cx| v.select_ids(&["el1"], cx)),
-        ("selected-arrow", false, |v, _, cx| v.select_ids(&["el4"], cx)),
-        ("selected-text", false, |v, _, cx| v.select_ids(&["el5"], cx)),
-        ("tool-rect", false, |v, w, cx| v.set_tool(Tool::Rectangle, w, cx)),
+        ("selected-rect", false, |v, _, cx| {
+            v.select_ids(&["el1"], cx)
+        }),
+        ("selected-arrow", false, |v, _, cx| {
+            v.select_ids(&["el4"], cx)
+        }),
+        ("selected-text", false, |v, _, cx| {
+            v.select_ids(&["el5"], cx)
+        }),
+        ("tool-rect", false, |v, w, cx| {
+            v.set_tool(Tool::Rectangle, w, cx)
+        }),
         ("help", false, |v, _, cx| v.debug_open(DebugUi::Help, cx)),
-        ("library", false, |v, _, cx| v.debug_open(DebugUi::Library, cx)),
-        ("ctx-canvas", false, |v, _, cx| v.debug_open(DebugUi::ContextMenu(900., 600.), cx)),
+        ("library", false, |v, _, cx| {
+            v.debug_open(DebugUi::Library, cx)
+        }),
+        ("ctx-canvas", false, |v, _, cx| {
+            v.debug_open(DebugUi::ContextMenu(900., 600.), cx)
+        }),
         ("ctx-element", false, |v, _, cx| {
             v.select_ids(&["el1"], cx);
             v.debug_open(DebugUi::ContextMenu(200., 175.), cx)
         }),
-        ("export", false, |v, _, cx| v.debug_open(DebugUi::Export, cx)),
+        ("export", false, |v, _, cx| {
+            v.debug_open(DebugUi::Export, cx)
+        }),
         ("picker", false, |v, _, cx| {
             v.select_ids(&["el1"], cx);
             v.debug_open(DebugUi::StrokePicker, cx)
+        }),
+        ("selected-rect-dark", true, |v, _, cx| {
+            v.select_ids(&["el1"], cx)
+        }),
+        ("multi-select", false, |v, _, cx| {
+            v.select_ids(&["el1", "el2", "el3", "el4", "el5"], cx)
+        }),
+        ("selected-img-tool", false, |v, w, cx| {
+            v.set_tool(Tool::Image, w, cx)
+        }),
+        ("laser", false, |v, w, cx| v.set_tool(Tool::Laser, w, cx)),
+        ("extra-tools", false, |v, _, cx| {
+            v.debug_open(DebugUi::ExtraTools, cx)
+        }),
+        ("text-to-diagram", false, |v, _, cx| {
+            v.debug_open(DebugUi::Mermaid, cx)
+        }),
+        ("lib-items", false, |v, _, cx| {
+            v.select_ids(&["el1", "el2", "el3", "el4", "el5"], cx);
+            v.debug_open(DebugUi::AddSelectionToLibrary, cx)
+        }),
+        ("lib-menu", false, |v, _, cx| {
+            v.debug_open(DebugUi::LibraryMenu, cx)
+        }),
+        ("stats", false, |v, _, cx| {
+            v.select_ids(&["el1"], cx);
+            v.debug_open(DebugUi::Stats, cx)
+        }),
+        ("zen", false, |v, _, cx| v.debug_open(DebugUi::Zen, cx)),
+        ("view-mode", false, |v, _, cx| {
+            v.debug_open(DebugUi::ViewMode, cx)
+        }),
+        ("search", false, |v, _, cx| {
+            v.debug_open(DebugUi::Search("fuchico"), cx)
         }),
     ];
     for (name, dark, prep) in cases {
@@ -289,13 +338,12 @@ fn snapshots_compare_with_stock() {
                         ExcalidrawStyle::light()
                     }
                 });
-                cx.new(|cx| {
-                    ExcalidrawView::new(COMPARE, style, Rc::new(|_, _| Ok(())), window, cx)
-                })
+                cx.new(|cx| ExcalidrawView::new(COMPARE, style, Rc::new(|_, _| Ok(())), window, cx))
             },
             move |view, window, cx| view.update(cx, |v, cx| prep(v, window, cx)),
         );
     }
 }
 
-const COMPARE: &str = include_str!("../../../../crates/fuchico-excalidraw/tests/fixtures/compare.excalidraw");
+const COMPARE: &str =
+    include_str!("../../../../crates/fuchico-excalidraw/tests/fixtures/compare.excalidraw");

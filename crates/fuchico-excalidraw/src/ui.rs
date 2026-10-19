@@ -52,6 +52,14 @@ enum Icon {
     Redo,
     Minus,
     Plus,
+    /// Library sidebar button (open book).
+    Book,
+    /// "More tools" (stock: circle, triangle and square).
+    Extra,
+    Laser,
+    Mermaid,
+    Search,
+    External,
 }
 
 fn icon_parts(i: Icon) -> Vec<Part> {
@@ -122,8 +130,8 @@ fn icon_parts(i: Icon) -> Vec<Part> {
         )],
         Icon::Ellipse => vec![Circle([12.0, 12.0], 8.5)],
         Icon::Arrow => vec![
-            Poly(&[[5.0, 19.0], [19.0, 5.0]], false),
-            Poly(&[[11.0, 5.0], [19.0, 5.0], [19.0, 13.0]], false),
+            Poly(&[[4.0, 12.0], [20.0, 12.0]], false),
+            Poly(&[[14.0, 6.0], [20.0, 12.0], [14.0, 18.0]], false),
         ],
         Icon::Line => vec![Poly(&[[4.0, 12.0], [20.0, 12.0]], false)],
         Icon::Pencil => vec![
@@ -139,10 +147,14 @@ fn icon_parts(i: Icon) -> Vec<Part> {
             ),
             Poly(&[[13.5, 6.5], [17.5, 10.5]], false),
         ],
+        // Stock's stylised "A" (outlined letter with a cross bar).
         Icon::Text => vec![
-            Poly(&[[5.0, 6.0], [5.0, 4.0], [19.0, 4.0], [19.0, 6.0]], false),
-            Poly(&[[12.0, 4.0], [12.0, 20.0]], false),
-            Poly(&[[9.5, 20.0], [14.5, 20.0]], false),
+            Poly(
+                &[[5.0, 20.0], [11.0, 4.0], [13.0, 4.0], [19.0, 20.0]],
+                false,
+            ),
+            Poly(&[[8.0, 20.0], [12.0, 9.0], [16.0, 20.0]], false),
+            Poly(&[[8.5, 15.0], [15.5, 15.0]], false),
         ],
         Icon::Image => vec![
             RoundRect([4.0, 5.0, 20.0, 19.0], 2.0),
@@ -214,6 +226,77 @@ fn icon_parts(i: Icon) -> Vec<Part> {
             ),
         ],
         Icon::Minus => vec![Poly(&[[6.0, 12.0], [18.0, 12.0]], false)],
+        Icon::Book => vec![
+            Poly(
+                &[
+                    [3.0, 5.0],
+                    [9.0, 5.0],
+                    [12.0, 7.0],
+                    [12.0, 20.0],
+                    [9.0, 18.0],
+                    [3.0, 18.0],
+                ],
+                true,
+            ),
+            Poly(
+                &[
+                    [21.0, 5.0],
+                    [15.0, 5.0],
+                    [12.0, 7.0],
+                    [12.0, 20.0],
+                    [15.0, 18.0],
+                    [21.0, 18.0],
+                ],
+                true,
+            ),
+        ],
+        Icon::Extra => vec![
+            Circle([12.0, 6.5], 3.5),
+            Circle([6.5, 16.5], 3.5),
+            RoundRect([14.0, 13.0, 21.0, 20.0], 1.0),
+        ],
+        Icon::Laser => vec![
+            Poly(&[[4.0, 20.0], [13.0, 11.0]], false),
+            Poly(
+                &[[11.0, 9.0], [15.0, 13.0], [17.0, 11.0], [13.0, 7.0]],
+                true,
+            ),
+            Poly(&[[18.0, 4.0], [18.5, 6.0]], false),
+            Poly(&[[21.0, 7.0], [19.0, 7.5]], false),
+            Poly(&[[20.5, 3.5], [19.5, 5.0]], false),
+        ],
+        Icon::Mermaid => vec![
+            Poly(
+                &[
+                    [4.0, 5.0],
+                    [8.5, 9.0],
+                    [12.0, 13.0],
+                    [15.5, 9.0],
+                    [20.0, 5.0],
+                ],
+                false,
+            ),
+            Poly(&[[12.0, 13.0], [12.0, 20.0]], false),
+            Poly(&[[9.0, 20.0], [15.0, 20.0]], false),
+        ],
+        Icon::Search => vec![
+            Circle([10.5, 10.5], 6.0),
+            Poly(&[[15.0, 15.0], [20.0, 20.0]], false),
+        ],
+        Icon::External => vec![
+            Poly(
+                &[
+                    [11.0, 5.0],
+                    [5.0, 5.0],
+                    [5.0, 19.0],
+                    [19.0, 19.0],
+                    [19.0, 13.0],
+                ],
+                false,
+            ),
+            Poly(&[[13.0, 4.0], [20.0, 4.0], [20.0, 11.0]], false),
+            Poly(&[[20.0, 4.0], [11.0, 13.0]], false),
+        ],
         Icon::Plus => vec![
             Poly(&[[6.0, 12.0], [18.0, 12.0]], false),
             Poly(&[[12.0, 6.0], [12.0, 18.0]], false),
@@ -283,6 +366,32 @@ fn icon(i: Icon, size: f32, color: Hsla) -> impl IntoElement {
 }
 
 // ---------------------------------------------------------------- canvas
+
+/// The laser pointer's fading red trail.
+fn paint_laser(
+    trail: &[(std::time::Instant, [f64; 2], bool)],
+    cam: Camera,
+    origin: Point<Pixels>,
+    window: &mut Window,
+) {
+    let decay = crate::view::LASER_DECAY.as_secs_f32();
+    for w in trail.windows(2) {
+        let (t, b, new) = w[1];
+        if new {
+            continue;
+        }
+        let life = 1.0 - t.elapsed().as_secs_f32() / decay;
+        if life <= 0.0 {
+            continue;
+        }
+        let mut pb = PathBuilder::stroke(px(1.0 + 3.0 * life));
+        pb.move_to(cam.to_screen(origin, w[0].1));
+        pb.line_to(cam.to_screen(origin, b));
+        if let Ok(p) = pb.build() {
+            window.paint_path(p, hsla(0.0, 1.0, 0.6, life));
+        }
+    }
+}
 
 struct Snapshot {
     view: Entity<ExcalidrawView>,
@@ -401,12 +510,21 @@ fn paint_canvas(
                 render::paint_frame(f, cam, origin, pal, window);
             }
             paint_overlay(v, &style, pal, origin, window);
+            paint_laser(&v.laser, cam, origin, window);
         });
+        if !v.laser.is_empty() {
+            let last = v.laser.iter().map(|l| l.0).max();
+            if last.is_some_and(|t| t.elapsed() < crate::view::LASER_DECAY) {
+                window.request_animation_frame();
+            }
+        }
 
         // Cursor.
         let cursor = match (&v.drag, v.tool) {
             (Some(Drag::Pan { .. }), _) => CursorStyle::ClosedHand,
             _ if v.space_down => CursorStyle::OpenHand,
+            (_, Tool::Laser) => CursorStyle::Crosshair,
+            _ if v.view_mode => CursorStyle::OpenHand,
             (_, Tool::Hand) => CursorStyle::OpenHand,
             (_, Tool::Text) => CursorStyle::IBeam,
             (_, Tool::Selection) => {
@@ -1018,9 +1136,11 @@ impl Render for ExcalidrawView {
             .size_full(),
         )
         .child(self.render_top(&style, cx))
-        .when(self.show_properties(), |d| {
-            d.child(self.render_properties(&style, pal, panel_h, cx))
-        })
+        .when(
+            self.show_properties() && !self.zen && !self.view_mode,
+            |d| d.child(self.render_properties(&style, pal, panel_h, cx)),
+        )
+        .when(self.stats_open, |d| d.child(self.render_stats(&style, cx)))
         .child(self.render_bottom(&style, cx))
         .when(self.menu_open, |d| {
             d.child(self.render_menu(&style, pal, cx))
@@ -1042,7 +1162,7 @@ impl Render for ExcalidrawView {
 }
 
 impl ExcalidrawView {
-    fn show_properties(&self) -> bool {
+    pub(crate) fn show_properties(&self) -> bool {
         (!self.selected.is_empty() && self.editing.is_none() || self.editing.is_some())
             || matches!(
                 self.tool,
@@ -1103,15 +1223,35 @@ impl ExcalidrawView {
                 cx,
             ));
         }
-        bar = bar.child(sep()).child(tool_button(
-            "t-frame",
-            Icon::Frame,
-            Some("F"),
-            t == Tool::Frame,
-            style,
-            |v, w, cx| v.set_tool(Tool::Frame, w, cx),
-            cx,
-        ));
+        // Stock "More tools": shows the active extra tool's icon.
+        let extra_icon = match t {
+            Tool::Frame => Icon::Frame,
+            Tool::Laser => Icon::Laser,
+            _ => Icon::Extra,
+        };
+        bar = bar.child(sep()).child(
+            div()
+                .relative()
+                .child(tool_button(
+                    "t-extra",
+                    extra_icon,
+                    None,
+                    self.extra_open || matches!(t, Tool::Frame | Tool::Laser),
+                    style,
+                    |v, _, _| v.extra_open = !v.extra_open,
+                    cx,
+                ))
+                .when(self.extra_open, |d| {
+                    d.child(
+                        div()
+                            .absolute()
+                            .top(px(46.0))
+                            .right(px(-4.0))
+                            .child(self.render_extra_tools(style, cx)),
+                    )
+                }),
+        );
+        let chrome = !self.zen && !self.view_mode;
 
         let menu =
             div()
@@ -1134,39 +1274,29 @@ impl ExcalidrawView {
             .left(px(0.0))
             .right(px(0.0))
             .child(menu)
-            .child(
-                div().absolute().top(px(16.0)).right(px(16.0)).child(
-                    island(style)
-                        .child(text_button(
-                            "lib-toggle".into(),
-                            "Library",
-                            self.library_open,
-                            style,
-                            |v, _, _| v.library_open = !v.library_open,
-                            cx,
-                        ))
-                        .child(text_button(
-                            "help".into(),
-                            "?",
-                            self.dialog == Some(crate::actions::Dialog::Help),
-                            style,
-                            |v, _, _| v.open_dialog(crate::actions::Dialog::Help),
-                            cx,
-                        )),
-                ),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .pt(px(16.0))
-                    .gap(px(6.0))
-                    .child(bar)
-                    .when_some(self.hint(), |d, h| {
-                        d.child(div().text_size(px(12.0)).text_color(style.muted).child(h))
-                    }),
-            )
+            .when(chrome && !self.library_open, |d| {
+                d.child(
+                    div()
+                        .absolute()
+                        .top(px(16.0))
+                        .right(px(16.0))
+                        .child(library_button(self.library_open, style, cx)),
+                )
+            })
+            .when(chrome, |d| {
+                d.child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .pt(px(16.0))
+                        .gap(px(6.0))
+                        .child(bar)
+                        .when_some(self.hint(), |d, h| {
+                            d.child(div().text_size(px(12.0)).text_color(style.muted).child(h))
+                        }),
+                )
+            })
     }
 
     fn render_bottom(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1201,7 +1331,76 @@ impl ExcalidrawView {
                 }))
                 .child(icon(ic, 15.0, c))
         };
-        div()
+        let exit = |id: &'static str, label: &'static str, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .debug_selector(move || id.to_string())
+                .px(px(12.0))
+                .h(px(36.0))
+                .flex()
+                .items_center()
+                .rounded(px(8.0))
+                .border_1()
+                .border_color(style.island_border)
+                .bg(style.island_bg)
+                .text_size(px(13.0))
+                .text_color(style.fg)
+                .hover(|s| s.bg(style.hover_bg))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if id == "exit-zen" {
+                        this.zen = false;
+                    } else {
+                        this.set_view_mode(false);
+                    }
+                    cx.notify();
+                }))
+                .child(label)
+        };
+        let help = div().absolute().bottom(px(16.0)).right(px(16.0)).child(
+            island(style).p(px(0.0)).child(
+                div()
+                    .id("help")
+                    .debug_selector(|| "help".into())
+                    .size(px(36.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(8.0))
+                    .hover(|s| s.bg(style.hover_bg))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.open_dialog(crate::actions::Dialog::Help);
+                        cx.notify();
+                    }))
+                    .child(
+                        div()
+                            .size(px(16.0))
+                            .rounded_full()
+                            .border_1()
+                            .border_color(style.fg)
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_size(px(10.0))
+                            .text_color(style.fg)
+                            .child("?"),
+                    ),
+            ),
+        );
+        let modes = div()
+            .absolute()
+            .bottom(px(16.0))
+            .left_0()
+            .right_0()
+            .flex()
+            .justify_center()
+            .gap(px(8.0))
+            .when(self.zen, |d| d.child(exit("exit-zen", "Exit zen mode", cx)))
+            .when(self.view_mode, |d| {
+                d.child(exit("exit-view", "Exit view mode", cx))
+            });
+        let left = div()
             .absolute()
             .bottom(px(16.0))
             .left(px(16.0))
@@ -1240,11 +1439,19 @@ impl ExcalidrawView {
                         cx,
                     )),
             )
-            .child(
-                island(style)
-                    .child(plain("undo", Icon::Undo, undo_c, |v, cx| v.undo(cx), cx))
-                    .child(plain("redo", Icon::Redo, redo_c, |v, cx| v.redo(cx), cx)),
-            )
+            .when(!self.view_mode && !self.zen, |d| {
+                d.child(
+                    island(style)
+                        .child(plain("undo", Icon::Undo, undo_c, |v, cx| v.undo(cx), cx))
+                        .child(plain("redo", Icon::Redo, redo_c, |v, cx| v.redo(cx), cx)),
+                )
+            });
+        div()
+            .absolute()
+            .inset_0()
+            .child(modes)
+            .child(left)
+            .when(!self.zen, |d| d.child(help))
     }
 
     fn render_menu(
@@ -1256,24 +1463,58 @@ impl ExcalidrawView {
         let bg = self.scene.view_background();
         let item = |id: &'static str,
                     label: &'static str,
-                    on: fn(&mut ExcalidrawView, &mut Context<ExcalidrawView>),
+                    key: &'static str,
+                    on: fn(&mut ExcalidrawView, &mut Window, &mut Context<ExcalidrawView>),
                     cx: &mut Context<Self>| {
             div()
                 .id(id)
                 .debug_selector(move || id.to_string())
+                .w_full()
+                .h(px(32.0))
                 .px(px(10.0))
-                .py(px(6.0))
+                .flex()
+                .items_center()
+                .justify_between()
                 .rounded(px(6.0))
                 .text_size(px(13.0))
                 .text_color(style.fg)
                 .hover(|s| s.bg(style.hover_bg))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    on(this, cx);
+                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     this.menu_open = false;
+                    on(this, window, cx);
                     cx.notify();
                 }))
                 .child(label)
+                .child(div().text_size(px(11.0)).text_color(style.muted).child(key))
+        };
+        let link =
+            |id: &'static str, label: &'static str, url: &'static str, cx: &mut Context<Self>| {
+                div()
+                    .id(id)
+                    .w_full()
+                    .h(px(32.0))
+                    .px(px(10.0))
+                    .flex()
+                    .items_center()
+                    .gap(px(8.0))
+                    .rounded(px(6.0))
+                    .text_size(px(13.0))
+                    .text_color(style.fg)
+                    .hover(|s| s.bg(style.hover_bg))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.menu_open = false;
+                        cx.open_url(url);
+                    }))
+                    .child(icon(Icon::External, 14.0, style.fg))
+                    .child(label)
+            };
+        let sep = || {
+            div()
+                .my(px(4.0))
+                .h(px(1.0))
+                .w_full()
+                .bg(style.island_border)
         };
         let mut swatches = row();
         for c in CANVAS_BG {
@@ -1297,28 +1538,269 @@ impl ExcalidrawView {
             |v, _, _| v.toggle_picker(PickerTarget::Canvas),
             cx,
         ));
+        use crate::actions::Dialog;
+        let view_only = self.view_mode;
         div().absolute().top(px(64.0)).left(px(16.0)).child(
             island(style)
+                .id("main-menu")
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .flex_col()
                 .items_start()
-                .w(px(220.0))
+                .w(px(240.0))
                 .p(px(8.0))
-                .gap(px(4.0))
+                .gap(px(0.0))
+                .when(!view_only, |d| {
+                    d.child(item(
+                        "m-open",
+                        "Open",
+                        "⌘O",
+                        |v, _, cx| v.open_scene_prompt(cx),
+                        cx,
+                    ))
+                })
                 .child(item(
-                    "m-fit",
-                    "Zoom to fit all elements",
-                    |v, _| v.zoom_to_fit(),
+                    "m-save",
+                    "Save to...",
+                    "",
+                    |v, _, cx| v.save_scene_prompt(cx),
                     cx,
                 ))
                 .child(item(
-                    "m-reset",
-                    "Reset the canvas",
-                    |v, cx| v.reset_canvas(cx),
+                    "m-export",
+                    "Export image...",
+                    "⌘⇧E",
+                    |v, _, _| v.open_dialog(Dialog::Export),
                     cx,
                 ))
-                .child(div().h(px(1.0)).w_full().bg(style.island_border))
-                .child(section("Canvas background", style).child(swatches)),
+                .child(item(
+                    "m-find",
+                    "Find on canvas",
+                    "⌘F",
+                    |v, _, _| v.open_search(),
+                    cx,
+                ))
+                .child(item(
+                    "m-help",
+                    "Help",
+                    "?",
+                    |v, _, _| v.open_dialog(Dialog::Help),
+                    cx,
+                ))
+                .when(!view_only, |d| {
+                    d.child(item(
+                        "m-reset",
+                        "Reset the canvas",
+                        "",
+                        |v, _, cx| v.reset_canvas(cx),
+                        cx,
+                    ))
+                })
+                .child(sep())
+                .child(
+                    div()
+                        .px(px(10.0))
+                        .py(px(4.0))
+                        .text_size(px(11.0))
+                        .text_color(style.muted)
+                        .child("Excalidraw links"),
+                )
+                .child(link(
+                    "m-github",
+                    "GitHub",
+                    "https://github.com/excalidraw/excalidraw",
+                    cx,
+                ))
+                .child(link(
+                    "m-follow",
+                    "Follow us",
+                    "https://x.com/excalidraw",
+                    cx,
+                ))
+                .child(link(
+                    "m-discord",
+                    "Discord chat",
+                    "https://discord.gg/UexuTaE",
+                    cx,
+                ))
+                .when(!view_only, |d| {
+                    d.child(sep()).child(
+                        div()
+                            .px(px(10.0))
+                            .py(px(4.0))
+                            .child(section("Canvas background", style).child(swatches)),
+                    )
+                }),
         )
+    }
+
+    fn render_extra_tools(
+        &self,
+        style: &ExcalidrawStyle,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let t = self.tool;
+        let item = |id: &'static str,
+                    ic: Icon,
+                    label: &'static str,
+                    key: &'static str,
+                    active: bool,
+                    on: fn(&mut ExcalidrawView, &mut Window, &mut Context<ExcalidrawView>),
+                    cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .debug_selector(move || id.to_string())
+                .w_full()
+                .h(px(32.0))
+                .px(px(10.0))
+                .flex()
+                .items_center()
+                .gap(px(10.0))
+                .rounded(px(6.0))
+                .when(active, |d| d.bg(style.active_bg))
+                .hover(|s| s.bg(style.hover_bg))
+                .text_size(px(13.0))
+                .text_color(style.fg)
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    this.extra_open = false;
+                    on(this, window, cx);
+                    cx.notify();
+                }))
+                .child(icon(ic, 15.0, style.fg))
+                .child(div().flex_1().child(label))
+                .child(div().text_size(px(11.0)).text_color(style.muted).child(key))
+        };
+        island(style)
+            .id("extra-tools")
+            .debug_selector(|| "extra-tools".into())
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .flex_col()
+            .items_start()
+            .w(px(200.0))
+            .p(px(6.0))
+            .gap(px(0.0))
+            .child(item(
+                "x-frame",
+                Icon::Frame,
+                "Frame tool",
+                "F",
+                t == Tool::Frame,
+                |v, w, cx| v.set_tool(Tool::Frame, w, cx),
+                cx,
+            ))
+            .child(item(
+                "x-laser",
+                Icon::Laser,
+                "Laser pointer",
+                "K",
+                t == Tool::Laser,
+                |v, w, cx| v.set_tool(Tool::Laser, w, cx),
+                cx,
+            ))
+            .child(
+                div()
+                    .px(px(10.0))
+                    .pt(px(6.0))
+                    .pb(px(2.0))
+                    .text_size(px(12.0))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(style.fg)
+                    .child("Generate"),
+            )
+            .child(item(
+                "x-mermaid",
+                Icon::Mermaid,
+                "Mermaid to Excalidraw",
+                "",
+                false,
+                |v, _, _| v.open_dialog(crate::actions::Dialog::Mermaid),
+                cx,
+            ))
+    }
+
+    fn render_stats(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
+        let kv = |k: &'static str, v: String| {
+            div()
+                .flex()
+                .w_full()
+                .justify_between()
+                .text_size(px(12.0))
+                .text_color(style.fg)
+                .child(div().text_color(style.muted).child(k))
+                .child(v)
+        };
+        let n = self.scene.elements().count();
+        let bb = self.scene.elements().map(geom::aabb).reduce(geom::union);
+        let (sw, sh) = bb.map(|b| (b[2] - b[0], b[3] - b[1])).unwrap_or((0.0, 0.0));
+        let mut panel = island(style)
+            .id("stats")
+            .debug_selector(|| "stats".into())
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .flex_col()
+            .items_start()
+            .w(px(220.0))
+            .p(px(12.0))
+            .gap(px(6.0))
+            .child(
+                div()
+                    .flex()
+                    .w_full()
+                    .justify_between()
+                    .items_center()
+                    .child(
+                        div()
+                            .text_size(px(14.0))
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(style.fg)
+                            .child("Stats"),
+                    )
+                    .child(text_button(
+                        "stats-close".into(),
+                        "×",
+                        false,
+                        style,
+                        |v, _, _| v.stats_open = false,
+                        cx,
+                    )),
+            )
+            .child(section("General", style))
+            .child(kv("Shapes", n.to_string()))
+            .child(kv("Width", format!("{}", sw.round())))
+            .child(kv("Height", format!("{}", sh.round())));
+        let list = self.selection_list();
+        if list.len() == 1 {
+            let e = list[0];
+            panel = panel
+                .child(section("Element properties", style))
+                .child(kv("Type", e.kind.clone()))
+                .child(kv("X", format!("{}", e.x().round())))
+                .child(kv("Y", format!("{}", e.y().round())))
+                .child(kv("W", format!("{}", e.width().round())))
+                .child(kv("H", format!("{}", e.height().round())))
+                .child(kv("A", format!("{}°", e.angle().to_degrees().round())));
+            if e.kind == "text" {
+                panel = panel.child(kv("Font size", format!("{}", e.font_size().round())));
+            }
+        } else if list.len() > 1 {
+            let b = list
+                .iter()
+                .map(|e| geom::aabb(e))
+                .reduce(geom::union)
+                .unwrap();
+            panel = panel
+                .child(section("Element properties", style))
+                .child(kv("Shapes", list.len().to_string()))
+                .child(kv("X", format!("{}", b[0].round())))
+                .child(kv("Y", format!("{}", b[1].round())))
+                .child(kv("W", format!("{}", (b[2] - b[0]).round())))
+                .child(kv("H", format!("{}", (b[3] - b[1]).round())));
+        }
+        let top = if self.zen || self.view_mode {
+            16.0
+        } else {
+            64.0
+        };
+        div().absolute().top(px(top)).right(px(16.0)).child(panel)
     }
 
     fn render_properties(
@@ -2003,58 +2485,195 @@ fn render_toast(msg: String, style: &ExcalidrawStyle) -> impl IntoElement {
         )
 }
 
-/// Excalidraw's keyboard shortcuts, grouped as in its help dialog.
-const HELP: &[(&str, &[(&str, &str)])] = &[
+/// Excalidraw's keyboard shortcuts in its help dialog's order and grouping,
+/// limited to what this editor implements. Each entry: label and the
+/// alternative key sequences ("or" between them).
+type Keys = &'static [&'static [&'static str]];
+const HELP: &[(&str, &[(&str, Keys)])] = &[
     (
         "Tools",
         &[
-            ("Hand (panning tool)", "H"),
-            ("Selection", "V / 1"),
-            ("Rectangle", "R / 2"),
-            ("Diamond", "D / 3"),
-            ("Ellipse", "O / 4"),
-            ("Arrow", "A / 5"),
-            ("Line", "L / 6"),
-            ("Draw", "P / 7"),
-            ("Text", "T / 8"),
-            ("Insert image", "9"),
-            ("Eraser", "E / 0"),
-            ("Keep selected tool active", "Q"),
+            ("Hand (panning tool)", &[&["H"]]),
+            ("Selection", &[&["V"], &["1"]]),
+            ("Rectangle", &[&["R"], &["2"]]),
+            ("Diamond", &[&["D"], &["3"]]),
+            ("Ellipse", &[&["O"], &["4"]]),
+            ("Arrow", &[&["A"], &["5"]]),
+            ("Line", &[&["L"], &["6"]]),
+            ("Draw", &[&["P"], &["7"]]),
+            ("Text", &[&["T"], &["8"]]),
+            ("Insert image", &[&["9"]]),
+            ("Eraser", &[&["E"], &["0"]]),
+            ("Frame tool", &[&["F"]]),
+            ("Laser pointer", &[&["K"]]),
+            (
+                "Pick color from canvas",
+                &[&["I"], &["Shift", "S"], &["Shift", "G"]],
+            ),
+            ("Edit text / add label", &[&["Enter"]]),
+            (
+                "Add new line (text editor)",
+                &[&["Enter"], &["Shift", "Enter"]],
+            ),
+            (
+                "Finish editing (text editor)",
+                &[&["Esc"], &["Cmd", "Enter"]],
+            ),
+            ("Curved arrow", &[&["A", "click", "click", "click"]]),
+            ("Curved line", &[&["L", "click", "click", "click"]]),
+            ("Keep selected tool active after drawing", &[&["Q"]]),
         ],
     ),
     (
         "View",
         &[
-            ("Zoom in", "⌘ +"),
-            ("Zoom out", "⌘ -"),
-            ("Reset zoom", "⌘ 0"),
-            ("Zoom to fit all elements", "⇧ 1"),
-            ("Toggle grid", "⌘ '"),
-            ("Snap to objects", "⌥ S"),
-            ("Move canvas", "Space + drag, wheel"),
+            ("Zoom in", &[&["Cmd", "+"]]),
+            ("Zoom out", &[&["Cmd", "-"]]),
+            ("Reset zoom", &[&["Cmd", "0"]]),
+            ("Zoom to fit all elements", &[&["Shift", "1"]]),
+            ("Zoom to selection", &[&["Shift", "2"]]),
+            ("Move page up/down", &[&["PgUp/PgDn"]]),
+            ("Move page left/right", &[&["Shift", "PgUp/PgDn"]]),
+            ("Zen mode", &[&["Option", "Z"]]),
+            ("Snap to objects", &[&["Option", "S"]]),
+            ("Toggle grid", &[&["Cmd", "'"]]),
+            ("View mode", &[&["Option", "R"]]),
+            ("Canvas & Shape properties", &[&["Option", "/"]]),
+            ("Find on canvas", &[&["Cmd", "F"]]),
         ],
     ),
     (
         "Editor",
         &[
-            ("Undo / Redo", "⌘ Z / ⌘ ⇧ Z"),
-            ("Cut / Copy / Paste", "⌘ X / C / V"),
-            ("Copy as PNG", "⇧ ⌥ C"),
-            ("Copy / paste styles", "⌘ ⌥ C / V"),
-            ("Select all", "⌘ A"),
-            ("Duplicate", "⌘ D"),
-            ("Delete", "⌫"),
-            ("Group / Ungroup", "⌘ G / ⌘ ⇧ G"),
-            ("Send backward / Bring forward", "⌘ [ / ⌘ ]"),
-            ("Send to back / Bring to front", "⌘ ⇧ [ / ]"),
-            ("Flip horizontal / vertical", "⇧ H / ⇧ V"),
-            ("Lock / unlock", "⌘ ⇧ L"),
-            ("Edit text / add label", "Enter"),
-            ("Export image", "⌘ ⇧ E"),
-            ("Help", "?"),
+            ("Move canvas", &[&["Space", "drag"], &["Wheel", "drag"]]),
+            ("Reset the canvas", &[&["Cmd", "Delete"]]),
+            ("Delete", &[&["Delete"]]),
+            ("Cut", &[&["Cmd", "X"]]),
+            ("Copy", &[&["Cmd", "C"]]),
+            ("Paste", &[&["Cmd", "V"]]),
+            ("Select all", &[&["Cmd", "A"]]),
+            ("Add element to selection", &[&["Shift", "click"]]),
+            ("Copy to clipboard as PNG", &[&["Shift", "Option", "C"]]),
+            ("Copy styles", &[&["Cmd", "Option", "C"]]),
+            ("Paste styles", &[&["Cmd", "Option", "V"]]),
+            ("Send to back", &[&["Cmd", "Option", "["]]),
+            ("Bring to front", &[&["Cmd", "Option", "]"]]),
+            ("Send backward", &[&["Cmd", "["]]),
+            ("Bring forward", &[&["Cmd", "]"]]),
+            ("Align top", &[&["Cmd", "Shift", "Up"]]),
+            ("Align bottom", &[&["Cmd", "Shift", "Down"]]),
+            ("Align left", &[&["Cmd", "Shift", "Left"]]),
+            ("Align right", &[&["Cmd", "Shift", "Right"]]),
+            ("Duplicate", &[&["Cmd", "D"], &["Option", "drag"]]),
+            ("Lock/unlock selection", &[&["Cmd", "Shift", "L"]]),
+            ("Undo", &[&["Cmd", "Z"]]),
+            ("Redo", &[&["Cmd", "Shift", "Z"]]),
+            ("Group selection", &[&["Cmd", "G"]]),
+            ("Ungroup selection", &[&["Cmd", "Shift", "G"]]),
+            ("Flip horizontal", &[&["Shift", "H"]]),
+            ("Flip vertical", &[&["Shift", "V"]]),
+            ("Show stroke color picker", &[&["S"]]),
+            ("Show background color picker", &[&["G"]]),
+            ("Decrease font size", &[&["Cmd", "Shift", "<"]]),
+            ("Increase font size", &[&["Cmd", "Shift", ">"]]),
         ],
     ),
 ];
+
+/// Links in the help dialog's header (stock order).
+const HELP_LINKS: [(&str, &str); 4] = [
+    ("Documentation", "https://docs.excalidraw.com"),
+    ("Read our blog", "https://plus.excalidraw.com/blog"),
+    (
+        "Found an issue? Submit",
+        "https://github.com/excalidraw/excalidraw/issues",
+    ),
+    ("YouTube", "https://youtube.com/@excalidraw"),
+];
+
+/// Default definition the stock Mermaid dialog starts with.
+const MERMAID_SAMPLE: &str = "flowchart TD\n A[Christmas] -->|Get money| B(Go shopping)\n B --> C{Let me think}\n C -->|One| D[Laptop]\n C -->|Two| E[iPhone]\n C -->|Three| F[Car]";
+
+fn library_button(
+    open: bool,
+    style: &ExcalidrawStyle,
+    cx: &mut Context<ExcalidrawView>,
+) -> impl IntoElement {
+    div()
+        .id("lib-toggle")
+        .debug_selector(|| "lib-toggle".into())
+        .occlude()
+        .h(px(36.0))
+        .px(px(12.0))
+        .flex()
+        .items_center()
+        .gap(px(8.0))
+        .rounded(px(8.0))
+        .bg(if open {
+            style.active_bg
+        } else {
+            style.hover_bg
+        })
+        .hover(|s| s.bg(style.active_bg))
+        .text_size(px(13.0))
+        .text_color(style.fg)
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .on_click(cx.listener(|v, _: &ClickEvent, _, cx| {
+            v.library_open = !v.library_open;
+            cx.notify();
+        }))
+        .child(icon(Icon::Book, 16.0, style.fg))
+        .child("Library")
+}
+
+/// A key chip in the help dialog.
+fn key_chip(k: &'static str, style: &ExcalidrawStyle) -> Div {
+    div()
+        .px(px(6.0))
+        .h(px(22.0))
+        .flex()
+        .items_center()
+        .rounded(px(4.0))
+        .bg(style.active_bg)
+        .text_size(px(10.0))
+        .text_color(style.fg)
+        .child(k)
+}
+
+/// Paints a library item's elements fitted into `b`.
+fn paint_thumbnail(
+    els: &[Element],
+    b: Bounds<Pixels>,
+    caches: &std::rc::Rc<std::cell::RefCell<render::Caches>>,
+    pal: Palette,
+    window: &mut Window,
+) {
+    let Some(bb) = els.iter().map(geom::aabb).reduce(geom::union) else {
+        return;
+    };
+    let pad = 8.0;
+    let (w, h) = (
+        f64::from(f32::from(b.size.width)) - 2.0 * pad,
+        f64::from(f32::from(b.size.height)) - 2.0 * pad,
+    );
+    let (bw, bh) = ((bb[2] - bb[0]).max(1.0), (bb[3] - bb[1]).max(1.0));
+    let zoom = (w / bw).min(h / bh).min(1.0);
+    let cam = Camera {
+        scroll_x: (w / 2.0 + pad) / zoom - (bb[0] + bb[2]) / 2.0,
+        scroll_y: (h / 2.0 + pad) / zoom - (bb[1] + bb[3]) / 2.0,
+        zoom,
+    };
+    let mut scene = crate::scene::Scene::default();
+    for e in els {
+        scene.add(e.clone());
+    }
+    let mut caches = caches.borrow_mut();
+    window.with_content_mask(Some(ContentMask { bounds: b }), |window| {
+        for el in scene.elements() {
+            render::paint_element(el, &scene, &mut caches, cam, b.origin, pal, 1.0, window);
+        }
+    });
+}
 
 /// A library item being dragged onto the canvas.
 #[derive(Clone)]
@@ -2080,25 +2699,270 @@ impl Render for LibraryDrag {
 
 impl ExcalidrawView {
     fn render_library(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
-        let mut list = div()
-            .id("lib-list")
+        let pal = self.palette(cx);
+        let tab =
+            |id: &'static str, ic: Icon, active: bool, search: bool, cx: &mut Context<Self>| {
+                div()
+                    .id(id)
+                    .debug_selector(move || id.to_string())
+                    .size(px(36.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(8.0))
+                    .when(active, |d| d.bg(style.selection))
+                    .when(!active, |d| d.hover(|s| s.bg(style.hover_bg)))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |v, _: &ClickEvent, _, cx| {
+                        v.sidebar_search = search;
+                        v.search_focus = search;
+                        v.lib_menu = false;
+                        cx.notify();
+                    }))
+                    .child(icon(
+                        ic,
+                        16.0,
+                        if active { style.island_bg } else { style.fg },
+                    ))
+            };
+        let header = div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .pb(px(10.0))
+            .border_b_1()
+            .border_color(style.island_border)
+            .child(
+                div()
+                    .flex()
+                    .p(px(2.0))
+                    .rounded(px(10.0))
+                    .border_1()
+                    .border_color(style.island_border)
+                    .child(tab(
+                        "sb-search",
+                        Icon::Search,
+                        self.sidebar_search,
+                        true,
+                        cx,
+                    ))
+                    .child(tab(
+                        "sb-library",
+                        Icon::Book,
+                        !self.sidebar_search,
+                        false,
+                        cx,
+                    )),
+            )
+            .child(text_button(
+                "lib-close".into(),
+                "×",
+                false,
+                style,
+                |v, _, _| {
+                    v.library_open = false;
+                    v.search_focus = false;
+                    v.lib_menu = false;
+                },
+                cx,
+            ));
+        let body = if self.sidebar_search {
+            self.render_search(style, cx).into_any_element()
+        } else {
+            self.render_library_tab(style, pal, cx).into_any_element()
+        };
+        div()
+            .id("library")
+            .debug_selector(|| "library".into())
+            .occlude()
+            .absolute()
+            .top_0()
+            .right_0()
+            .bottom_0()
+            .w(px(302.0))
             .flex()
             .flex_col()
-            .gap(px(4.0))
-            .w_full()
-            .max_h(px(420.0))
-            .overflow_y_scroll();
-        if self.library.items.is_empty() {
-            list = list.child(
+            .p(px(12.0))
+            .gap(px(12.0))
+            .bg(style.island_bg)
+            .border_l_1()
+            .border_color(style.island_border)
+            .shadow_sm()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(header)
+            .child(body)
+    }
+
+    fn render_search(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
+        let matches = self.search_matches();
+        let q = self.search_query.clone();
+        let field_text: SharedString = if q.is_empty() && !self.search_focus {
+            "Find on canvas".into()
+        } else if self.search_focus {
+            format!("{q}▏").into()
+        } else {
+            q.clone().into()
+        };
+        let field = div()
+            .id("search-input")
+            .debug_selector(|| "search-input".into())
+            .h(px(36.0))
+            .px(px(10.0))
+            .flex()
+            .items_center()
+            .gap(px(8.0))
+            .rounded(px(8.0))
+            .border_1()
+            .border_color(if self.search_focus {
+                style.selection
+            } else {
+                style.island_border
+            })
+            .text_size(px(13.0))
+            .text_color(if q.is_empty() && !self.search_focus {
+                style.muted
+            } else {
+                style.fg
+            })
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_click(cx.listener(|v, _: &ClickEvent, _, cx| {
+                v.search_focus = true;
+                cx.notify();
+            }))
+            .child(icon(Icon::Search, 14.0, style.muted))
+            .child(field_text);
+        let mut col = div().flex().flex_col().gap(px(6.0)).child(field);
+        if !q.trim().is_empty() {
+            let count = match matches.len() {
+                0 => "No matches".to_string(),
+                1 => "1 result".to_string(),
+                n => format!("{n} results"),
+            };
+            col = col.child(
                 div()
+                    .id("search-count")
+                    .debug_selector(|| "search-count".into())
                     .text_size(px(12.0))
                     .text_color(style.muted)
-                    .child("No items yet. Select elements and press “Add selection”, or import a .excalidrawlib file."),
+                    .child(count),
+            );
+            let ql = q.trim().to_lowercase();
+            let mut list = div()
+                .id("search-results")
+                .flex()
+                .flex_col()
+                .gap(px(2.0))
+                .overflow_y_scroll();
+            for (i, id) in matches.iter().enumerate() {
+                let Some(el) = self.scene.get(id) else {
+                    continue;
+                };
+                let text = el.text().replace('\n', " ");
+                let preview: String = text.chars().take(80).collect();
+                let lower = preview.to_lowercase();
+                // Highlight the first hit (char-aligned when lowercase keeps length).
+                let parts = lower
+                    .find(&ql)
+                    .filter(|_| lower.len() == preview.len())
+                    .map(|s| {
+                        let e = s + ql.len();
+                        (
+                            preview[..s].to_string(),
+                            preview[s..e].to_string(),
+                            preview[e..].to_string(),
+                        )
+                    })
+                    .unwrap_or((preview.clone(), String::new(), String::new()));
+                let sel = format!("search-hit-{i}");
+                let active = i == self.search_index && self.selected.len() == 1;
+                list = list.child(
+                    div()
+                        .id(SharedString::from(sel.clone()))
+                        .debug_selector(move || sel)
+                        .px(px(8.0))
+                        .py(px(6.0))
+                        .rounded(px(6.0))
+                        .flex()
+                        .text_size(px(13.0))
+                        .text_color(style.fg)
+                        .when(active, |d| d.bg(style.active_bg))
+                        .hover(|s| s.bg(style.hover_bg))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .on_click(cx.listener(move |v, _: &ClickEvent, _, cx| {
+                            v.focus_match(i);
+                            cx.notify();
+                        }))
+                        .child(parts.0)
+                        .child(
+                            div()
+                                .bg(gpui_kit::rgba(0xffc94a99))
+                                .rounded(px(2.0))
+                                .child(parts.1),
+                        )
+                        .child(parts.2),
+                );
+            }
+            col = col.child(list);
+        }
+        col
+    }
+
+    fn render_library_tab(
+        &self,
+        style: &ExcalidrawStyle,
+        pal: Palette,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        const CELL: f32 = 62.0;
+        let heading = |t: &'static str| {
+            div()
+                .text_size(px(16.0))
+                .font_weight(FontWeight::BOLD)
+                .text_color(style.selection)
+                .child(t)
+        };
+        let mut grid = div()
+            .id("lib-list")
+            .flex()
+            .flex_wrap()
+            .gap(px(8.0))
+            .w_full();
+        let can_add = !self.selected.is_empty();
+        if can_add {
+            grid = grid.child(
+                div()
+                    .id("lib-add")
+                    .debug_selector(|| "lib-add".into())
+                    .size(px(CELL))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(8.0))
+                    .border_1()
+                    .border_color(style.island_border)
+                    .hover(|s| s.bg(style.hover_bg))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(
+                        cx.listener(|v, _: &ClickEvent, _, cx| v.add_selection_to_library(cx)),
+                    )
+                    .child(
+                        div()
+                            .size(px(26.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(6.0))
+                            .bg(style.selection)
+                            .text_color(style.island_bg)
+                            .text_size(px(18.0))
+                            .child("+"),
+                    ),
             );
         }
         for (i, item) in self.library.items.iter().enumerate() {
             let id = crate::library::item_id(item).to_string();
-            let n = crate::library::item_elements(item).len();
+            let els = crate::library::item_elements(item);
+            let n = els.len();
             let name: SharedString = crate::library::item_name(item)
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string())
@@ -2111,94 +2975,195 @@ impl ExcalidrawView {
                 })
                 .into();
             let sel = format!("lib-item-{i}");
-            let (id2, id3, name2) = (id.clone(), id.clone(), name.clone());
-            list = list.child(
+            let (id2, id3) = (id.clone(), id.clone());
+            let caches = self.lib_caches.clone();
+            grid = grid.child(
                 div()
-                    .flex()
-                    .items_center()
-                    .gap(px(4.0))
+                    .id(SharedString::from(sel.clone()))
+                    .debug_selector(move || sel)
+                    .group("lib-cell")
+                    .relative()
+                    .size(px(CELL))
+                    .rounded(px(8.0))
+                    .border_1()
+                    .border_color(style.island_border)
+                    .bg(pal.canvas.to_hsla())
+                    .overflow_hidden()
+                    .hover(|s| s.border_color(style.selection))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.insert_library_item(&id2, None, cx)
+                    }))
+                    .on_drag(
+                        LibraryDrag {
+                            id: id3,
+                            name: name.clone(),
+                        },
+                        |d, _, _, cx| cx.new(|_| d.clone()),
+                    )
+                    .child(
+                        canvas(
+                            |_, _, _| (),
+                            move |b, _, window, _| paint_thumbnail(&els, b, &caches, pal, window),
+                        )
+                        .absolute()
+                        .inset_0(),
+                    )
                     .child(
                         div()
-                            .id(SharedString::from(sel.clone()))
-                            .debug_selector(move || sel)
-                            .flex_1()
-                            .h(px(32.0))
-                            .px(px(8.0))
-                            .flex()
-                            .items_center()
-                            .rounded(px(6.0))
-                            .border_1()
-                            .border_color(style.island_border)
-                            .text_size(px(12.0))
-                            .text_color(style.fg)
-                            .hover(|s| s.bg(style.hover_bg))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                this.insert_library_item(&id2, None, cx)
-                            }))
-                            .on_drag(
-                                LibraryDrag {
-                                    id: id3,
-                                    name: name2,
-                                },
-                                |d, _, _, cx| cx.new(|_| d.clone()),
-                            )
-                            .child(name),
-                    )
-                    .child(text_button(
-                        format!("lib-remove-{i}").into(),
-                        "×",
-                        false,
-                        style,
-                        move |v, _, _| v.library.remove(&id),
-                        cx,
-                    )),
+                            .absolute()
+                            .top(px(1.0))
+                            .right(px(1.0))
+                            .invisible()
+                            .group_hover("lib-cell", |s| s.visible())
+                            .child(
+                                text_button(
+                                    format!("lib-remove-{i}").into(),
+                                    "×",
+                                    false,
+                                    style,
+                                    move |v, _, _| v.library.remove(&id),
+                                    cx,
+                                )
+                                .min_w(px(18.0))
+                                .h(px(18.0))
+                                .px(px(2.0)),
+                            ),
+                    ),
             );
         }
-        div().absolute().top(px(64.0)).right(px(16.0)).child(
+        let lib_menu = self.lib_menu.then(|| {
+            let mi = |id: &'static str,
+                      label: &'static str,
+                      on: fn(&mut ExcalidrawView, &mut Context<ExcalidrawView>),
+                      cx: &mut Context<Self>| {
+                div()
+                    .id(id)
+                    .debug_selector(move || id.to_string())
+                    .w_full()
+                    .h(px(30.0))
+                    .px(px(10.0))
+                    .flex()
+                    .items_center()
+                    .rounded(px(6.0))
+                    .text_size(px(13.0))
+                    .text_color(style.fg)
+                    .hover(|s| s.bg(style.hover_bg))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |v, _: &ClickEvent, _, cx| {
+                        v.lib_menu = false;
+                        on(v, cx);
+                        cx.notify();
+                    }))
+                    .child(label)
+            };
             island(style)
-                .id("library")
-                .debug_selector(|| "library".into())
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .id("lib-menu")
+                .debug_selector(|| "lib-menu".into())
+                .absolute()
+                .top(px(30.0))
+                .right_0()
+                .w(px(180.0))
                 .flex_col()
                 .items_start()
-                .w(px(260.0))
-                .p(px(10.0))
+                .child(mi(
+                    "lib-import",
+                    "Open",
+                    |v, cx| v.import_library_prompt(cx),
+                    cx,
+                ))
+                .child(mi(
+                    "lib-export",
+                    "Save to...",
+                    |v, cx| v.export_library_prompt(cx),
+                    cx,
+                ))
+                .child(mi(
+                    "lib-reset",
+                    "Reset library",
+                    |v, cx| v.reset_library(cx),
+                    cx,
+                ))
+        });
+        let empty = |title: &'static str, sub: Option<&'static str>| {
+            div()
+                .w_full()
+                .py(px(24.0))
+                .flex()
+                .flex_col()
+                .items_center()
                 .gap(px(8.0))
-                .child(
-                    div()
-                        .text_size(px(14.0))
-                        .text_color(style.fg)
-                        .child("Library"),
-                )
-                .child(
-                    row()
-                        .child(text_button(
-                            "lib-add".into(),
-                            "Add selection",
-                            false,
-                            style,
-                            |v, _, cx| v.add_selection_to_library(cx),
-                            cx,
+                .child(div().text_size(px(14.0)).text_color(style.fg).child(title))
+                .when_some(sub, |d, s| {
+                    d.child(
+                        div()
+                            .text_size(px(12.0))
+                            .text_color(style.muted)
+                            .text_center()
+                            .child(s),
+                    )
+                })
+        };
+        div()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .gap(px(12.0))
+            .min_h_0()
+            .child(
+                div()
+                    .id("lib-scroll")
+                    .flex_1()
+                    .flex()
+                    .flex_col()
+                    .gap(px(12.0))
+                    .overflow_y_scroll()
+                    .child(
+                        div()
+                            .relative()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(heading("Personal Library"))
+                            .child(text_button(
+                                "lib-more".into(),
+                                "⋮",
+                                self.lib_menu,
+                                style,
+                                |v, _, _| v.lib_menu = !v.lib_menu,
+                                cx,
+                            ))
+                            .children(lib_menu),
+                    )
+                    .when(self.library.items.is_empty() && !can_add, |d| {
+                        d.child(empty(
+                            "No items added yet...",
+                            Some(
+                                "Select an item on canvas to add it here, or install a library from the public repository, below.",
+                            ),
                         ))
-                        .child(text_button(
-                            "lib-import".into(),
-                            "Import",
-                            false,
-                            style,
-                            |v, _, cx| v.import_library_prompt(cx),
-                            cx,
-                        ))
-                        .child(text_button(
-                            "lib-export".into(),
-                            "Export",
-                            false,
-                            style,
-                            |v, _, cx| v.export_library_prompt(cx),
-                            cx,
-                        )),
-                )
-                .child(list),
-        )
+                    })
+                    .child(grid),
+            )
+            .child(
+                div()
+                    .id("lib-browse")
+                    .debug_selector(|| "lib-browse".into())
+                    .h(px(36.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(8.0))
+                    .bg(style.selection)
+                    .text_color(style.island_bg)
+                    .text_size(px(13.0))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(|_, _: &ClickEvent, _, cx| {
+                        cx.open_url("https://libraries.excalidraw.com")
+                    }))
+                    .child("Browse libraries"),
+            )
     }
 
     fn render_picker(
@@ -2413,6 +3378,8 @@ impl ExcalidrawView {
         let title = match dlg {
             Dialog::Export => "Export image",
             Dialog::Help => "Help",
+            Dialog::Mermaid => "Mermaid to Excalidraw",
+            Dialog::ResetLibrary => "Reset library",
         };
         let close = text_button(
             "dlg-close".into(),
@@ -2430,8 +3397,43 @@ impl ExcalidrawView {
             .child(div().text_size(px(16.0)).text_color(style.fg).child(title))
             .child(close);
         let body = match dlg {
-            Dialog::Help => self.render_help(style).into_any_element(),
+            Dialog::Help => self.render_help(style, cx).into_any_element(),
+            Dialog::Mermaid => self.render_mermaid(style).into_any_element(),
             Dialog::Export => self.render_export(style, cx).into_any_element(),
+            Dialog::ResetLibrary => div()
+                .flex()
+                .flex_col()
+                .gap(px(16.0))
+                .w_full()
+                .child(
+                    div()
+                        .text_size(px(14.0))
+                        .text_color(style.fg)
+                        .child("Are you sure you want to clear the library?"),
+                )
+                .child(
+                    row()
+                        .justify_end()
+                        .w_full()
+                        .gap(px(8.0))
+                        .child(text_button(
+                            "dlg-cancel".into(),
+                            "Cancel",
+                            false,
+                            style,
+                            |v, _, _| v.dialog = None,
+                            cx,
+                        ))
+                        .child(text_button(
+                            "dlg-confirm".into(),
+                            "Confirm",
+                            true,
+                            style,
+                            |v, _, cx| v.confirm_reset_library(cx),
+                            cx,
+                        )),
+                )
+                .into_any_element(),
         };
         div()
             .id("dialog-backdrop")
@@ -2461,8 +3463,13 @@ impl ExcalidrawView {
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .flex_col()
                     .items_start()
-                    .w(px(if dlg == Dialog::Help { 720.0 } else { 420.0 }))
-                    .max_h(px(560.0))
+                    .w(px(match dlg {
+                        Dialog::Help => 920.0,
+                        Dialog::Mermaid => 1200.0,
+                        Dialog::Export => 420.0,
+                        Dialog::ResetLibrary => 400.0,
+                    }))
+                    .max_h(self.bounds.get().size.height - px(40.0))
                     .overflow_y_scroll()
                     .p(px(16.0))
                     .gap(px(12.0))
@@ -2471,30 +3478,197 @@ impl ExcalidrawView {
             )
     }
 
-    fn render_help(&self, style: &ExcalidrawStyle) -> impl IntoElement {
-        let mut cols = div().flex().gap(px(16.0)).items_start().w_full();
-        for (group, items) in HELP {
-            let mut c = div().flex().flex_col().flex_1().gap(px(4.0)).child(
+    fn render_help(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
+        let mut links = row().gap(px(8.0));
+        for (i, (label, url)) in HELP_LINKS.iter().enumerate() {
+            let url = *url;
+            links = links.child(
                 div()
-                    .text_size(px(13.0))
-                    .text_color(style.muted)
-                    .child(*group),
+                    .id(SharedString::from(format!("help-link-{i}")))
+                    .h(px(36.0))
+                    .px(px(12.0))
+                    .flex()
+                    .items_center()
+                    .gap(px(8.0))
+                    .rounded(px(8.0))
+                    .bg(style.hover_bg)
+                    .hover(|s| s.bg(style.active_bg))
+                    .text_size(px(12.0))
+                    .text_color(style.fg)
+                    .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.open_url(url)))
+                    .child(icon(Icon::External, 14.0, style.fg))
+                    .child(*label),
             );
-            for (label, key) in *items {
-                c = c.child(
+        }
+        let group = |name: &'static str, items: &'static [(&'static str, Keys)]| {
+            let mut table = div()
+                .flex()
+                .flex_col()
+                .w_full()
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(style.island_border);
+            for (n, (label, alts)) in items.iter().enumerate() {
+                let mut keys = div().flex().items_center().gap(px(4.0));
+                for (k, seq) in alts.iter().enumerate() {
+                    if k > 0 {
+                        keys =
+                            keys.child(div().text_size(px(12.0)).text_color(style.fg).child("or"));
+                    }
+                    for key in seq.iter() {
+                        keys = keys.child(key_chip(key, style));
+                    }
+                }
+                table = table.child(
                     div()
                         .flex()
                         .justify_between()
+                        .items_center()
                         .gap(px(8.0))
-                        .text_size(px(12.0))
+                        .min_h(px(38.0))
+                        .px(px(12.0))
+                        .when(n > 0, |d| d.border_t_1().border_color(style.island_border))
+                        .text_size(px(13.0))
                         .text_color(style.fg)
                         .child(*label)
-                        .child(div().text_color(style.muted).child(*key)),
+                        .child(keys),
                 );
             }
-            cols = cols.child(c);
+            div()
+                .flex()
+                .flex_col()
+                .w_full()
+                .gap(px(8.0))
+                .child(
+                    div()
+                        .text_size(px(15.0))
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(style.fg)
+                        .child(name),
+                )
+                .child(table)
+        };
+        let (tools, view, editor) = (HELP[0], HELP[1], HELP[2]);
+        div()
+            .flex()
+            .flex_col()
+            .w_full()
+            .gap(px(16.0))
+            .child(links)
+            .child(
+                div()
+                    .text_size(px(17.0))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(style.fg)
+                    .child("Keyboard shortcuts"),
+            )
+            .child(
+                div()
+                    .flex()
+                    .gap(px(24.0))
+                    .items_start()
+                    .w_full()
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .gap(px(16.0))
+                            .child(group(tools.0, tools.1))
+                            .child(group(view.0, view.1)),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .child(group(editor.0, editor.1)),
+                    ),
+            )
+    }
+
+    fn render_mermaid(&self, style: &ExcalidrawStyle) -> impl IntoElement {
+        let pane = |title: &'static str, body: AnyElement| {
+            div()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .gap(px(6.0))
+                .child(div().text_size(px(13.0)).text_color(style.fg).child(title))
+                .child(
+                    div()
+                        .h(px(360.0))
+                        .w_full()
+                        .rounded(px(6.0))
+                        .border_1()
+                        .border_color(style.island_border)
+                        .p(px(12.0))
+                        .child(body),
+                )
+        };
+        let mut src = div()
+            .flex()
+            .flex_col()
+            .font_family("Menlo")
+            .text_size(px(12.0))
+            .text_color(style.fg);
+        for l in MERMAID_SAMPLE.lines() {
+            src = src.child(l.to_string());
         }
-        cols
+        let err = div()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(px(12.0))
+            .text_color(gpui_kit::red())
+            .child(
+                div()
+                    .text_size(px(24.0))
+                    .font_weight(FontWeight::BOLD)
+                    .child("Error!"),
+            )
+            .child(
+                div()
+                    .id("mermaid-error")
+                    .debug_selector(|| "mermaid-error".into())
+                    .font_family("Menlo")
+                    .text_size(px(12.0))
+                    .child(crate::actions::MERMAID_UNAVAILABLE),
+            );
+        div()
+            .flex()
+            .flex_col()
+            .w_full()
+            .gap(px(12.0))
+            .child(
+                div()
+                    .text_size(px(13.0))
+                    .italic()
+                    .text_color(style.fg)
+                    .child("Currently only Flowchart, Sequence, and Class Diagrams are supported. The other types will be rendered as image in Excalidraw."),
+            )
+            .child(
+                div()
+                    .flex()
+                    .gap(px(24.0))
+                    .w_full()
+                    .child(pane("Mermaid Syntax", src.into_any_element()))
+                    .child(pane("Preview", err.into_any_element())),
+            )
+            .child(
+                div().flex().w_full().justify_end().child(
+                    div()
+                        .px(px(24.0))
+                        .h(px(36.0))
+                        .flex()
+                        .items_center()
+                        .rounded(px(8.0))
+                        .bg(style.selection.opacity(0.5))
+                        .text_size(px(13.0))
+                        .text_color(gpui_kit::white())
+                        .child("Insert →"),
+                ),
+            )
     }
 
     fn render_export(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {

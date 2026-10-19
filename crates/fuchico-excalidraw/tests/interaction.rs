@@ -668,15 +668,172 @@ fn library_add_insert_drag_export(cx: &mut TestAppContext) {
         .iter()
         .find(|e| (f(e, "x") + f(e, "width") / 2.0 - 500.0).abs() < 1.0);
     assert!(dropped.is_some(), "{rects:?}");
-    // Export via the save dialog.
+    // Export via the ⋮ menu's "Save to..." and the save dialog.
+    h.button("lib-more");
+    assert!(h.exists("lib-menu"));
     h.button("lib-export");
+    assert!(!h.exists("lib-menu"));
     let out = temp_path("mine.excalidrawlib");
     let o2 = out.clone();
     h.cx.simulate_new_path_selection(move |_| Some(o2));
     h.cx.run_until_parked();
     let exported: Value = serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
     assert_eq!(exported["libraryItems"].as_array().unwrap().len(), 1);
-    // Remove.
+    // Remove (the × shows on hover).
+    let cell = h.bounds("lib-item-0").unwrap().center();
+    h.mv(cell, None, Modifiers::default());
     h.button("lib-remove-0");
     assert!(!h.exists("lib-item-0"));
+    // Reset asks first; Cancel keeps the items.
+    h.button("lib-add");
+    h.button("lib-more");
+    h.button("lib-reset");
+    assert!(h.exists("dialog-reset-library"));
+    h.button("dlg-cancel");
+    assert!(h.exists("lib-item-0"));
+    h.button("lib-more");
+    h.button("lib-reset");
+    h.button("dlg-confirm");
+    assert!(!h.exists("lib-item-0"));
+    // The sidebar closes with ×, bringing the Library button back.
+    assert!(!h.exists("lib-toggle"));
+    h.button("lib-close");
+    assert!(!h.exists("library"));
+    assert!(h.exists("lib-toggle"));
+}
+
+// ------------------------------------------------------- stock chrome
+
+const COMPARE: &str = include_str!("fixtures/compare.excalidraw");
+
+#[gpui::test]
+fn find_on_canvas_searches_text(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    h.press("cmd-f");
+    assert!(h.exists("library"));
+    assert!(h.exists("search-input"));
+    h.press("f u c h");
+    assert!(h.exists("search-hit-0"));
+    assert!(!h.exists("search-hit-1"));
+    assert_eq!(h.selection(), vec!["el5".to_string()]);
+    h.press("backspace backspace backspace backspace z z");
+    assert!(!h.exists("search-hit-0"));
+    assert!(h.exists("search-count"));
+    // Escape leaves the field; keys go back to the canvas.
+    h.press("escape");
+    h.press("r");
+    let tool = h.cx.update(|_, cx| h.view.read(cx).tool());
+    assert_eq!(tool, fuchico_excalidraw::Tool::Rectangle);
+    // The Library tab is one click away.
+    h.button("sb-library");
+    assert!(h.exists("lib-browse"));
+    assert!(!h.exists("search-input"));
+}
+
+#[gpui::test]
+fn zen_and_view_modes(cx: &mut TestAppContext) {
+    let mut h = open(cx, EMPTY);
+    assert!(h.exists("t-rect"));
+    h.press("alt-z");
+    assert!(h.cx.update(|_, cx| h.view.read(cx).zen_mode()));
+    assert!(!h.exists("t-rect"));
+    h.button("exit-zen");
+    assert!(h.exists("t-rect"));
+    // View mode: read-only, no toolbar, drags pan instead of drawing.
+    h.press("alt-r");
+    assert!(h.cx.update(|_, cx| h.view.read(cx).view_mode()));
+    assert!(!h.exists("t-rect"));
+    h.press("r");
+    h.drag(p(300.0, 300.0), p(400.0, 400.0));
+    assert!(h.elements().is_empty());
+    // The canvas context menu offers the mode toggles.
+    h.rclick(p(500.0, 500.0));
+    assert!(h.exists("cm-view-mode"));
+    h.button("cm-view-mode");
+    assert!(!h.cx.update(|_, cx| h.view.read(cx).view_mode()));
+    assert!(h.exists("t-rect"));
+}
+
+#[gpui::test]
+fn laser_pointer_draws_nothing(cx: &mut TestAppContext) {
+    let mut h = open(cx, EMPTY);
+    h.press("k");
+    let tool = h.cx.update(|_, cx| h.view.read(cx).tool());
+    assert_eq!(tool, fuchico_excalidraw::Tool::Laser);
+    h.drag(p(300.0, 300.0), p(400.0, 400.0));
+    assert!(h.elements().is_empty());
+}
+
+#[gpui::test]
+fn extra_tools_menu_and_mermaid_stub(cx: &mut TestAppContext) {
+    let mut h = open(cx, EMPTY);
+    h.button("t-extra");
+    assert!(h.exists("extra-tools"));
+    h.button("x-laser");
+    assert!(!h.exists("extra-tools"));
+    let tool = h.cx.update(|_, cx| h.view.read(cx).tool());
+    assert_eq!(tool, fuchico_excalidraw::Tool::Laser);
+    h.button("t-extra");
+    h.button("x-mermaid");
+    assert!(h.exists("dialog-mermaid-to-excalidraw"));
+    // Like the original app: the converter is stubbed out.
+    assert!(h.exists("mermaid-error"));
+    h.press("escape");
+    assert!(!h.exists("dialog-mermaid-to-excalidraw"));
+}
+
+#[gpui::test]
+fn stats_panel_toggles(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    h.press("alt-/");
+    assert!(h.exists("stats"));
+    h.button("stats-close");
+    assert!(!h.exists("stats"));
+}
+
+#[gpui::test]
+fn main_menu_save_and_open_scene(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    let out = temp_path("scene.excalidraw");
+    let o2 = out.clone();
+    h.button("menu");
+    h.button("m-save");
+    h.cx.simulate_new_path_selection(move |_| Some(o2));
+    h.cx.run_until_parked();
+    let saved = std::fs::read_to_string(&out).unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&saved).unwrap(),
+        serde_json::from_str::<Value>(&h.cx.update(|_, cx| h.view.read(cx).to_json())).unwrap()
+    );
+    // Clear, then open the saved file back.
+    h.press("cmd-a");
+    h.press("delete");
+    assert!(h.elements().is_empty());
+    h.button("menu");
+    h.button("m-open");
+    let o3 = out.clone();
+    h.cx.simulate_path_prompt_response(move |_| Some(vec![o3]));
+    h.cx.run_until_parked();
+    h.frame();
+    assert_eq!(h.elements().len(), 5);
+}
+
+#[gpui::test]
+fn align_font_size_and_layer_shortcuts(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    h.view
+        .update(&mut h.cx, |v, cx| v.select_ids(&["el1", "el2"], cx));
+    h.press("cmd-shift-up");
+    let (a, b) = (
+        h.json()["elements"][0].clone(),
+        h.json()["elements"][1].clone(),
+    );
+    assert_eq!(f(&a, "y"), f(&b, "y"));
+    h.view.update(&mut h.cx, |v, cx| v.select_ids(&["el5"], cx));
+    let before = f(&h.of("text")[0], "fontSize");
+    h.press("cmd-shift-.");
+    assert!(f(&h.of("text")[0], "fontSize") > before);
+    // ⌘⌥[ sends to back.
+    h.press("cmd-alt-[");
+    assert_eq!(h.json()["elements"][0]["id"], "el5");
 }

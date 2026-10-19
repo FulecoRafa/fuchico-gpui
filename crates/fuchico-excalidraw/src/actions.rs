@@ -27,7 +27,16 @@ pub enum PickerTarget {
 pub enum Dialog {
     Export,
     Help,
+    /// "Text to diagram" → Mermaid. Fuchico stubs the converter, so (like the
+    /// original app) the dialog only reports that it is unavailable.
+    Mermaid,
+    /// "Reset library" confirmation (library deletes are not undoable).
+    ResetLibrary,
 }
+
+/// The error the original app's mermaid-to-excalidraw stub throws.
+pub const MERMAID_UNAVAILABLE: &str =
+    "Mermaid to Excalidraw conversion is not available in Fuchico.";
 
 /// Export dialog settings (Excalidraw's image export options).
 #[derive(Clone, Debug, PartialEq)]
@@ -87,9 +96,12 @@ pub enum Action {
     ToggleGrid,
     ToggleObjectSnap,
     UnlockAll,
-    ZoomToFit,
     Export,
     Help,
+    ZenMode,
+    ViewMode,
+    Stats,
+    Find,
 }
 
 impl Action {
@@ -118,9 +130,12 @@ impl Action {
             Action::ToggleGrid => "grid",
             Action::ToggleObjectSnap => "obj-snap",
             Action::UnlockAll => "unlock-all",
-            Action::ZoomToFit => "zoom-fit",
             Action::Export => "export",
             Action::Help => "help",
+            Action::ZenMode => "zen",
+            Action::ViewMode => "view-mode",
+            Action::Stats => "stats",
+            Action::Find => "find",
         }
     }
 }
@@ -131,6 +146,32 @@ impl ExcalidrawView {
     pub(crate) fn context_entries(&self) -> Vec<Option<(Action, String, &'static str, bool)>> {
         let mut v: Vec<Option<(Action, String, &'static str, bool)>> = Vec::new();
         let e = |a, l: &str, k| Some((a, l.to_string(), k, false));
+        let modes = |v: &mut Vec<_>| {
+            v.push(Some((Action::ZenMode, "Zen mode".into(), "⌥Z", self.zen)));
+            v.push(Some((
+                Action::ViewMode,
+                "View mode".into(),
+                "⌥R",
+                self.view_mode,
+            )));
+            v.push(Some((
+                Action::Stats,
+                "Canvas & Shape properties".into(),
+                "⌥/",
+                self.stats_open,
+            )));
+        };
+        if self.view_mode {
+            // Stock: the canvas menu in view mode is just the view toggles.
+            v.push(Some((
+                Action::ToggleGrid,
+                "Toggle grid".into(),
+                "⌘'",
+                self.scene.grid_enabled(),
+            )));
+            modes(&mut v);
+            return v;
+        }
         if self.selected.is_empty() {
             v.push(e(Action::Paste, "Paste", "⌘V"));
             v.push(None);
@@ -154,10 +195,7 @@ impl ExcalidrawView {
                 "⌥S",
                 self.scene.app_bool("objectsSnapModeEnabled"),
             )));
-            v.push(e(Action::ZoomToFit, "Zoom to fit all elements", "⇧1"));
-            v.push(None);
-            v.push(e(Action::Export, "Export image…", "⇧⌘E"));
-            v.push(e(Action::Help, "Help", "?"));
+            modes(&mut v);
             return v;
         }
         let list = self.selection_list();
@@ -177,8 +215,8 @@ impl ExcalidrawView {
         v.push(None);
         v.push(e(Action::SendBackward, "Send backward", "⌘["));
         v.push(e(Action::BringForward, "Bring forward", "⌘]"));
-        v.push(e(Action::SendToBack, "Send to back", "⌘⇧["));
-        v.push(e(Action::BringToFront, "Bring to front", "⌘⇧]"));
+        v.push(e(Action::SendToBack, "Send to back", "⌘⌥["));
+        v.push(e(Action::BringToFront, "Bring to front", "⌘⌥]"));
         v.push(None);
         v.push(e(Action::FlipH, "Flip horizontal", "⇧H"));
         v.push(e(Action::FlipV, "Flip vertical", "⇧V"));
@@ -240,9 +278,15 @@ impl ExcalidrawView {
             Action::ToggleGrid => self.toggle_grid(cx),
             Action::ToggleObjectSnap => self.toggle_object_snap(cx),
             Action::UnlockAll => self.unlock_all(cx),
-            Action::ZoomToFit => self.zoom_to_fit(),
             Action::Export => self.open_dialog(Dialog::Export),
             Action::Help => self.open_dialog(Dialog::Help),
+            Action::ZenMode => self.zen = !self.zen,
+            Action::ViewMode => {
+                let on = !self.view_mode;
+                self.set_view_mode(on);
+            }
+            Action::Stats => self.stats_open = !self.stats_open,
+            Action::Find => self.open_search(),
         }
         cx.notify();
     }
@@ -768,6 +812,25 @@ impl ExcalidrawView {
         self.selected = sel;
         self.tool = Tool::Selection;
         self.commit(cx);
+        cx.notify();
+    }
+
+    /// Asks before clearing the personal library (stock confirms too).
+    pub(crate) fn reset_library(&mut self, _cx: &mut Context<Self>) {
+        self.dialog = Some(Dialog::ResetLibrary);
+    }
+
+    pub(crate) fn confirm_reset_library(&mut self, cx: &mut Context<Self>) {
+        let ids: Vec<String> = self
+            .library
+            .items
+            .iter()
+            .map(|i| library::item_id(i).to_string())
+            .collect();
+        for id in ids {
+            self.library.remove(&id);
+        }
+        self.dialog = None;
         cx.notify();
     }
 

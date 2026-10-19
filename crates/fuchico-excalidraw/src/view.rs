@@ -78,6 +78,8 @@ pub enum Tool {
     Image,
     Eraser,
     Frame,
+    /// Laser pointer (K): a fading trail, nothing is added to the scene.
+    Laser,
 }
 
 impl Tool {
@@ -107,6 +109,17 @@ pub enum DebugUi {
     /// Context menu at a pane-local point.
     ContextMenu(f32, f32),
     StrokePicker,
+    ExtraTools,
+    Mermaid,
+    Stats,
+    Zen,
+    ViewMode,
+    /// Sidebar Search tab with a query typed in.
+    Search(&'static str),
+    /// Adds the selection to the library (and opens the sidebar).
+    AddSelectionToLibrary,
+    /// The library sidebar's ⋮ menu.
+    LibraryMenu,
 }
 
 /// Selection-box handles.
@@ -187,7 +200,11 @@ pub(crate) enum Drag {
         index: usize,
     },
     Erase,
+    Laser,
 }
+
+/// How long a laser-pointer trail point stays visible (stock: ~1 s decay).
+pub(crate) const LASER_DECAY: std::time::Duration = std::time::Duration::from_millis(1000);
 
 #[derive(Clone, Debug)]
 pub(crate) struct TextEdit {
@@ -236,6 +253,15 @@ pub struct ExcalidrawView {
     pub(crate) copied_styles: Option<crate::model::Element>,
     pub(crate) library: crate::library::Library,
     pub(crate) library_open: bool,
+    /// Which tab of the right sidebar is shown.
+    pub(crate) sidebar_search: bool,
+    pub(crate) search_query: String,
+    pub(crate) search_focus: bool,
+    /// Index into the current search matches (Enter cycles).
+    pub(crate) search_index: usize,
+    pub(crate) lib_menu: bool,
+    /// Shape caches for library thumbnails (separate from the canvas).
+    pub(crate) lib_caches: Rc<RefCell<Caches>>,
     pub(crate) toast: Option<String>,
     pub(crate) guides: Vec<crate::snap::Guide>,
     pub(crate) opacity_track: Rc<Cell<Bounds<Pixels>>>,
@@ -243,6 +269,16 @@ pub struct ExcalidrawView {
     /// IME composition range (chars) inside the edited text.
     pub(crate) marked: Option<std::ops::Range<usize>>,
     pub(crate) source_path: Option<std::path::PathBuf>,
+    /// Zen mode (⌥Z): hides the toolbar and properties panel.
+    pub(crate) zen: bool,
+    /// View mode (⌥R): read-only, dragging pans.
+    pub(crate) view_mode: bool,
+    /// "Canvas & Shape properties" stats panel (⌥/).
+    pub(crate) stats_open: bool,
+    /// The toolbar's "More tools" dropdown.
+    pub(crate) extra_open: bool,
+    /// Laser-pointer trail: (time, world point, starts a new stroke).
+    pub(crate) laser: Vec<(std::time::Instant, P, bool)>,
 }
 
 fn load_source(src: &DrawingSource) -> Result<String, String> {
@@ -318,6 +354,11 @@ impl ExcalidrawView {
             pointer: None,
             space_down: false,
             menu_open: false,
+            zen: false,
+            view_mode: false,
+            stats_open: false,
+            extra_open: false,
+            laser: Vec::new(),
             focus: cx.focus_handle(),
             bounds: Rc::new(Cell::new(Bounds::default())),
             caches: Rc::new(RefCell::new(Caches::default())),
@@ -340,6 +381,12 @@ impl ExcalidrawView {
             copied_styles: None,
             library: crate::library::Library::load(crate::library::default_path()),
             library_open: false,
+            sidebar_search: false,
+            search_query: String::new(),
+            search_focus: false,
+            search_index: 0,
+            lib_menu: false,
+            lib_caches: Rc::new(RefCell::new(Caches::default())),
             toast: None,
             guides: Vec::new(),
             opacity_track: Rc::new(Cell::new(Bounds::default())),
@@ -416,6 +463,22 @@ impl ExcalidrawView {
                 });
             }
             DebugUi::StrokePicker => self.toggle_picker(PickerTarget::Stroke),
+            DebugUi::ExtraTools => self.extra_open = true,
+            DebugUi::Mermaid => self.open_dialog(Dialog::Mermaid),
+            DebugUi::Stats => self.stats_open = true,
+            DebugUi::Zen => self.zen = true,
+            DebugUi::ViewMode => self.set_view_mode(true),
+            DebugUi::Search(q) => {
+                self.open_search();
+                self.search_query = q.to_string();
+                self.focus_match(0);
+            }
+            DebugUi::AddSelectionToLibrary => self.add_selection_to_library(cx),
+            DebugUi::LibraryMenu => {
+                self.library_open = true;
+                self.sidebar_search = false;
+                self.lib_menu = true;
+            }
         }
         cx.notify();
     }
@@ -479,7 +542,31 @@ impl ExcalidrawView {
         &self.focus
     }
 
+    /// Whether zen mode is on.
+    pub fn zen_mode(&self) -> bool {
+        self.zen
+    }
+
+    /// Whether view (read-only) mode is on.
+    pub fn view_mode(&self) -> bool {
+        self.view_mode
+    }
+
+    pub(crate) fn set_view_mode(&mut self, on: bool) {
+        self.view_mode = on;
+        if on {
+            self.selected.clear();
+            self.editing = None;
+            self.multi = None;
+            self.drag = None;
+            self.context_menu = None;
+            self.picker = None;
+            self.extra_open = false;
+        }
+    }
+
     pub fn set_tool(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
+        self.extra_open = false;
         self.finish_multi(cx);
         self.commit_text(cx);
         self.tool = tool;
@@ -791,12 +878,22 @@ impl ExcalidrawView {
     ) {
         window.focus(&self.focus, cx);
         self.menu_open = false;
+        self.extra_open = false;
         if self.error.is_some() {
             return;
         }
         let p = self.world(ev.position);
         self.pointer = Some(ev.position);
-        if ev.button == MouseButton::Middle || self.space_down || self.tool == Tool::Hand {
+        if self.view_mode && ev.button == MouseButton::Right {
+            self.context_menu = Some(ev.position);
+            cx.notify();
+            return;
+        }
+        if ev.button == MouseButton::Middle
+            || self.space_down
+            || self.tool == Tool::Hand
+            || self.view_mode && self.tool != Tool::Laser
+        {
             self.drag = Some(Drag::Pan {
                 start: ev.position,
                 cam: self.cam,
@@ -859,6 +956,12 @@ impl ExcalidrawView {
         }
         match self.tool {
             Tool::Hand => {}
+            Tool::Laser => {
+                self.laser.retain(|l| l.0.elapsed() < LASER_DECAY);
+                self.laser.push((std::time::Instant::now(), p, true));
+                self.drag = Some(Drag::Laser);
+                cx.notify();
+            }
             Tool::Selection => self.selection_down(ev, p, window, cx),
             Tool::Eraser => {
                 self.erasing.clear();
@@ -1110,6 +1213,11 @@ impl ExcalidrawView {
             return;
         };
         match drag {
+            Drag::Laser => {
+                self.laser.retain(|l| l.0.elapsed() < LASER_DECAY);
+                self.laser.push((std::time::Instant::now(), p, false));
+                cx.notify();
+            }
             Drag::Pan { start, cam } => {
                 let dx = f64::from(f32::from(ev.position.x - start.x));
                 let dy = f64::from(f32::from(ev.position.y - start.y));
@@ -1345,7 +1453,7 @@ impl ExcalidrawView {
         let p = self.world(ev.position);
         self.bind_hint = None;
         match drag {
-            Drag::Pan { .. } | Drag::Marquee { .. } => {}
+            Drag::Pan { .. } | Drag::Marquee { .. } | Drag::Laser => {}
             Drag::Move { ids, moved, .. } => {
                 if moved {
                     // Arrows moved without their targets come unbound.
@@ -2213,6 +2321,11 @@ impl ExcalidrawView {
         let primary = m.platform || m.control;
         let key = ks.key.as_str();
         let mut handled = true;
+        if self.search_key(ks, cx) {
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
         if self.picker_key(ks, cx) {
             cx.stop_propagation();
             cx.notify();
@@ -2233,7 +2346,42 @@ impl ExcalidrawView {
             return;
         }
         use crate::actions::{Action, Dialog};
+        // Mode toggles (⌥Z zen, ⌥R view, ⌥/ stats) work in every mode.
+        let mode = match (primary, m.shift, m.alt, key) {
+            (false, false, true, "z" | "Ω") => Some(Action::ZenMode),
+            (false, false, true, "r" | "®") => Some(Action::ViewMode),
+            (false, false, true, "/" | "÷") => Some(Action::Stats),
+            _ => None,
+        };
+        if let Some(a) = mode {
+            self.run_action(a, window, cx);
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
+        if self.view_mode {
+            // Read-only: only navigation and the laser pointer.
+            match (primary, m.shift, key) {
+                (true, _, "=") | (true, _, "+") => self.zoom_step(1.1, None),
+                (false, shift, "pageup") => self.page(shift, false),
+                (false, shift, "pagedown") => self.page(shift, true),
+                (true, _, "-") => self.zoom_step(1.0 / 1.1, None),
+                (true, _, "0") => self.zoom_step(1.0 / self.cam.zoom, None),
+                (false, true, "1") | (false, _, "!") => self.zoom_to_fit(),
+                (false, false, "k") => self.tool = Tool::Laser,
+                (true, false, "f") => self.open_search(),
+                (false, false, "h") => self.tool = Tool::Hand,
+                (false, _, "escape") => self.tool = Tool::Selection,
+                (false, _, " ") | (false, _, "space") => self.space_down = true,
+                _ => return,
+            }
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
         let action = match (primary, m.shift, m.alt, key) {
+            (true, _, true, "[" | "{" | "“" | "”") => Some(Action::SendToBack),
+            (true, _, true, "]" | "}" | "‘" | "’") => Some(Action::BringToFront),
             (false, true, false, "h") => Some(Action::FlipH),
             (false, true, false, "v") => Some(Action::FlipV),
             (true, true, false, "l") => Some(Action::Lock),
@@ -2243,6 +2391,7 @@ impl ExcalidrawView {
             (true, false, true, "v") => Some(Action::PasteStyles),
             (false, true, true, "c") => Some(Action::CopyPng),
             (true, true, false, "e") => Some(Action::Export),
+            (true, false, false, "f") => Some(Action::Find),
             (false, _, false, "?") | (false, true, false, "/") => Some(Action::Help),
             _ => None,
         };
@@ -2298,10 +2447,38 @@ impl ExcalidrawView {
                 self.scene.reorder(&s, false, shift);
                 self.commit(cx);
             }
+            (true, true, "up" | "down" | "left" | "right") => {
+                use crate::actions::Align;
+                let a = match key {
+                    "up" => Align::Top,
+                    "down" => Align::Bottom,
+                    "left" => Align::Left,
+                    _ => Align::Right,
+                };
+                self.align(a, cx);
+            }
+            (true, true, "," | "<") => self.step_font_size(false, cx),
+            (true, true, "." | ">") => self.step_font_size(true, cx),
             (true, _, "=") | (true, _, "+") => self.zoom_step(1.1, None),
             (true, _, "-") => self.zoom_step(1.0 / 1.1, None),
             (true, _, "0") => self.zoom_step(1.0 / self.cam.zoom, None),
             (false, true, "1") | (false, _, "!") => self.zoom_to_fit(),
+            (false, true, "2") | (false, _, "@") => self.zoom_to_selection(),
+            (false, shift, "pageup") => self.page(shift, false),
+            (false, shift, "pagedown") => self.page(shift, true),
+            (true, _, "delete") | (true, _, "backspace") => self.reset_canvas(cx),
+            (false, false, "s") if self.show_properties() => {
+                self.toggle_picker(crate::actions::PickerTarget::Stroke)
+            }
+            (false, false, "g") if self.show_properties() => {
+                self.toggle_picker(crate::actions::PickerTarget::Background)
+            }
+            (false, false, "i") | (false, true, "s" | "S") => {
+                self.eyedropper = Some(crate::actions::PickerTarget::Stroke)
+            }
+            (false, true, "g" | "G") => {
+                self.eyedropper = Some(crate::actions::PickerTarget::Background)
+            }
             (false, _, "delete") | (false, _, "backspace") => self.delete_selection(cx),
             (false, _, "escape") => {
                 if self.multi.is_some() {
@@ -2413,13 +2590,156 @@ impl ExcalidrawView {
         let Some(bb) = self.scene.elements().map(geom::aabb).reduce(geom::union) else {
             return;
         };
+        self.zoom_to_bbox(bb, 1.0);
+    }
+
+    /// Zoom to selection (⇧2); like stock it may zoom in past 100%.
+    pub(crate) fn zoom_to_selection(&mut self) {
+        let Some(bb) = self
+            .selection_list()
+            .into_iter()
+            .map(geom::aabb)
+            .reduce(geom::union)
+        else {
+            return;
+        };
+        self.zoom_to_bbox(bb, 30.0);
+    }
+
+    /// PgUp/PgDn (⇧ for left/right) scroll a viewport page.
+    pub(crate) fn page(&mut self, horizontal: bool, forward: bool) {
+        let b = self.bounds.get();
+        let s = if forward { -1.0 } else { 1.0 };
+        if horizontal {
+            self.cam.scroll_x += s * f64::from(f32::from(b.size.width)) / self.cam.zoom;
+        } else {
+            self.cam.scroll_y += s * f64::from(f32::from(b.size.height)) / self.cam.zoom;
+        }
+    }
+
+    /// ⌘⇧< / ⌘⇧>: text size steps of 10% (stock `changeFontSize`).
+    pub(crate) fn step_font_size(&mut self, up: bool, cx: &mut Context<Self>) {
+        let f = if up { 1.1 } else { 1.0 / 1.1 };
+        let base = self
+            .single()
+            .filter(|e| e.kind == "text")
+            .map(|e| e.font_size())
+            .unwrap_or(self.defaults.font_size);
+        let fs = (base * f).round().max(1.0);
+        self.apply(
+            move |e, d| {
+                if e.kind == "text" {
+                    e.f.font_size.set(Num(fs));
+                }
+                d.font_size = fs;
+            },
+            cx,
+        );
+    }
+
+    /// Opens the sidebar on the Search tab with the query field focused.
+    pub(crate) fn open_search(&mut self) {
+        self.library_open = true;
+        self.sidebar_search = true;
+        self.search_focus = true;
+        self.menu_open = false;
+        self.lib_menu = false;
+    }
+
+    /// Text elements whose text contains the query (case-insensitive), in
+    /// reading order (top to bottom, then left to right).
+    pub(crate) fn search_matches(&self) -> Vec<String> {
+        let q = self.search_query.trim().to_lowercase();
+        if q.is_empty() {
+            return Vec::new();
+        }
+        let mut hits: Vec<(f64, f64, String)> = self
+            .scene
+            .elements()
+            .filter(|e| e.kind == "text" && e.text().to_lowercase().contains(&q))
+            .map(|e| (e.y(), e.x(), e.id.clone()))
+            .collect();
+        hits.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        hits.into_iter().map(|h| h.2).collect()
+    }
+
+    /// Selects match `i` and scrolls it into view.
+    pub(crate) fn focus_match(&mut self, i: usize) {
+        let m = self.search_matches();
+        if m.is_empty() {
+            return;
+        }
+        let i = i % m.len();
+        self.search_index = i;
+        let Some(el) = self.scene.get(&m[i]) else {
+            return;
+        };
+        let bb = geom::aabb(el);
+        // Select the container for bound text, like stock.
+        let id = el
+            .container_id()
+            .map(str::to_string)
+            .unwrap_or_else(|| el.id.clone());
+        self.selected = std::iter::once(id).collect();
+        self.tool = Tool::Selection;
+        let z = self.cam.zoom;
+        let b = self.bounds.get();
+        let (vw, vh) = (
+            f64::from(f32::from(b.size.width)),
+            f64::from(f32::from(b.size.height)),
+        );
+        let z = if z < 1.0 { 1.0 } else { z };
+        self.cam.zoom = z;
+        self.cam.scroll_x = vw / 2.0 / z - (bb[0] + bb[2]) / 2.0;
+        self.cam.scroll_y = vh / 2.0 / z - (bb[1] + bb[3]) / 2.0;
+    }
+
+    /// Keyboard for the focused search field. Returns whether consumed.
+    pub(crate) fn search_key(&mut self, ks: &Keystroke, _cx: &mut Context<Self>) -> bool {
+        if !(self.search_focus && self.library_open && self.sidebar_search) {
+            return false;
+        }
+        let m = &ks.modifiers;
+        if m.platform || m.control {
+            return false;
+        }
+        match ks.key.as_str() {
+            "escape" => self.search_focus = false,
+            "backspace" => {
+                self.search_query.pop();
+                self.search_index = 0;
+            }
+            "enter" => {
+                let i = if m.shift {
+                    let n = self.search_matches().len().max(1);
+                    (self.search_index + n - 1) % n
+                } else {
+                    self.search_index + 1
+                };
+                self.focus_match(i);
+            }
+            _ => match ks.key_char.as_deref() {
+                Some(c) if !c.chars().any(char::is_control) => {
+                    self.search_query.push_str(c);
+                    self.search_index = 0;
+                    self.focus_match(0);
+                }
+                _ => return false,
+            },
+        }
+        true
+    }
+
+    fn zoom_to_bbox(&mut self, bb: [f64; 4], max_zoom: f64) {
         let b = self.bounds.get();
         let (vw, vh) = (
             f64::from(f32::from(b.size.width)),
             f64::from(f32::from(b.size.height)),
         );
         let (w, h) = ((bb[2] - bb[0]).max(1.0), (bb[3] - bb[1]).max(1.0));
-        let z = ((vw - 100.0) / w).min((vh - 160.0) / h).clamp(0.1, 1.0);
+        let z = ((vw - 100.0) / w)
+            .min((vh - 160.0) / h)
+            .clamp(0.1, max_zoom);
         self.cam.zoom = z;
         self.cam.scroll_x = vw / 2.0 / z - (bb[0] + bb[2]) / 2.0;
         self.cam.scroll_y = vh / 2.0 / z - (bb[1] + bb[3]) / 2.0;
@@ -2741,6 +3061,78 @@ impl ExcalidrawView {
         }
     }
 
+    /// Main menu → Open (⌘O): replaces the scene with a chosen
+    /// `.excalidraw` file (undoable; saved back into this drawing).
+    pub(crate) fn open_scene_prompt(&mut self, cx: &mut Context<Self>) {
+        let rx = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("Open".into()),
+        });
+        cx.spawn(async move |this: WeakEntity<Self>, cx: &mut AsyncApp| {
+            let path = rx.await.ok().and_then(|r| r.ok()).flatten();
+            let _ = this.update(cx, |v, cx| {
+                if let Some(p) = path.and_then(|p| p.into_iter().next()) {
+                    v.open_scene_file(&p, cx);
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    pub(crate) fn open_scene_file(&mut self, p: &std::path::Path, cx: &mut Context<Self>) -> bool {
+        let parsed = std::fs::read_to_string(p)
+            .ok()
+            .and_then(|s| Scene::parse(&s).ok());
+        let Some(scene) = parsed else {
+            self.toast("Couldn't load invalid file");
+            return false;
+        };
+        self.commit_text(cx);
+        self.selected.clear();
+        self.cam = camera_from(&scene);
+        self.scene = scene;
+        self.commit(cx);
+        true
+    }
+
+    /// Main menu → Save to...: writes a copy of the scene as `.excalidraw`.
+    pub(crate) fn save_scene_prompt(&mut self, cx: &mut Context<Self>) {
+        let stem = self
+            .source_path
+            .as_ref()
+            .and_then(|p| p.file_stem())
+            .map(|n| {
+                n.to_string_lossy()
+                    .trim_end_matches(".excalidraw")
+                    .to_string()
+            })
+            .unwrap_or_else(|| "drawing".into());
+        let dir = self
+            .source_path
+            .as_ref()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+            .or_else(dirs::home_dir)
+            .unwrap_or_else(|| PathBuf::from("."));
+        let json = self.scene.to_json();
+        let rx = cx.prompt_for_new_path(&dir, Some(&format!("{stem}.excalidraw")));
+        cx.spawn(async move |this: WeakEntity<Self>, cx: &mut AsyncApp| {
+            let path = rx.await.ok().and_then(|r| r.ok()).flatten();
+            let _ = this.update(cx, |v, cx| {
+                if let Some(p) = path {
+                    match std::fs::write(&p, &json) {
+                        Ok(()) => v.toast("File saved"),
+                        Err(e) => v.toast(&format!("Couldn't save: {e}")),
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     pub(crate) fn reset_canvas(&mut self, cx: &mut Context<Self>) {
         let ids: HashSet<String> = self.scene.elements().map(|e| e.id.clone()).collect();
         self.scene.remove(&ids);
@@ -2790,6 +3182,7 @@ impl ExcalidrawView {
                 );
             }
             Tool::Eraser => return None,
+            Tool::Laser => return None,
             Tool::Hand | Tool::Rectangle | Tool::Diamond | Tool::Ellipse | Tool::Frame => {
                 return None;
             }
@@ -2907,6 +3300,7 @@ fn tool_for_key(k: &str) -> Option<Tool> {
         "0" | "e" => Tool::Eraser,
         "h" => Tool::Hand,
         "f" => Tool::Frame,
+        "k" => Tool::Laser,
         _ => return None,
     })
 }
