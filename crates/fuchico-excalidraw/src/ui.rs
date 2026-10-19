@@ -60,6 +60,8 @@ enum Icon {
     Mermaid,
     Search,
     External,
+    Download,
+    Copy,
 }
 
 fn icon_parts(i: Icon) -> Vec<Part> {
@@ -282,6 +284,27 @@ fn icon_parts(i: Icon) -> Vec<Part> {
         Icon::Search => vec![
             Circle([10.5, 10.5], 6.0),
             Poly(&[[15.0, 15.0], [20.0, 20.0]], false),
+        ],
+        Icon::Download => vec![
+            Poly(&[[12.0, 4.0], [12.0, 15.0]], false),
+            Poly(&[[7.0, 10.0], [12.0, 15.0], [17.0, 10.0]], false),
+            Poly(
+                &[[4.0, 16.0], [4.0, 20.0], [20.0, 20.0], [20.0, 16.0]],
+                false,
+            ),
+        ],
+        Icon::Copy => vec![
+            RoundRect([9.0, 9.0, 20.0, 20.0], 2.0),
+            Poly(
+                &[
+                    [15.0, 9.0],
+                    [15.0, 4.0],
+                    [4.0, 4.0],
+                    [4.0, 15.0],
+                    [9.0, 15.0],
+                ],
+                false,
+            ),
         ],
         Icon::External => vec![
             Poly(
@@ -3466,7 +3489,7 @@ impl ExcalidrawView {
                     .w(px(match dlg {
                         Dialog::Help => 920.0,
                         Dialog::Mermaid => 1200.0,
-                        Dialog::Export => 420.0,
+                        Dialog::Export => 1000.0,
                         Dialog::ResetLibrary => 400.0,
                     }))
                     .max_h(self.bounds.get().size.height - px(40.0))
@@ -3673,47 +3696,136 @@ impl ExcalidrawView {
 
     fn render_export(&self, style: &ExcalidrawStyle, cx: &mut Context<Self>) -> impl IntoElement {
         let e = self.export.clone();
+        let accent = style.selection;
         let toggle = |id: &'static str,
                       label: &'static str,
                       on: bool,
                       f: fn(&mut crate::actions::ExportState),
                       cx: &mut Context<Self>| {
+            let sel = id.to_string();
             div()
                 .flex()
                 .w_full()
+                .h(px(32.0))
                 .justify_between()
                 .items_center()
-                .text_size(px(13.0))
+                .text_size(px(15.0))
                 .text_color(style.fg)
                 .child(label)
-                .child(text_button(
-                    id.into(),
-                    if on { "On" } else { "Off" },
-                    on,
-                    style,
-                    move |v, _, _| {
-                        f(&mut v.export);
-                        v.export_preview = None;
-                    },
-                    cx,
-                ))
+                .child(
+                    // Stock switch: a pill with a sliding knob.
+                    div()
+                        .id(id)
+                        .debug_selector(move || sel)
+                        .w(px(38.0))
+                        .h(px(20.0))
+                        .p(px(3.0))
+                        .flex()
+                        .items_center()
+                        .when(on, |d| d.justify_end())
+                        .rounded(px(10.0))
+                        .border_1()
+                        .border_color(if on { accent } else { style.fg })
+                        .bg(if on { accent } else { style.island_bg })
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .on_click(cx.listener(move |v, _: &ClickEvent, _, cx| {
+                            f(&mut v.export);
+                            cx.notify();
+                        }))
+                        .child(div().size(px(12.0)).rounded(px(6.0)).bg(if on {
+                            style.island_bg
+                        } else {
+                            style.fg
+                        })),
+                )
         };
-        let mut scales = row();
+        let mut scales = div()
+            .flex()
+            .p(px(2.0))
+            .gap(px(2.0))
+            .rounded(px(8.0))
+            .border_1()
+            .border_color(style.island_border);
         for s in [1u8, 2, 3] {
-            scales = scales.child(text_button(
-                format!("ex-{s}").into(),
-                format!("{s}×"),
-                e.scale == s as f64,
-                style,
-                move |v, _, _| v.export.scale = s as f64,
-                cx,
-            ));
+            let id = format!("ex-{s}");
+            let sel = id.clone();
+            let active = e.scale == s as f64;
+            scales = scales.child(
+                div()
+                    .id(SharedString::from(id))
+                    .debug_selector(move || sel)
+                    .w(px(26.0))
+                    .h(px(22.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(6.0))
+                    .text_size(px(11.0))
+                    .when(active, |d| d.bg(accent).text_color(style.island_bg))
+                    .when(!active, |d| {
+                        d.text_color(accent).hover(|s| s.bg(style.hover_bg))
+                    })
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |v, _: &ClickEvent, _, cx| {
+                        v.export.scale = s as f64;
+                        cx.notify();
+                    }))
+                    .child(format!("{s}×")),
+            );
         }
-        div()
+        let primary = |id: &'static str,
+                       ic: Icon,
+                       label: &'static str,
+                       on: fn(&mut ExcalidrawView, &mut Context<ExcalidrawView>),
+                       cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .debug_selector(move || id.to_string())
+                .flex_shrink_0()
+                .h(px(40.0))
+                .px(px(12.0))
+                .flex()
+                .items_center()
+                .gap(px(8.0))
+                .rounded(px(8.0))
+                .bg(accent)
+                .hover(|s| s.opacity(0.9))
+                .text_color(style.island_bg)
+                .text_size(px(12.0))
+                .font_weight(FontWeight::SEMIBOLD)
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(cx.listener(move |v, _: &ClickEvent, _, cx| {
+                    on(v, cx);
+                    cx.notify();
+                }))
+                .child(icon(ic, 16.0, style.island_bg))
+                .child(label)
+        };
+        let entity = cx.entity();
+        let preview = div()
+            .id("ex-preview")
+            .debug_selector(|| "ex-preview".into())
+            .flex_1()
+            .h(px(360.0))
+            .rounded(px(8.0))
+            .border_1()
+            .border_color(style.island_border)
+            .overflow_hidden()
+            .child(
+                canvas(
+                    |_, _, _| (),
+                    move |b, _, window, cx| {
+                        paint_export_preview(entity.read(cx), b, window);
+                    },
+                )
+                .size_full(),
+            );
+        let settings = div()
+            .w(px(370.0))
+            .flex_shrink_0()
             .flex()
             .flex_col()
-            .w_full()
-            .gap(px(8.0))
+            .gap(px(6.0))
             .child(toggle(
                 "ex-bg",
                 "Background",
@@ -3748,42 +3860,111 @@ impl ExcalidrawView {
                 div()
                     .flex()
                     .w_full()
+                    .h(px(36.0))
                     .justify_between()
                     .items_center()
-                    .text_size(px(13.0))
+                    .text_size(px(15.0))
                     .text_color(style.fg)
                     .child("Scale")
                     .child(scales),
             )
+            .child(div().flex_1())
             .child(
                 row()
                     .gap(px(8.0))
-                    .child(text_button(
-                        "ex-png".into(),
+                    .justify_end()
+                    .child(primary(
+                        "ex-png",
+                        Icon::Download,
                         "PNG",
-                        false,
-                        style,
-                        |v, _, cx| v.export_to_file(false, cx),
+                        |v, cx| v.export_to_file(false, cx),
                         cx,
                     ))
-                    .child(text_button(
-                        "ex-svg".into(),
+                    .child(primary(
+                        "ex-svg",
+                        Icon::Download,
                         "SVG",
-                        false,
-                        style,
-                        |v, _, cx| v.export_to_file(true, cx),
+                        |v, cx| v.export_to_file(true, cx),
                         cx,
                     ))
-                    .child(text_button(
-                        "ex-copy".into(),
-                        "Copy PNG",
-                        false,
-                        style,
-                        |v, _, cx| {
+                    .child(primary(
+                        "ex-copy",
+                        Icon::Copy,
+                        "Copy to clipboard",
+                        |v, cx| {
                             v.copy_as_png(cx);
                         },
                         cx,
                     )),
-            )
+            );
+        div()
+            .flex()
+            .w_full()
+            .h(px(360.0))
+            .gap(px(32.0))
+            .child(preview)
+            .child(settings)
     }
+}
+
+/// The export dialog's live preview: the exported area fitted into `b` on
+/// a checkerboard, with the export's background and dark-mode settings.
+fn paint_export_preview(v: &ExcalidrawView, b: Bounds<Pixels>, window: &mut Window) {
+    let tile = 10.0f32;
+    let (w, h) = (f32::from(b.size.width), f32::from(b.size.height));
+    let light: Hsla = gpui_kit::rgb(0xffffff).into();
+    let dark_tile: Hsla = gpui_kit::rgb(0xe9ecef).into();
+    window.paint_quad(fill(b, light));
+    let (cols, rows) = ((w / tile).ceil() as i32, (h / tile).ceil() as i32);
+    for r in 0..rows {
+        for c in 0..cols {
+            if (r + c) % 2 == 1 {
+                let o = point(
+                    b.origin.x + px(c as f32 * tile),
+                    b.origin.y + px(r as f32 * tile),
+                );
+                window.paint_quad(fill(Bounds::new(o, size(px(tile), px(tile))), dark_tile));
+            }
+        }
+    }
+    let opts = v.export_options();
+    let els = crate::export::export_elements(&v.scene, opts.only.as_ref());
+    let Some(bb) = crate::export::export_bounds(&els) else {
+        return;
+    };
+    let pad = opts.padding;
+    let bb = [bb[0] - pad, bb[1] - pad, bb[2] + pad, bb[3] + pad];
+    let margin = 24.0;
+    let (aw, ah) = (f64::from(w) - 2.0 * margin, f64::from(h) - 2.0 * margin);
+    let (bw, bh) = ((bb[2] - bb[0]).max(1.0), (bb[3] - bb[1]).max(1.0));
+    let zoom = (aw / bw).min(ah / bh).min(2.0);
+    let cam = Camera {
+        scroll_x: f64::from(w) / 2.0 / zoom - (bb[0] + bb[2]) / 2.0,
+        scroll_y: f64::from(h) / 2.0 / zoom - (bb[1] + bb[3]) / 2.0,
+        zoom,
+    };
+    let bg = color::parse(&v.scene.view_background()).unwrap_or(Rgba::new(1.0, 1.0, 1.0, 1.0));
+    let pal = Palette {
+        dark: opts.dark,
+        canvas: if opts.dark { bg.dark_filter() } else { bg },
+    };
+    window.with_content_mask(Some(ContentMask { bounds: b }), |window| {
+        if opts.background {
+            let s = |x: f64, y: f64| {
+                point(
+                    b.origin.x + px(((x + cam.scroll_x) * zoom) as f32),
+                    b.origin.y + px(((y + cam.scroll_y) * zoom) as f32),
+                )
+            };
+            window.paint_quad(fill(
+                Bounds::from_corners(s(bb[0], bb[1]), s(bb[2], bb[3])),
+                pal.canvas.to_hsla(),
+            ));
+        }
+        let caches = v.caches.clone();
+        let mut caches = caches.borrow_mut();
+        for el in els {
+            render::paint_element(el, &v.scene, &mut caches, cam, b.origin, pal, 1.0, window);
+        }
+    });
 }

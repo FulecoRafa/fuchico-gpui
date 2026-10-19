@@ -590,6 +590,7 @@ fn export_dialog_writes_svg_with_scene(cx: &mut TestAppContext) {
     h.rect(p(300.0, 300.0), p(400.0, 380.0));
     h.press("cmd-shift-e");
     assert!(h.exists("dialog-export-image"));
+    assert!(h.exists("ex-preview"));
     h.button("ex-embed");
     h.button("ex-3");
     h.button("ex-svg");

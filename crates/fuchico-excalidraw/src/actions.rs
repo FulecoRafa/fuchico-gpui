@@ -297,7 +297,6 @@ impl ExcalidrawView {
         self.picker = None;
         if d == Dialog::Export {
             self.export.only_selected = !self.selected.is_empty();
-            self.export_preview = None;
         }
         self.dialog = Some(d);
     }
