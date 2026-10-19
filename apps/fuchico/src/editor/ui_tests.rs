@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use fuchico_core::events::CoreEvent;
 use fuchico_editor::{EditorEvent, EngineKind, LineNumbers};
-use gpui_kit::{App, Entity, Focusable, Modifiers, TestAppContext};
+use gpui_kit::{App, AppContext, Entity, Focusable, Modifiers, TestAppContext};
 
 use super::{AUTOSAVE_MS, EditorPane, State, format_bytes};
 use crate::bus::{self, AppEvent};
@@ -351,8 +351,8 @@ async fn settings_theme_and_shortcuts_apply_live(cx: &mut TestAppContext) {
         "new binding inserts the date"
     );
 
-    // Engine seam: Normal is non-modal; Vim falls back to the modal engine
-    // without the Helix chip / `:` palette (TODO fuchico-vim).
+    // Engine seam: Normal is non-modal; Vim runs fuchico-vim without the
+    // Helix chip / `:` palette.
     ui.cx
         .update(|_, cx| SettingsStore::update(cx, |s| s.keybinding_mode = KeybindingMode::Normal));
     ui.frame();
@@ -368,8 +368,100 @@ async fn settings_theme_and_shortcuts_apply_live(cx: &mut TestAppContext) {
         .update(|_, cx| SettingsStore::update(cx, |s| s.keybinding_mode = KeybindingMode::Vim));
     ui.frame();
     let o = opts(&mut ui);
-    assert_eq!(o.engine, EngineKind::Helix);
+    assert_eq!(o.engine, EngineKind::Vim);
     assert!(!o.mode_chip && !o.command_line_via_host);
+    assert!(ui.cx.read(|cx| view.read(cx).engine().is_vim()));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Vim mode end to end in the pane: the engine switches live (text kept),
+/// `:w` writes the file, and two panes of one window share registers.
+#[gpui_kit::test]
+async fn vim_mode_switch_save_and_shared_registers(cx: &mut TestAppContext) {
+    cx.update(test_ui::init_shell);
+    let dir = test_ui::temp_dir("editor-vim");
+    let path = dir.join("v.md").to_string_lossy().to_string();
+    std::fs::write(&path, "alpha beta\n").unwrap();
+    let rec = test_ui::record(cx, |e| {
+        matches!(e, AppEvent::Core(CoreEvent::FileWritten { .. }))
+    });
+    let (mut ui, pane, events) = open_pane(cx, &path, PaneContext::default()).await;
+    let view = ui.cx.read(|cx| pane.read(cx).view().unwrap().clone());
+    let vtext = |ui: &mut Ui| ui.cx.read(|cx| view.read(cx).text());
+
+    // Helix edit, then switch to Vim at runtime: the text survives.
+    ui.press("i");
+    ui.type_text("x");
+    ui.press("escape");
+    assert_eq!(vtext(&mut ui), "xalpha beta\n");
+    ui.cx
+        .update(|_, cx| SettingsStore::update(cx, |s| s.keybinding_mode = KeybindingMode::Vim));
+    ui.frame();
+    assert!(ui.cx.read(|cx| view.read(cx).engine().is_vim()));
+    assert_eq!(vtext(&mut ui), "xalpha beta\n");
+
+    // Vim keys: `x` deletes, `dw` deletes a word.
+    ui.press("0");
+    ui.press("x");
+    ui.press("d");
+    ui.press("w");
+    assert_eq!(vtext(&mut ui), "beta\n");
+
+    // `:` opens cm-vim's own prompt (not the palette); `:w` saves.
+    ui.press(":");
+    assert!(
+        !events
+            .borrow()
+            .iter()
+            .any(|e| matches!(e, PaneEvent::OpenCommandPalette(_)))
+    );
+    assert_eq!(
+        ui.cx.read(|cx| view.read(cx).prompt()),
+        Some((":".to_string(), String::new()))
+    );
+    ui.type_text("w");
+    ui.press("enter");
+    ui.wait("written", |cx| written(&rec, &path, "editor", cx) >= 1)
+        .await;
+    assert_eq!(disk(&path), "beta\n");
+    assert_eq!(ui.cx.read(|cx| view.read(cx).prompt()), None);
+
+    // Registers are shared with the window's other Vim editors.
+    ui.press("y");
+    ui.press("y");
+    let other = ui.cx.update(|window, cx| {
+        let v = cx.new(|cx| {
+            fuchico_editor::EditorView::new(
+                "one\n",
+                fuchico_editor::EditorOptions {
+                    engine: EngineKind::Vim,
+                    ..Default::default()
+                },
+                fuchico_editor::EditorStyle::ayu_dark(),
+                window,
+                cx,
+            )
+        });
+        let g = super::vim_globals_for(window, cx);
+        v.update(cx, |v, _| v.set_vim_globals(Some(g)));
+        v
+    });
+    ui.cx.update(|_, cx| {
+        other.update(cx, |v, cx| {
+            let fx = v
+                .engine_mut()
+                .handle_key(fuchico_helix::KeyEvent::char('p'));
+            v.apply_effects(fx, cx);
+        })
+    });
+    assert_eq!(ui.cx.read(|cx| other.read(cx).text()), "one\nbeta\n");
+
+    // Back to Helix: text kept, Helix keys again.
+    ui.cx
+        .update(|_, cx| SettingsStore::update(cx, |s| s.keybinding_mode = KeybindingMode::Helix));
+    ui.frame();
+    assert!(!ui.cx.read(|cx| view.read(cx).engine().is_vim()));
+    assert_eq!(vtext(&mut ui), "beta\n");
     let _ = std::fs::remove_dir_all(&dir);
 }
 

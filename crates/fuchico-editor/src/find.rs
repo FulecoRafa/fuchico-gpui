@@ -230,23 +230,35 @@ impl EditorView {
 
     /// Search matches to paint in `visible` (bytes), with "selected".
     pub(crate) fn search_highlights(&self, visible: Range<usize>) -> Vec<(Range<usize>, bool)> {
-        if !self.find.open {
-            return Vec::new();
-        }
-        let Some(m) = self.find.query.matcher() else {
-            return Vec::new();
-        };
         let text = self.model.text();
-        let sel = self.sel_bytes();
         let to = (visible.end + 1000).min(text.len());
-        m.matches_in(text, visible.start, to)
-            .filter(|r| r.start <= visible.end)
-            .take(10_000)
-            .map(|r| {
-                let s = sel.contains(&r);
-                (r, s)
-            })
-            .collect()
+        let mut out: Vec<(Range<usize>, bool)> = Vec::new();
+        if self.find.open
+            && let Some(m) = self.find.query.matcher()
+        {
+            let sel = self.sel_bytes();
+            out.extend(
+                m.matches_in(text, visible.start, to)
+                    .filter(|r| r.start <= visible.end)
+                    .take(10_000)
+                    .map(|r| {
+                        let s = sel.contains(&r);
+                        (r, s)
+                    }),
+            );
+        }
+        // cm-vim's `hlsearch` overlay (`.cm-searchMatch`).
+        if let Some(v) = self.engine.as_vim() {
+            let (from, to) = (self.char_of(visible.start), self.char_of(to));
+            out.extend(
+                v.editor()
+                    .search_highlight(from, to)
+                    .into_iter()
+                    .take(10_000)
+                    .map(|(a, b)| (self.byte_of(a)..self.byte_of(b), false)),
+            );
+        }
+        out
     }
 
     /// `highlightSelectionMatches` ranges in `visible` (bytes), minus the
@@ -624,11 +636,12 @@ impl EditorView {
 
     // ---- selection commands -------------------------------------------------------------
 
-    /// On non-mac Mod-* is Ctrl-*: the Helix normal/select keymap owns
-    /// Ctrl-d / Ctrl-u (half-page moves) and wins over CodeMirror's keymap.
+    /// On non-mac Mod-* is Ctrl-*: the Helix (or Vim, `Prec.highest`)
+    /// normal-mode keymap owns Ctrl-d / Ctrl-u (half-page moves) and wins
+    /// over CodeMirror's keymap.
     fn helix_owns_ctrl(&mut self, key: &str, cx: &mut Context<Self>) -> bool {
         if cfg!(target_os = "macos")
-            || self.options.engine != EngineKind::Helix
+            || self.options.engine == EngineKind::Normal
             || self.mode() == ModeType::Insert
         {
             return false;

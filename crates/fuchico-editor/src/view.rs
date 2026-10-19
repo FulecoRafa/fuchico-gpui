@@ -10,9 +10,8 @@ use chrono::Local;
 use fuchico_core::fuzzy::fuzzy_match;
 use fuchico_core::outline::OutlineHeader;
 use fuchico_helix::{
-    Change, Completions, Config, Editor, Effect, External, Key, KeyEvent, ModeType,
-    Modifiers as HxMods, PromptKind, Range as HxRange, Scroll, ScrollAlign, Selection,
-    TextEdit as HxEdit,
+    Change, Completions, Config, Effect, External, Key, KeyEvent, ModeType, Modifiers as HxMods,
+    PromptKind, Range as HxRange, Scroll, ScrollAlign, Selection, TextEdit as HxEdit,
 };
 use fuchico_markdown::completion::should_open_completion;
 use fuchico_markdown::text::{Assoc, map_pos};
@@ -20,6 +19,7 @@ use fuchico_markdown::{
     CompletionContext, CompletionOption, FenceToolbar, FoldState, MarkdownModel, Settings,
     TableData, TableEditState, TableKey, TableModel, TableOutcome, TextEdit as MdEdit,
 };
+use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
     App, ClipboardEntry, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable,
     InteractiveElement, IntoElement, KeyDownEvent, Keystroke, MouseButton, MouseDownEvent,
@@ -30,6 +30,7 @@ use gpui_kit::{
 use crate::actions::*;
 use crate::commands::{self, CommandEdit, TokenKind};
 use crate::element::{EditorElement, Frame, Hit};
+use crate::engine::{Engine, SharedVimGlobals};
 use crate::host::{SharedLayout, ViewHost};
 use crate::style::{EditorStyle, mix};
 
@@ -59,16 +60,25 @@ pub enum InsertCursor {
 }
 
 /// Which key engine drives the view.
-///
-/// Seam for further engines (a Vim engine plugs in here as a new variant).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EngineKind {
     /// Modal Helix keys (fuchico-helix).
     #[default]
     Helix,
     /// Plain non-modal editing (CodeMirror defaults): always inserting,
-    /// shift-arrows extend the selection, Escape does nothing.
+    /// shift-arrows extend the selection, Escape does nothing. Runs on the
+    /// Helix engine kept in insert mode.
     Normal,
+    /// Modal Vim keys (fuchico-vim, `@replit/codemirror-vim` `vim()` with
+    /// default options): cm-vim's bottom dialog for `:` / `/` / `?` and
+    /// messages, fat cursor, `hlsearch` overlay, no mode chip.
+    Vim,
+}
+
+impl EngineKind {
+    pub(crate) fn is_vim(self) -> bool {
+        self == EngineKind::Vim
+    }
 }
 
 /// View options (host settings).
@@ -202,6 +212,8 @@ pub enum EditorEvent {
 #[derive(Debug, Clone)]
 pub(crate) struct PromptState {
     pub kind: PromptKind,
+    /// `:` / `/` / `?` (Vim: the engine's prompt prefix).
+    pub label: String,
     pub value: String,
     pub placeholder: Option<String>,
     pub completions: Completions,
@@ -250,7 +262,13 @@ pub(crate) struct TableEdit {
 // ---- the view -----------------------------------------------------------------
 
 pub struct EditorView {
-    pub(crate) engine: Editor,
+    pub(crate) engine: Engine,
+    /// Vim globals shared with the window's other editors (see
+    /// [`EditorView::set_vim_globals`]).
+    vim_globals: Option<SharedVimGlobals>,
+    /// Bumped per message; a cm-vim notification closes after 15 s unless
+    /// a newer one replaced it.
+    message_epoch: u64,
     pub(crate) shared: Rc<RefCell<SharedLayout>>,
     pub(crate) model: MarkdownModel,
     pub(crate) folds: FoldState,
@@ -339,18 +357,14 @@ impl EditorView {
             half_page: 10,
             ..Default::default()
         }));
-        let config = Config {
-            externals: options.externals.clone(),
-            tab_size: options.tab_size.max(1) as usize,
-            indent_unit: " ".repeat(options.tab_size.max(1) as usize),
-            ..Config::default()
-        };
-        let engine = Editor::with_host(text, config, Box::new(ViewHost::new(shared.clone())));
+        let engine = make_engine(text, &options, &shared, None);
         let normalized = engine.text();
         let model =
             MarkdownModel::with_path(&normalized, md_settings(&options), options.path.as_deref());
         let mut view = EditorView {
             engine,
+            vim_globals: None,
+            message_epoch: 0,
             shared,
             model,
             folds: FoldState::new(),
@@ -408,7 +422,7 @@ impl EditorView {
         self.engine.mode_label()
     }
     pub fn mode(&self) -> ModeType {
-        self.engine.mode().ty
+        self.engine.mode_type()
     }
     /// Pending keys (`"2"`, `"g"`, `"<space>"`, ...).
     pub fn pending_status(&self) -> String {
@@ -422,13 +436,20 @@ impl EditorView {
     pub fn selection(&self) -> &Selection {
         self.engine.selection()
     }
-    pub fn engine(&self) -> &Editor {
+    pub fn engine(&self) -> &Engine {
         &self.engine
     }
     /// Direct engine access (registers, config, custom commands). Effects
     /// returned by engine calls should be passed to [`Self::apply_effects`].
-    pub fn engine_mut(&mut self) -> &mut Editor {
+    pub fn engine_mut(&mut self) -> &mut Engine {
         &mut self.engine
+    }
+    /// Shares Vim registers / search / macros / mappings with other
+    /// editors holding the same cell (cm-vim's one `vimGlobalState` per
+    /// page). Kept across engine switches.
+    pub fn set_vim_globals(&mut self, globals: Option<SharedVimGlobals>) {
+        self.engine.set_shared_vim_globals(globals.clone());
+        self.vim_globals = globals;
     }
     pub fn model(&self) -> &MarkdownModel {
         &self.model
@@ -460,7 +481,7 @@ impl EditorView {
     /// Inline prompt (`:` / search) label + text, if open.
     pub fn prompt(&self) -> Option<(String, String)> {
         match &self.overlay {
-            Overlay::Prompt(p) => Some((prompt_label(p.kind).to_string(), p.value.clone())),
+            Overlay::Prompt(p) => Some((p.label.clone(), p.value.clone())),
             _ => None,
         }
     }
@@ -542,11 +563,15 @@ impl EditorView {
             self.model.set_path(options.path.as_deref());
         }
         self.shared.borrow_mut().path = options.path.clone();
+        let switch = options.engine.is_vim() != self.engine.is_vim();
         let cfg = self.engine.config_mut();
         cfg.externals = options.externals.clone();
         cfg.tab_size = options.tab_size.max(1) as usize;
         cfg.indent_unit = " ".repeat(cfg.tab_size);
         self.options = options;
+        if switch {
+            self.switch_engine(cx);
+        }
         self.ensure_engine_mode(cx);
         self.layout_dirty = true;
         self.wrap_rows.clear();
@@ -827,11 +852,19 @@ impl EditorView {
                 }
                 Effect::Scroll(s) => self.pending_scroll = Some(s),
                 Effect::Message { text, error } => {
-                    self.message = Some((text.clone(), error));
-                    cx.emit(EditorEvent::Message { text, error });
+                    if let Some(v) = self.engine.as_vim() {
+                        // the `:s///c` confirmation is a prompt, not a message
+                        if v.editor().confirm_prompt() != Some(text.as_str()) {
+                            self.vim_message(text.clone(), error, cx);
+                            cx.emit(EditorEvent::Message { text, error });
+                        }
+                    } else {
+                        self.message = Some((text.clone(), error));
+                        cx.emit(EditorEvent::Message { text, error });
+                    }
                 }
                 Effect::OpenCommandLine { placeholder } => {
-                    if self.options.command_line_via_host {
+                    if self.options.command_line_via_host && !self.engine.is_vim() {
                         let _ = self.engine.prompt_close(false);
                         cx.emit(EditorEvent::OpenCommandLine { placeholder });
                     } else {
@@ -947,13 +980,27 @@ impl EditorView {
             let clip = cx.read_from_clipboard().and_then(|i| i.text());
             self.shared.borrow_mut().clipboard = clip;
         }
-        self.message = None;
+        let vim = self.engine.is_vim();
+        if !vim {
+            self.message = None;
+        }
         let fx = self.engine.handle_key(ev);
         let written = self.shared.borrow_mut().clipboard_written.take();
         if let Some(w) = written {
             cx.write_to_clipboard(ClipboardItem::new_string(w));
         }
+        if vim
+            && self.message.is_some()
+            && self
+                .engine
+                .as_vim()
+                .is_some_and(|v| v.editor().message().is_none())
+        {
+            // a long notification closes on the next key
+            self.message = None;
+        }
         self.apply_effects(fx, cx);
+        self.vim_sync_prompt();
     }
 
     pub(crate) fn on_key_down(
@@ -1084,8 +1131,33 @@ impl EditorView {
         false
     }
 
+    /// Rebuilds the engine for a keybinding switch between the Helix family
+    /// (Helix / Normal) and Vim: same text, the cursor at the old head,
+    /// prompts closed. The undo history does not carry over.
+    fn switch_engine(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.overlay, Overlay::Prompt(_)) {
+            self.overlay = Overlay::None;
+        }
+        self.completion = None;
+        self.message = None;
+        let head = self.engine.selection().main().head;
+        let text = self.engine.text();
+        self.engine = make_engine(&text, &self.options, &self.shared, self.vim_globals.clone());
+        let head = head.min(self.engine.doc().len());
+        let fx = self
+            .engine
+            .set_selection_from_pointer(Selection::single(head, head));
+        self.apply_effects(fx, cx);
+        self.find.reset_history(self.engine.selection().clone());
+        cx.notify();
+    }
+
     /// Mod-z / Mod-shift-z (CodeMirror `historyKeymap`), every engine.
     pub fn undo(&mut self, redo: bool, cx: &mut Context<Self>) {
+        if let Some(fx) = self.engine.with_vim(|e| e.history_command(redo)) {
+            self.apply_effects(fx, cx);
+            return;
+        }
         let was_insert = self.mode() == ModeType::Insert;
         if was_insert {
             self.feed_key(KeyEvent::new(Key::Escape, HxMods::default()), cx);
@@ -1110,12 +1182,34 @@ impl EditorView {
 
     fn open_prompt(&mut self, kind: PromptKind, placeholder: Option<String>) {
         self.prompt_scroll_start = self.scroll_y;
+        if let Engine::Vim(v) = &self.engine {
+            // cm-vim `showPrompt`: the engine owns prefix and value (`'<,'>`
+            // in visual mode); no completion popup. `openDialog` closes
+            // the open notification.
+            let ed = v.editor();
+            let label = ed.prompt_prefix().unwrap_or(":").to_string();
+            let value = ed.prompt_value().unwrap_or_default().to_string();
+            self.message = None;
+            self.overlay = Overlay::Prompt(PromptState {
+                kind,
+                label,
+                typed: value.clone(),
+                value,
+                placeholder: None,
+                completions: Completions::default(),
+                selected: None,
+                reading_register: false,
+            });
+            self.completion = None;
+            return;
+        }
         let completions = match kind {
             PromptKind::Command => self.engine.prompt_completions(""),
             _ => Completions::default(),
         };
         self.overlay = Overlay::Prompt(PromptState {
             kind,
+            label: prompt_label(kind).to_string(),
             value: String::new(),
             placeholder,
             completions,
@@ -1128,7 +1222,11 @@ impl EditorView {
 
     fn prompt_set(&mut self, value: String, cx: &mut Context<Self>) {
         let fx = self.engine.prompt_input(&value);
-        let completions = self.engine.prompt_completions(&value);
+        let completions = if self.engine.is_vim() {
+            Completions::default()
+        } else {
+            self.engine.prompt_completions(&value)
+        };
         if let Overlay::Prompt(p) = &mut self.overlay {
             p.value = value.clone();
             p.typed = value;
@@ -1156,6 +1254,11 @@ impl EditorView {
         };
         let p = p.clone();
         let m = ks.modifiers;
+        if self.engine.is_vim() {
+            self.vim_prompt_key(ks, cx);
+            cx.notify();
+            return;
+        }
         // cm-helix `commandInput`: `Ctrl-r <reg>` appends the register's
         // first value; Escape only cancels the pending read.
         if p.kind == PromptKind::Command {
@@ -1234,6 +1337,128 @@ impl EditorView {
             }
         }
         cx.notify();
+    }
+
+    /// cm-vim's prompt input: every key goes to the engine (its
+    /// `onKeyDown` / input / `onKeyUp`: Escape, Enter, Backspace, history,
+    /// `Ctrl-u`, typed text). No Tab completion and no `Ctrl-r` in cm-vim.
+    fn vim_prompt_key(&mut self, ks: &Keystroke, cx: &mut Context<Self>) {
+        if ks.key != "tab"
+            && let Some(kev) = to_helix(ks)
+        {
+            self.feed_key(kev, cx);
+        }
+        self.vim_sync_prompt();
+    }
+
+    /// Mirrors the Vim engine's prompt into the overlay (it closes itself
+    /// on Enter / Escape and rewrites its value on history keys).
+    fn vim_sync_prompt(&mut self) {
+        let Engine::Vim(v) = &self.engine else {
+            return;
+        };
+        let ed = v.editor();
+        match (ed.prompt_kind(), &mut self.overlay) {
+            (None, Overlay::Prompt(_)) => self.overlay = Overlay::None,
+            (Some(_), Overlay::Prompt(p)) => {
+                if let Some(val) = ed.prompt_value()
+                    && val != p.value
+                {
+                    p.value = val.to_string();
+                    p.typed = p.value.clone();
+                }
+                if let Some(pre) = ed.prompt_prefix() {
+                    p.label = pre.to_string();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// cm-vim's search prompt description (`pcreLabel()`).
+    pub(crate) fn vim_search_desc(&self) -> Option<&'static str> {
+        let v = self.engine.as_vim()?;
+        if !matches!(
+            self.overlay,
+            Overlay::Prompt(PromptState {
+                kind: PromptKind::Search(_),
+                ..
+            })
+        ) {
+            return None;
+        }
+        let pcre = v.read_globals(|g| {
+            !matches!(
+                g.options.get("pcre"),
+                Some(fuchico_vim::OptionValue::Bool(false))
+            )
+        });
+        Some(if pcre {
+            "(JavaScript regexp: set pcre)"
+        } else {
+            "(Vim regexp: set nopcre)"
+        })
+    }
+
+    /// Clicking the description toggles `pcre` and re-runs the incremental
+    /// search.
+    pub(crate) fn vim_toggle_pcre(&mut self, cx: &mut Context<Self>) {
+        let Overlay::Prompt(p) = &self.overlay else {
+            return;
+        };
+        let value = p.value.clone();
+        self.engine.with_vim(|e| {
+            let opts = &mut e.globals_mut().options;
+            let on = !matches!(
+                opts.get("pcre"),
+                Some(fuchico_vim::OptionValue::Bool(false))
+            );
+            opts.insert("pcre".into(), fuchico_vim::OptionValue::Bool(!on));
+        });
+        self.prompt_set(value, cx);
+        cx.notify();
+    }
+
+    /// A cm-vim notification (`showConfirm`): closes after 15 s, or stays
+    /// until the next key for the long "Press ENTER" kind.
+    fn vim_message(&mut self, text: String, error: bool, cx: &mut Context<Self>) {
+        let long = text.ends_with("Press ENTER or type command to continue");
+        self.message = Some((text, error));
+        self.message_epoch += 1;
+        if !long {
+            let epoch = self.message_epoch;
+            cx.spawn(async move |this, cx| {
+                cx.background_executor()
+                    .timer(std::time::Duration::from_secs(15))
+                    .await;
+                let _ = this.update(cx, |v, cx| {
+                    if v.message_epoch == epoch {
+                        v.message = None;
+                        cx.notify();
+                    }
+                });
+            })
+            .detach();
+        }
+    }
+
+    /// The text of cm-vim's bottom panel when no prompt is open: the
+    /// `:s///c` confirmation, a notification, or `recording @q`.
+    pub(crate) fn vim_panel_text(&self) -> Option<(String, bool)> {
+        let v = self.engine.as_vim()?;
+        let ed = v.editor();
+        if let Some(c) = ed.confirm_prompt() {
+            return Some((c.to_string(), false));
+        }
+        if let Some((m, _)) = &self.message {
+            // `showConfirm` paints every message red
+            return Some((m.clone(), true));
+        }
+        v.read_globals(|g| {
+            let m = &g.macro_mode_state;
+            m.latest_register.filter(|_| m.is_recording)
+        })
+        .map(|r| (format!("recording @{r}"), false))
     }
 
     // ---- outline (Mod-o) ---------------------------------------------------------
@@ -1989,6 +2214,19 @@ impl EditorView {
         })
     }
 
+    /// Search-match marks (find panel and Vim `hlsearch`) in the whole
+    /// buffer: (byte range, selected).
+    #[doc(hidden)]
+    pub fn debug_search_marks(&self) -> Vec<(Range<usize>, bool)> {
+        self.search_highlights(0..self.model.text().len())
+    }
+
+    /// Text of cm-vim's bottom panel when no prompt is open.
+    #[doc(hidden)]
+    pub fn debug_vim_panel(&self) -> Option<String> {
+        self.vim_panel_text().map(|(t, _)| t)
+    }
+
     /// Painted cursors of the last frame: (window bounds, primary, fill
     /// colour).
     pub fn debug_cursors(&self) -> Vec<(gpui_kit::Bounds<Pixels>, bool, gpui_kit::Hsla)> {
@@ -2144,6 +2382,27 @@ pub fn prompt_grid(n: usize, width: Pixels, em: Pixels) -> (usize, usize) {
     let rows = n.div_ceil(cols);
     // Fill every column the rows need (no trailing empty columns).
     (n.div_ceil(rows), rows)
+}
+
+/// The engine for `options.engine` (Vim, or Helix for Helix / Normal).
+fn make_engine(
+    text: &str,
+    options: &EditorOptions,
+    shared: &Rc<RefCell<SharedLayout>>,
+    vim_globals: Option<SharedVimGlobals>,
+) -> Engine {
+    let config = Config {
+        externals: options.externals.clone(),
+        tab_size: options.tab_size.max(1) as usize,
+        indent_unit: " ".repeat(options.tab_size.max(1) as usize),
+        ..Config::default()
+    };
+    let host = Box::new(ViewHost::new(shared.clone()));
+    if options.engine.is_vim() {
+        Engine::vim(text, config, host, vim_globals)
+    } else {
+        Engine::helix(text, config, host)
+    }
 }
 
 pub(crate) fn prompt_label(kind: PromptKind) -> &'static str {
@@ -2424,6 +2683,7 @@ impl Render for EditorView {
         }
         if let Some((msg, err)) = &self.message
             && !bottom_bar
+            && !self.engine.is_vim()
         {
             body = body.child(
                 div()
@@ -2441,9 +2701,87 @@ impl Render for EditorView {
             );
         }
 
+        // cm-vim's bottom panel (`.cm-vim-panel`, only while a dialog is
+        // open): the `:` / `/` prompt, the `:s///c` confirmation, a
+        // notification or `recording @q`.
+        let vim_prompt = match &self.overlay {
+            Overlay::Prompt(p) if self.engine.is_vim() => Some(p),
+            _ => None,
+        };
+        let vim_text = if vim_prompt.is_none() {
+            self.vim_panel_text()
+        } else {
+            None
+        };
+        if vim_prompt.is_some() || vim_text.is_some() {
+            let mut panel = div()
+                .id("fuchico-editor-vim-panel")
+                .absolute()
+                .left_0()
+                .right_0()
+                .bottom_0()
+                .flex()
+                .items_start()
+                .min_h(px(12. * 1.3))
+                .px(px(10.))
+                .bg(st.card)
+                .text_color(st.card_foreground)
+                .border_t_1()
+                .border_color(st.border)
+                .font_family(st.mono_family.clone())
+                .text_size(px(12.))
+                .on_mouse_down(MouseButton::Left, stop);
+            if let Some(p) = vim_prompt {
+                panel = panel
+                    .child(
+                        div()
+                            .flex()
+                            .flex_1()
+                            .child(p.label.clone())
+                            .child(p.value.clone())
+                            .child(div().w(px(1.)).h(px(14.)).bg(st.card_foreground)),
+                    )
+                    .when_some(self.vim_search_desc(), |d, desc| {
+                        d.child(
+                            div()
+                                .id("fuchico-editor-vim-desc")
+                                .cursor_pointer()
+                                .text_color(gpui_kit::rgb(0x888888))
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(|v, _: &MouseDownEvent, _, cx| {
+                                        cx.stop_propagation();
+                                        v.vim_toggle_pcre(cx);
+                                    }),
+                                )
+                                .child(desc),
+                        )
+                    });
+            } else if let Some((text, red)) = vim_text {
+                // `showConfirm`: `color: red; white-space: pre`; a click
+                // closes it.
+                panel = panel.child(
+                    div()
+                        .flex_1()
+                        .whitespace_nowrap()
+                        .when(red, |d| d.text_color(gpui_kit::rgb(0xff0000)))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|v, _: &MouseDownEvent, _, cx| {
+                                v.message = None;
+                                cx.notify();
+                            }),
+                        )
+                        .children(text.split('\n').map(|l| div().child(l.to_string()))),
+                );
+            }
+            body = body.child(panel);
+        }
+
         match &self.overlay {
+            Overlay::Prompt(_) if self.engine.is_vim() => {}
             Overlay::Prompt(p) => {
-                let label = prompt_label(p.kind);
+                let label = p.label.clone();
                 let shown = if p.value.is_empty() {
                     p.placeholder.clone().unwrap_or_default()
                 } else {

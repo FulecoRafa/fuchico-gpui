@@ -286,6 +286,12 @@ impl Editor {
     pub fn set_globals(&mut self, g: VimGlobals) {
         self.g = g;
     }
+    /// Mutable access to the globals (hosts sharing one [`VimGlobals`]
+    /// between editors swap it in and out with `std::mem::swap`, which,
+    /// unlike [`Editor::take_globals`], builds no default keymap).
+    pub fn globals_mut(&mut self) -> &mut VimGlobals {
+        &mut self.g
+    }
     /// Move the globals out (to hand them to another editor).
     pub fn take_globals(&mut self) -> VimGlobals {
         std::mem::take(&mut self.g)
@@ -376,6 +382,14 @@ impl Editor {
             out.extend(self.handle_key(KeyEvent::char(c)));
         }
         out
+    }
+
+    /// CodeMirror's `undo` / `redo` commands (the host's Mod-z /
+    /// Mod-Shift-z): one history step, without leaving the current mode.
+    pub fn history_command(&mut self, redo: bool) -> Vec<Effect> {
+        let snap = self.snapshot();
+        self.operation(false, |ed| ed.run_history_command(redo));
+        self.finish(snap)
     }
 
     /// Advance the editor's clock (tests: insert-mode key timeouts and

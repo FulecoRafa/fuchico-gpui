@@ -1,7 +1,8 @@
 //! Native GPUI Markdown editor for Fuchico.
 //!
 //! [`EditorView`] glues three pieces together:
-//! - [`fuchico_helix::Editor`]: the modal (Helix) engine, which owns the
+//! - an [`Engine`]: the modal engine, [`fuchico_helix::Editor`] (Helix and
+//!   Normal modes) or [`fuchico_vim::Editor`] (Vim mode), which owns the
 //!   text, selections, modes, registers and undo history (char offsets);
 //! - [`fuchico_markdown::MarkdownModel`]: the live-preview model (parse,
 //!   decorations, folds, tables, completions; byte offsets);
@@ -17,6 +18,7 @@ pub mod actions;
 pub mod commands;
 pub mod display;
 mod element;
+pub mod engine;
 mod find;
 mod host;
 mod images;
@@ -26,6 +28,7 @@ mod view;
 
 pub use actions::*;
 pub use commands::{CommandEdit, TokenKind};
+pub use engine::{Engine, SharedVimGlobals, VimEngine, VimGlobals};
 pub use find::{EditorStrings, FindField};
 pub use style::EditorStyle;
 pub use view::{

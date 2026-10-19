@@ -216,6 +216,15 @@ impl EditorStyle {
         }
         .into()
     }
+    /// Vim fat cursor (the app theme's `.cm-fat-cursor`): fill (foreground
+    /// 45%, transparent when unfocused) and 1px outline (65% / 40%).
+    pub fn fat_cursor(&self, focused: bool) -> (Hsla, Hsla) {
+        if focused {
+            (mix(self.foreground, 0.45), mix(self.foreground, 0.65))
+        } else {
+            (gpui_kit::transparent_black(), mix(self.foreground, 0.40))
+        }
+    }
     /// Secondary block cursors: identical to the primary in the original.
     pub fn block_cursor_secondary(&self) -> Hsla {
         self.block_cursor()
