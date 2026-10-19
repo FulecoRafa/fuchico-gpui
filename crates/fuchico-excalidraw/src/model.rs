@@ -435,6 +435,9 @@ impl Element {
     pub fn line_height(&self) -> f64 {
         Self::num(&self.f.line_height, 1.25)
     }
+    pub fn link(&self) -> &str {
+        self.f.link.get().map(|s| s.as_str()).unwrap_or("")
+    }
     pub fn text(&self) -> &str {
         self.f.text.get().map(|s| s.as_str()).unwrap_or("")
     }

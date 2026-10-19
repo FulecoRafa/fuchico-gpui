@@ -247,6 +247,9 @@ impl Xf {
 pub fn build_path(ops: &[Op], xf: &Xf, paint: &Paint, zoom: f64) -> Option<gpui_kit::Path<Pixels>> {
     let mut b = match paint {
         Paint::Fill => PathBuilder::fill(),
+        Paint::FillNonZero => PathBuilder::fill().with_style(gpui_kit::PathStyle::Fill(
+            gpui_kit::FillOptions::default().with_fill_rule(gpui_kit::FillRule::NonZero),
+        )),
         Paint::Stroke { width, dash } => {
             let w = px((*width as f64 * zoom).max(0.5) as f32);
             if let Some([a, g]) = dash {
@@ -504,7 +507,8 @@ fn paint_image(
     if w <= 0.0 || h <= 0.0 {
         return;
     }
-    let img = if el.angle() == 0.0 && !scale.0 && !scale.1 {
+    let crop = crate::export::crop_of(el);
+    let img = if crop.is_none() && el.angle() == 0.0 && !scale.0 && !scale.1 {
         Some(dec.plain.clone())
     } else {
         let key = {
@@ -514,14 +518,20 @@ fn paint_image(
             w.to_bits().hash(&mut hs);
             h.to_bits().hash(&mut hs);
             scale.hash(&mut hs);
+            if let Some(c) = crop {
+                for v in [c.x, c.y, c.width, c.height] {
+                    v.to_bits().hash(&mut hs);
+                }
+            }
             hs.finish()
         };
         caches
             .transformed
             .entry((file_id.clone(), key))
             .or_insert_with(|| {
+                let cropped = crop.map(|c| crop_rgba(&dec.rgba, c));
                 Some(Arc::new(transform_image(
-                    &dec.rgba,
+                    cropped.as_ref().unwrap_or(&dec.rgba),
                     w,
                     h,
                     el.angle(),
@@ -536,6 +546,17 @@ fn paint_image(
     let br = cam.to_screen(origin, [b[2], b[3]]);
     let bounds = Bounds::from_corners(tl, br);
     let _ = window.paint_image(bounds, bounds, Corners::default(), img, 0, false);
+}
+
+/// The part of a decoded image a crop (in natural pixels) keeps.
+fn crop_rgba(src: &image::RgbaImage, c: crate::export::Crop) -> image::RgbaImage {
+    let kx = f64::from(src.width()) / c.natural_width.max(1e-6);
+    let ky = f64::from(src.height()) / c.natural_height.max(1e-6);
+    let x = ((c.x * kx).round().max(0.0) as u32).min(src.width() - 1);
+    let y = ((c.y * ky).round().max(0.0) as u32).min(src.height() - 1);
+    let w = ((c.width * kx).round().max(1.0) as u32).min(src.width() - x);
+    let h = ((c.height * ky).round().max(1.0) as u32).min(src.height() - y);
+    image::imageops::crop_imm(src, x, y, w, h).to_image()
 }
 
 /// Resamples `src` stretched to `w`×`h`, flipped and rotated by `angle`, into

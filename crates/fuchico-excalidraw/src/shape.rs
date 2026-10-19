@@ -37,8 +37,15 @@ pub enum Ink {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Paint {
-    Stroke { width: f32, dash: Option<[f32; 2]> },
+    Stroke {
+        width: f32,
+        dash: Option<[f32; 2]>,
+    },
+    /// Even-odd fill (rough.js paths, polygons and curves; glyphs).
     Fill,
+    /// Non-zero fill: rough.js fills ellipses and rectangles this way, and
+    /// their two overlapping sketch passes would cancel under even-odd.
+    FillNonZero,
 }
 
 #[derive(Clone, Debug)]
@@ -202,6 +209,7 @@ fn sets_to_layers(
     fill_ink: Ink,
     out: &mut Vec<Layer>,
 ) {
+    let shape = d.shape.clone();
     let sw = d.options.stroke_width.unwrap_or(1.0);
     let fw = {
         let f = d.options.fill_weight.unwrap_or(-1.0);
@@ -234,7 +242,14 @@ fn sets_to_layers(
             ),
             OpSetType::FillPath => {
                 ops.push(Op::Close);
-                (Paint::Fill, fill_ink)
+                // rough.js: `curve`/`polygon`/`path` fill even-odd, the rest
+                // (ellipse, rectangle, …) non-zero.
+                let paint = if matches!(shape.as_str(), "curve" | "polygon" | "path") {
+                    Paint::Fill
+                } else {
+                    Paint::FillNonZero
+                };
+                (paint, fill_ink)
             }
         };
         out.push(Layer { paint, ink, ops });
@@ -802,5 +817,20 @@ mod tests {
                 format!("{:?}", s2.layers[0].ops)
             );
         }
+    }
+
+    /// rough.js fills an ellipse with two overlapping passes; even-odd would
+    /// cancel them out (the solid ellipse used to render unfilled).
+    #[test]
+    fn solid_ellipse_fills_non_zero() {
+        let e = el(
+            r##"{"id":"a","type":"ellipse","x":0,"y":0,"width":180,"height":110,"seed":1002,"backgroundColor":"#ffc9c9","fillStyle":"solid"}"##,
+        );
+        let s = generate(&e);
+        assert!(s.layers.iter().any(|l| l.paint == Paint::FillNonZero));
+        let r = el(
+            r##"{"id":"a","type":"rectangle","x":0,"y":0,"width":180,"height":110,"seed":1,"roundness":{"type":3},"backgroundColor":"#ffc9c9","fillStyle":"solid"}"##,
+        );
+        assert!(generate(&r).layers.iter().any(|l| l.paint == Paint::Fill));
     }
 }

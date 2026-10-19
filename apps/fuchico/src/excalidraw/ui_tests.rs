@@ -242,3 +242,130 @@ const SAMPLE: &str = r##"{"type":"excalidraw","version":2,"source":"test","eleme
 {"id":"e1","type":"ellipse","x":440,"y":160,"width":160,"height":100,"angle":0,"strokeColor":"#e03131","backgroundColor":"transparent","fillStyle":"solid","strokeWidth":2,"strokeStyle":"solid","roughness":1,"opacity":100,"groupIds":[],"frameId":null,"roundness":null,"seed":22,"version":1,"versionNonce":2,"isDeleted":false,"boundElements":null,"updated":1,"link":null,"locked":false},
 {"id":"t1","type":"text","x":150,"y":300,"width":200,"height":25,"angle":0,"strokeColor":"#1e1e1e","backgroundColor":"transparent","fillStyle":"solid","strokeWidth":2,"strokeStyle":"solid","roughness":1,"opacity":100,"groupIds":[],"frameId":null,"roundness":null,"seed":33,"version":1,"versionNonce":3,"isDeleted":false,"boundElements":null,"updated":1,"link":null,"locked":false,"text":"Hello drawing","fontSize":20,"fontFamily":1,"textAlign":"left","verticalAlign":"top","containerId":null,"originalText":"Hello drawing","lineHeight":1.25,"baseline":18}
 ],"appState":{"viewBackgroundColor":"#ffffff","gridSize":null},"files":{}}"##;
+
+/// Side-by-side material for the parity round: the editor in the states
+/// the original's stock Excalidraw was captured in (same scene, same
+/// 1280×800 viewport). Writes `target/snapshots/excal-*.png`.
+#[test]
+fn snapshots_compare_with_stock() {
+    use fuchico_excalidraw::{DebugUi, Tool};
+    let lib = test_ui::temp_dir("excal-cmp-lib").join("library.excalidrawlib");
+    // SAFETY: test-only; read once when each view is created.
+    unsafe { std::env::set_var(fuchico_excalidraw::library::LIBRARY_ENV, &lib) };
+    let cases: &[(&str, bool, Prep)] = &[
+        ("default", false, |_, _, _| {}),
+        ("default-dark", true, |_, _, _| {}),
+        ("menu", false, |v, _, cx| v.debug_open(DebugUi::Menu, cx)),
+        ("selected-rect", false, |v, _, cx| {
+            v.select_ids(&["el1"], cx)
+        }),
+        ("selected-arrow", false, |v, _, cx| {
+            v.select_ids(&["el4"], cx)
+        }),
+        ("selected-text", false, |v, _, cx| {
+            v.select_ids(&["el5"], cx)
+        }),
+        ("tool-rect", false, |v, w, cx| {
+            v.set_tool(Tool::Rectangle, w, cx)
+        }),
+        ("help", false, |v, _, cx| v.debug_open(DebugUi::Help, cx)),
+        ("library", false, |v, _, cx| {
+            v.debug_open(DebugUi::Library, cx)
+        }),
+        ("ctx-canvas", false, |v, _, cx| {
+            v.debug_open(DebugUi::ContextMenu(900., 600.), cx)
+        }),
+        ("ctx-element", false, |v, _, cx| {
+            v.select_ids(&["el1"], cx);
+            v.debug_open(DebugUi::ContextMenu(200., 175.), cx)
+        }),
+        ("export", false, |v, _, cx| {
+            v.debug_open(DebugUi::Export, cx)
+        }),
+        ("picker", false, |v, _, cx| {
+            v.select_ids(&["el1"], cx);
+            v.debug_open(DebugUi::StrokePicker, cx)
+        }),
+        ("selected-rect-dark", true, |v, _, cx| {
+            v.select_ids(&["el1"], cx)
+        }),
+        ("multi-select", false, |v, _, cx| {
+            v.select_ids(&["el1", "el2", "el3", "el4", "el5"], cx)
+        }),
+        ("selected-img-tool", false, |v, w, cx| {
+            v.set_tool(Tool::Image, w, cx)
+        }),
+        ("laser", false, |v, w, cx| v.set_tool(Tool::Laser, w, cx)),
+        ("extra-tools", false, |v, _, cx| {
+            v.debug_open(DebugUi::ExtraTools, cx)
+        }),
+        ("text-to-diagram", false, |v, _, cx| {
+            v.debug_open(DebugUi::Mermaid, cx)
+        }),
+        ("lib-items", false, |v, _, cx| {
+            v.select_ids(&["el1", "el2", "el3", "el4", "el5"], cx);
+            v.debug_open(DebugUi::AddSelectionToLibrary, cx)
+        }),
+        ("lib-menu", false, |v, _, cx| {
+            v.debug_open(DebugUi::LibraryMenu, cx)
+        }),
+        ("stats", false, |v, _, cx| {
+            v.select_ids(&["el1"], cx);
+            v.debug_open(DebugUi::Stats, cx)
+        }),
+        ("zen", false, |v, _, cx| v.debug_open(DebugUi::Zen, cx)),
+        ("view-mode", false, |v, _, cx| {
+            v.debug_open(DebugUi::ViewMode, cx)
+        }),
+        ("search", false, |v, _, cx| {
+            v.debug_open(DebugUi::Search("fuchico"), cx)
+        }),
+        ("link", false, |v, _, cx| {
+            v.debug_open(DebugUi::Link("el1", "https://excalidraw.com", false), cx)
+        }),
+        ("link-edit", false, |v, _, cx| {
+            v.debug_open(DebugUi::Link("el1", "https://excalidraw.com", true), cx)
+        }),
+    ];
+    for (name, dark, prep) in cases {
+        snap_case(name, *dark, COMPARE, *prep);
+    }
+    // Image crop mode: an image showing its left 60%, the rest dimmed.
+    snap_case("crop", false, CROP, |v, _, cx| {
+        v.debug_open(DebugUi::Crop("im"), cx)
+    });
+    snap_case("cropped", false, CROP, |v, _, cx| v.select_ids(&["im"], cx));
+}
+
+type Prep = fn(
+    &mut fuchico_excalidraw::ExcalidrawView,
+    &mut gpui_kit::Window,
+    &mut gpui_kit::Context<fuchico_excalidraw::ExcalidrawView>,
+);
+
+fn snap_case(name: &str, dark: bool, scene: &'static str, prep: Prep) {
+    use fuchico_excalidraw::{ExcalidrawStyle, ExcalidrawView};
+    {
+        crate::snapshot::snapshot_with(
+            &format!("excal-{name}"),
+            gpui_kit::size(px(1280.), px(800.)),
+            SnapTheme::default_mode(dark),
+            move |window, cx| {
+                let style: fuchico_excalidraw::StyleFn = Rc::new(move |_| {
+                    if dark {
+                        ExcalidrawStyle::dark()
+                    } else {
+                        ExcalidrawStyle::light()
+                    }
+                });
+                cx.new(|cx| ExcalidrawView::new(scene, style, Rc::new(|_, _| Ok(())), window, cx))
+            },
+            move |view, window, cx| view.update(cx, |v, cx| prep(v, window, cx)),
+        );
+    }
+}
+
+const CROP: &str = r#"{"type":"excalidraw","version":2,"source":"test","elements":[{"id":"im","type":"image","x":400,"y":250,"width":192,"height":320,"angle":0,"strokeColor":"transparent","backgroundColor":"transparent","fillStyle":"solid","strokeWidth":2,"strokeStyle":"solid","roughness":1,"opacity":100,"groupIds":[],"seed":1,"version":1,"versionNonce":1,"isDeleted":false,"boundElements":null,"updated":1,"link":null,"locked":false,"status":"saved","fileId":"f","scale":[1,1],"crop":{"x":0,"y":0,"width":19.2,"height":32,"naturalWidth":32,"naturalHeight":32}}],"appState":{"scrollX":0,"scrollY":0,"zoom":{"value":1}},"files":{"f":{"mimeType":"image/png","id":"f","dataURL":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAE0UlEQVR42hXUEZioWgCF0cHBMAzDMAwHw75HYRiGYRiGYRiG4cEwDMMwu28Fyzb8tH9+fv7790tETEJKRk7xE/79UVJR09DS0dsMjEzMLKxs7DaBg5OLm4eXn59fAUTEJKRk5BS/AiipqGlo6ehtBkYmZhZWNnabwMHJxc3D+/sFRAKIiElIycgpIgGUVNQ0tHT0NgMjEzMLKxu7TeDg5OLm4Y2+gFgAETEJKRk5RSyAkoqahpaO3mZgZGJmYWVjtwkcnFzcPLzxF5AIICImISUjp0gEUFJR09DS0dsMjEzMLKxs7DaBg5OLm4c3+QJSAUTEJKRk5BSpAEoqahpaOnqbgZGJmYWVjd0mcHBycfPwpl9AJoCImISUjJwiE0BJRU1DS0dvMzAyMbOwsrHbBA5OLm4e3uwLyAUQEZOQkpFT5AIoqahpaOnobQZGJmYWVjZ2m8DBycXNw5t/AUX490tETEJKRk5R/Pfvj5KKmoaWjt5mYGRiZmFlY7cJHJxc3Dy8/Pz8CSAiJiElI6f4E0BJRU1DS0dvMzAyMbOwsrHbBA5OLm4e3r8voBRARExCSkZOUQqgpKKmoaWjtxkYmZhZWNnYbQIHJxc3D2/5BVQCiIhJSMnIKSoBlFTUNLR09DYDIxMzCysbu03g4OTi5uGtvoBaABExCSkZOUUtgJKKmoaWjt5mYGRiZmFlY7cJHJxc3Dy89RfQCCAiJiElI6doBFBSUdPQ0tHbDIxMzCysbOw2gYOTi5uHt/kCWgFExCSkZOQUrQBKKmoaWjp6m4GRiZmFlY3dJnBwcnHz8LZfQCeAiJiElIycohNASUVNQ0tHbzMwMjGzsLKx2wQOTi5uHt7uC+gdERExCSkZOUXviCipqGlo6ehtBkYmZhZWNnabwMHJxc3D239HNAggIiYhJSOnGARQUlHT0NLR2wyMTMwsrGzsNoGDk4ubh3f4AkYBRMQkpGTkFKMASipqGlo6epuBkYmZhZWN3SZwcHJx8/COX8AkgIiYhJSMnGISQElFTUNLR28zMDIxs7CysdsEDk4ubh7e6QuYBRARk5CSkVPMAiipqGlo6ehtBkYmZhZWNnabwMHJxc3DO38BiwAiYhJSMnKKRQAlFTUNLR29zcDIxMzCysZuEzg4ubh5eJcvYBVARExCSkZOsQqgpKKmoaWjtxkYmZhZWNnYbQIHJxc3D+/6BWwCiIhJSMnIKTYBlFTUNLR09DYDIxMzCysbu03g4OTi5uHdvoDdERERk5CSkVPsjoiSipqGlo7eZmBkYmZhZWO3CRycXNw8vPt3REEAETEJKRk5RRBASUVNQ0tHbzMwMjGzsLKx2wQOTi5uHt7wBRwCiIhJSMnIKQ4BlFTUNLR09DYDIxMzCysbu03g4OTi5uE9voBTABExCSkZOcUpgJKKmoaWjt5mYGRiZmFlY7cJHJxc3Dy85xdwCSAiJiElI6e4BFBSUdPQ0tHbDIxMzCysbOw2gYOTi5uH9/oCbgFExCSkZOQUtwBKKmoaWjp6m4GRiZmFlY3dJnBwcnHz8N5fwCOAiJiElIyc4hFASUVNQ0tHbzMwMjGzsLKx2wQOTi5uHt7nC3gFEBGTkJKRU7wCKKmoaWjp6G0GRiZmFlY2dpvAwcnFzcPL/wGmIJfYHKI6AAAAAElFTkSuQmCC","created":1}}}"#;
+
+const COMPARE: &str =
+    include_str!("../../../../crates/fuchico-excalidraw/tests/fixtures/compare.excalidraw");

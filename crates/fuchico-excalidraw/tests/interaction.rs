@@ -332,7 +332,9 @@ fn colour_picker_palette_shades_hex(cx: &mut TestAppContext) {
     assert_eq!(h.of("rectangle")[0]["strokeColor"], "#ffc9c9");
     h.button("pk-shade-4");
     assert_eq!(h.of("rectangle")[0]["strokeColor"], "#fa5252");
-    h.press("f"); // violet (q w e r t / a s d f g / z x c v b)
+    h.press("f"); // grape (stock order: q w e r t / a s d f g / z x c v b)
+    assert_eq!(h.of("rectangle")[0]["strokeColor"], "#9c36b5");
+    h.press("d"); // violet
     assert_eq!(h.of("rectangle")[0]["strokeColor"], "#6741d9");
     assert_eq!(
         h.cx.update(|_, cx| h.view.read(cx).tool()),
@@ -388,13 +390,17 @@ fn arrow_type_elbow_routes_orthogonally(cx: &mut TestAppContext) {
     let a = h.of("arrow")[0].clone();
     assert_eq!(a["elbowed"], false);
     assert_eq!(a["roundness"]["type"], 2);
-    // New arrows use the chosen type; every Excalidraw arrowhead is offered.
+    // New arrows use the chosen type; every Excalidraw arrowhead is offered
+    // in the end-arrowhead popover.
+    h.button("ah-end");
+    assert!(h.exists("ah-popover"));
     for k in [
         "None", "Arrow", "Bar", "●", "○", "▲", "△", "◆", "◇", "Cf1", "CfN", "Cf1N",
     ] {
         assert!(h.exists(&format!("ah-false-{k}")), "{k}");
     }
     h.button("ah-false-◇");
+    assert!(!h.exists("ah-popover"));
     assert_eq!(h.of("arrow")[0]["endArrowhead"], "diamond_outline");
 }
 
@@ -442,18 +448,18 @@ fn opacity_slider_drags(cx: &mut TestAppContext) {
     let b = h.bounds("op-slider").unwrap();
     let y = b.center().y;
     h.down(
-        point(b.left() + px(25.0), y),
+        point(b.left() + b.size.width * 0.25, y),
         MouseButton::Left,
         Modifiers::default(),
         1,
     );
     h.mv(
-        point(b.left() + px(60.0), y),
+        point(b.left() + b.size.width * 0.6, y),
         Some(MouseButton::Left),
         Modifiers::default(),
     );
     h.up(
-        point(b.left() + px(60.0), y),
+        point(b.left() + b.size.width * 0.6, y),
         MouseButton::Left,
         Modifiers::default(),
         1,
@@ -588,6 +594,7 @@ fn export_dialog_writes_svg_with_scene(cx: &mut TestAppContext) {
     h.rect(p(300.0, 300.0), p(400.0, 380.0));
     h.press("cmd-shift-e");
     assert!(h.exists("dialog-export-image"));
+    assert!(h.exists("ex-preview"));
     h.button("ex-embed");
     h.button("ex-3");
     h.button("ex-svg");
@@ -666,15 +673,275 @@ fn library_add_insert_drag_export(cx: &mut TestAppContext) {
         .iter()
         .find(|e| (f(e, "x") + f(e, "width") / 2.0 - 500.0).abs() < 1.0);
     assert!(dropped.is_some(), "{rects:?}");
-    // Export via the save dialog.
+    // Export via the ⋮ menu's "Save to..." and the save dialog.
+    h.button("lib-more");
+    assert!(h.exists("lib-menu"));
     h.button("lib-export");
+    assert!(!h.exists("lib-menu"));
     let out = temp_path("mine.excalidrawlib");
     let o2 = out.clone();
     h.cx.simulate_new_path_selection(move |_| Some(o2));
     h.cx.run_until_parked();
     let exported: Value = serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
     assert_eq!(exported["libraryItems"].as_array().unwrap().len(), 1);
-    // Remove.
+    // Remove (the × shows on hover).
+    let cell = h.bounds("lib-item-0").unwrap().center();
+    h.mv(cell, None, Modifiers::default());
     h.button("lib-remove-0");
     assert!(!h.exists("lib-item-0"));
+    // Reset asks first; Cancel keeps the items.
+    h.button("lib-add");
+    h.button("lib-more");
+    h.button("lib-reset");
+    assert!(h.exists("dialog-reset-library"));
+    h.button("dlg-cancel");
+    assert!(h.exists("lib-item-0"));
+    h.button("lib-more");
+    h.button("lib-reset");
+    h.button("dlg-confirm");
+    assert!(!h.exists("lib-item-0"));
+    // The sidebar closes with ×, bringing the Library button back.
+    assert!(!h.exists("lib-toggle"));
+    h.button("lib-close");
+    assert!(!h.exists("library"));
+    assert!(h.exists("lib-toggle"));
+}
+
+// ------------------------------------------------------- stock chrome
+
+const COMPARE: &str = include_str!("fixtures/compare.excalidraw");
+
+#[gpui::test]
+fn find_on_canvas_searches_text(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    h.press("cmd-f");
+    assert!(h.exists("library"));
+    assert!(h.exists("search-input"));
+    h.press("f u c h");
+    assert!(h.exists("search-hit-0"));
+    assert!(!h.exists("search-hit-1"));
+    assert_eq!(h.selection(), vec!["el5".to_string()]);
+    h.press("backspace backspace backspace backspace z z");
+    assert!(!h.exists("search-hit-0"));
+    assert!(h.exists("search-count"));
+    // Escape leaves the field; keys go back to the canvas.
+    h.press("escape");
+    h.press("r");
+    let tool = h.cx.update(|_, cx| h.view.read(cx).tool());
+    assert_eq!(tool, fuchico_excalidraw::Tool::Rectangle);
+    // The Library tab is one click away.
+    h.button("sb-library");
+    assert!(h.exists("lib-browse"));
+    assert!(!h.exists("search-input"));
+}
+
+#[gpui::test]
+fn zen_and_view_modes(cx: &mut TestAppContext) {
+    let mut h = open(cx, EMPTY);
+    assert!(h.exists("t-rect"));
+    h.press("alt-z");
+    assert!(h.cx.update(|_, cx| h.view.read(cx).zen_mode()));
+    assert!(!h.exists("t-rect"));
+    h.button("exit-zen");
+    assert!(h.exists("t-rect"));
+    // View mode: read-only, no toolbar, drags pan instead of drawing.
+    h.press("alt-r");
+    assert!(h.cx.update(|_, cx| h.view.read(cx).view_mode()));
+    assert!(!h.exists("t-rect"));
+    h.press("r");
+    h.drag(p(300.0, 300.0), p(400.0, 400.0));
+    assert!(h.elements().is_empty());
+    // The canvas context menu offers the mode toggles.
+    h.rclick(p(500.0, 500.0));
+    assert!(h.exists("cm-view-mode"));
+    h.button("cm-view-mode");
+    assert!(!h.cx.update(|_, cx| h.view.read(cx).view_mode()));
+    assert!(h.exists("t-rect"));
+}
+
+#[gpui::test]
+fn laser_pointer_draws_nothing(cx: &mut TestAppContext) {
+    let mut h = open(cx, EMPTY);
+    h.press("k");
+    let tool = h.cx.update(|_, cx| h.view.read(cx).tool());
+    assert_eq!(tool, fuchico_excalidraw::Tool::Laser);
+    h.drag(p(300.0, 300.0), p(400.0, 400.0));
+    assert!(h.elements().is_empty());
+}
+
+#[gpui::test]
+fn extra_tools_menu_and_mermaid_stub(cx: &mut TestAppContext) {
+    let mut h = open(cx, EMPTY);
+    h.button("t-extra");
+    assert!(h.exists("extra-tools"));
+    h.button("x-laser");
+    assert!(!h.exists("extra-tools"));
+    let tool = h.cx.update(|_, cx| h.view.read(cx).tool());
+    assert_eq!(tool, fuchico_excalidraw::Tool::Laser);
+    h.button("t-extra");
+    h.button("x-mermaid");
+    assert!(h.exists("dialog-mermaid-to-excalidraw"));
+    // Like the original app: the converter is stubbed out.
+    assert!(h.exists("mermaid-error"));
+    h.press("escape");
+    assert!(!h.exists("dialog-mermaid-to-excalidraw"));
+}
+
+#[gpui::test]
+fn stats_panel_toggles(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    h.press("alt-/");
+    assert!(h.exists("stats"));
+    h.button("stats-close");
+    assert!(!h.exists("stats"));
+}
+
+#[gpui::test]
+fn main_menu_save_and_open_scene(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    let out = temp_path("scene.excalidraw");
+    let o2 = out.clone();
+    h.button("menu");
+    h.button("m-save");
+    h.cx.simulate_new_path_selection(move |_| Some(o2));
+    h.cx.run_until_parked();
+    let saved = std::fs::read_to_string(&out).unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&saved).unwrap(),
+        serde_json::from_str::<Value>(&h.cx.update(|_, cx| h.view.read(cx).to_json())).unwrap()
+    );
+    // Clear, then open the saved file back.
+    h.press("cmd-a");
+    h.press("delete");
+    assert!(h.elements().is_empty());
+    h.button("menu");
+    h.button("m-open");
+    let o3 = out.clone();
+    h.cx.simulate_path_prompt_response(move |_| Some(vec![o3]));
+    h.cx.run_until_parked();
+    h.frame();
+    assert_eq!(h.elements().len(), 5);
+}
+
+#[gpui::test]
+fn align_font_size_and_layer_shortcuts(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    h.view
+        .update(&mut h.cx, |v, cx| v.select_ids(&["el1", "el2"], cx));
+    h.press("cmd-shift-up");
+    let (a, b) = (
+        h.json()["elements"][0].clone(),
+        h.json()["elements"][1].clone(),
+    );
+    assert_eq!(f(&a, "y"), f(&b, "y"));
+    h.view.update(&mut h.cx, |v, cx| v.select_ids(&["el5"], cx));
+    let before = f(&h.of("text")[0], "fontSize");
+    h.press("cmd-shift-.");
+    assert!(f(&h.of("text")[0], "fontSize") > before);
+    // ⌘⌥[ sends to back.
+    h.press("cmd-alt-[");
+    assert_eq!(h.json()["elements"][0]["id"], "el5");
+}
+
+#[gpui::test]
+fn element_links(cx: &mut TestAppContext) {
+    let mut h = open(cx, COMPARE);
+    let link = |h: &mut H| {
+        h.elements()
+            .into_iter()
+            .find(|e| e["id"] == "el5")
+            .map(|e| e["link"].clone())
+            .unwrap()
+    };
+    // Select the text via search, then ⌘K opens the hyperlink editor.
+    h.press("cmd-f");
+    h.press("f u c h");
+    h.press("escape");
+    assert_eq!(h.selection(), vec!["el5".to_string()]);
+    assert!(!h.exists("link-popover"));
+    h.press("cmd-k");
+    assert!(h.exists("link-input"));
+    h.press("a b c");
+    h.press("enter");
+    assert!(!h.exists("link-input"));
+    assert_eq!(link(&mut h), "abc");
+    // A selected linked element shows the preview; every linked element
+    // gets the chain handle.
+    assert!(h.exists("link-open"));
+    assert!(h.exists("link-icon-el5"));
+    // Edit: clear it and submit — stock stores `null`.
+    h.button("link-edit");
+    h.press("backspace backspace backspace");
+    h.press("enter");
+    assert_eq!(link(&mut h), Value::Null);
+    assert!(!h.exists("link-icon-el5"));
+    // Escape cancels.
+    h.press("cmd-k");
+    h.press("q");
+    h.press("escape");
+    assert!(!h.exists("link-input"));
+    assert_eq!(link(&mut h), Value::Null);
+    // The Actions button opens it too; clicking away submits.
+    h.button("a-link");
+    h.press("x");
+    h.click(p(20.0, 700.0));
+    assert_eq!(link(&mut h), "x");
+    // The trash button removes it.
+    h.press("cmd-f");
+    h.press("enter");
+    h.press("escape");
+    h.button("link-remove");
+    assert_eq!(link(&mut h), Value::Null);
+}
+
+const IMAGE: &str = r#"{"type":"excalidraw","version":2,"source":"test","elements":[{"id":"im","type":"image","x":300,"y":300,"width":200,"height":200,"angle":0,"strokeColor":"transparent","backgroundColor":"transparent","fillStyle":"solid","strokeWidth":2,"strokeStyle":"solid","roughness":1,"opacity":100,"groupIds":[],"seed":1,"version":1,"versionNonce":1,"isDeleted":false,"boundElements":null,"updated":1,"link":null,"locked":false,"status":"saved","fileId":"f","scale":[1,1],"crop":null}],"appState":{"scrollX":0,"scrollY":0,"zoom":{"value":1}},"files":{"f":{"mimeType":"image/png","id":"f","dataURL":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP4z8AAQkC8AEieYPgPAESMCGKJ8LHJAAAAAElFTkSuQmCC","created":1}}}"#;
+
+#[gpui::test]
+fn image_crop_mode(cx: &mut TestAppContext) {
+    let mut h = open(cx, IMAGE);
+    let img = |h: &mut H| h.of("image")[0].clone();
+    // Double-click enters crop mode (no text is created).
+    h.dbl(p(400.0, 400.0));
+    assert!(h.of("text").is_empty());
+    assert_eq!(h.selection(), vec!["im".to_string()]);
+    // Dragging the east handle trims the right half instead of scaling.
+    h.drag(p(504.0, 400.0), p(400.0, 400.0));
+    let i = img(&mut h);
+    assert!((f(&i, "width") - 100.0).abs() < 0.5, "{i}");
+    assert!((f(&i, "height") - 200.0).abs() < 0.5, "{i}");
+    assert!((f(&i, "x") - 300.0).abs() < 0.5, "{i}");
+    let c = &i["crop"];
+    assert!((f(c, "width") - 1.0).abs() < 0.01, "{c}");
+    assert!((f(c, "height") - 2.0).abs() < 0.01, "{c}");
+    assert_eq!(f(c, "x"), 0.0);
+    assert_eq!(f(c, "naturalWidth"), 2.0);
+    // The west handle trims from the left: crop.x moves.
+    h.drag(p(296.0, 400.0), p(350.0, 400.0));
+    let i = img(&mut h);
+    assert!((f(&i, "x") - 350.0).abs() < 0.5, "{i}");
+    assert!((f(&i["crop"], "x") - 0.5).abs() < 0.01, "{i}");
+    // Growing back is clamped to the uncropped image; a full crop is null.
+    h.drag(p(346.0, 400.0), p(100.0, 400.0));
+    h.drag(p(404.0, 400.0), p(900.0, 400.0));
+    let i = img(&mut h);
+    assert!((f(&i, "width") - 200.0).abs() < 0.5, "{i}");
+    assert!((f(&i, "x") - 300.0).abs() < 0.5, "{i}");
+    assert_eq!(i["crop"], Value::Null);
+    // Escape leaves crop mode: the handle scales again.
+    h.press("escape");
+    h.drag(p(504.0, 400.0), p(400.0, 400.0));
+    let i = img(&mut h);
+    assert_eq!(i["crop"], Value::Null);
+    assert!((f(&i, "width") - 100.0).abs() < 0.5, "scaled {i}");
+    // Enter on a selected image (and the context menu) re-enter crop mode.
+    h.press("enter");
+    let i = img(&mut h);
+    let (x, w) = (f(&i, "x"), f(&i, "width"));
+    let (y, hh) = (f(&i, "y"), f(&i, "height"));
+    let mid = (y + hh / 2.0) as f32;
+    h.drag(p((x + w + 4.0) as f32, mid), p((x + w / 2.0) as f32, mid));
+    assert!(img(&mut h)["crop"].is_object());
+    h.press("escape");
+    h.rclick(p((x + w / 4.0) as f32, mid));
+    assert!(h.exists("cm-crop"));
 }

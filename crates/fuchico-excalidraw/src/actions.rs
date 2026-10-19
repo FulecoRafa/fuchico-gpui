@@ -27,7 +27,16 @@ pub enum PickerTarget {
 pub enum Dialog {
     Export,
     Help,
+    /// "Text to diagram" → Mermaid. Fuchico stubs the converter, so (like the
+    /// original app) the dialog only reports that it is unavailable.
+    Mermaid,
+    /// "Reset library" confirmation (library deletes are not undoable).
+    ResetLibrary,
 }
+
+/// The error the original app's mermaid-to-excalidraw stub throws.
+pub const MERMAID_UNAVAILABLE: &str =
+    "Mermaid to Excalidraw conversion is not available in Fuchico.";
 
 /// Export dialog settings (Excalidraw's image export options).
 #[derive(Clone, Debug, PartialEq)]
@@ -87,9 +96,14 @@ pub enum Action {
     ToggleGrid,
     ToggleObjectSnap,
     UnlockAll,
-    ZoomToFit,
     Export,
     Help,
+    ZenMode,
+    ViewMode,
+    Stats,
+    Find,
+    Link,
+    Crop,
 }
 
 impl Action {
@@ -118,9 +132,14 @@ impl Action {
             Action::ToggleGrid => "grid",
             Action::ToggleObjectSnap => "obj-snap",
             Action::UnlockAll => "unlock-all",
-            Action::ZoomToFit => "zoom-fit",
             Action::Export => "export",
             Action::Help => "help",
+            Action::ZenMode => "zen",
+            Action::ViewMode => "view-mode",
+            Action::Stats => "stats",
+            Action::Find => "find",
+            Action::Link => "link",
+            Action::Crop => "crop",
         }
     }
 }
@@ -131,6 +150,32 @@ impl ExcalidrawView {
     pub(crate) fn context_entries(&self) -> Vec<Option<(Action, String, &'static str, bool)>> {
         let mut v: Vec<Option<(Action, String, &'static str, bool)>> = Vec::new();
         let e = |a, l: &str, k| Some((a, l.to_string(), k, false));
+        let modes = |v: &mut Vec<_>| {
+            v.push(Some((Action::ZenMode, "Zen mode".into(), "⌥Z", self.zen)));
+            v.push(Some((
+                Action::ViewMode,
+                "View mode".into(),
+                "⌥R",
+                self.view_mode,
+            )));
+            v.push(Some((
+                Action::Stats,
+                "Canvas & Shape properties".into(),
+                "⌥/",
+                self.stats_open,
+            )));
+        };
+        if self.view_mode {
+            // Stock: the canvas menu in view mode is just the view toggles.
+            v.push(Some((
+                Action::ToggleGrid,
+                "Toggle grid".into(),
+                "⌘'",
+                self.scene.grid_enabled(),
+            )));
+            modes(&mut v);
+            return v;
+        }
         if self.selected.is_empty() {
             v.push(e(Action::Paste, "Paste", "⌘V"));
             v.push(None);
@@ -154,10 +199,7 @@ impl ExcalidrawView {
                 "⌥S",
                 self.scene.app_bool("objectsSnapModeEnabled"),
             )));
-            v.push(e(Action::ZoomToFit, "Zoom to fit all elements", "⇧1"));
-            v.push(None);
-            v.push(e(Action::Export, "Export image…", "⇧⌘E"));
-            v.push(e(Action::Help, "Help", "?"));
+            modes(&mut v);
             return v;
         }
         let list = self.selection_list();
@@ -173,12 +215,23 @@ impl ExcalidrawView {
             v.push(e(Action::PasteStyles, "Paste styles", "⌘⌥V"));
         }
         v.push(None);
+        if list.len() == 1 && list[0].container_id().is_none() {
+            let label = if list[0].link().is_empty() {
+                "Add link"
+            } else {
+                "Edit link"
+            };
+            v.push(e(Action::Link, label, "⌘K"));
+        }
+        if list.len() == 1 && list[0].kind == "image" {
+            v.push(e(Action::Crop, "Crop image", "↵"));
+        }
         v.push(e(Action::AddToLibrary, "Add to library", ""));
         v.push(None);
         v.push(e(Action::SendBackward, "Send backward", "⌘["));
         v.push(e(Action::BringForward, "Bring forward", "⌘]"));
-        v.push(e(Action::SendToBack, "Send to back", "⌘⇧["));
-        v.push(e(Action::BringToFront, "Bring to front", "⌘⇧]"));
+        v.push(e(Action::SendToBack, "Send to back", "⌘⌥["));
+        v.push(e(Action::BringToFront, "Bring to front", "⌘⌥]"));
         v.push(None);
         v.push(e(Action::FlipH, "Flip horizontal", "⇧H"));
         v.push(e(Action::FlipV, "Flip vertical", "⇧V"));
@@ -240,9 +293,17 @@ impl ExcalidrawView {
             Action::ToggleGrid => self.toggle_grid(cx),
             Action::ToggleObjectSnap => self.toggle_object_snap(cx),
             Action::UnlockAll => self.unlock_all(cx),
-            Action::ZoomToFit => self.zoom_to_fit(),
             Action::Export => self.open_dialog(Dialog::Export),
             Action::Help => self.open_dialog(Dialog::Help),
+            Action::ZenMode => self.zen = !self.zen,
+            Action::ViewMode => {
+                let on = !self.view_mode;
+                self.set_view_mode(on);
+            }
+            Action::Stats => self.stats_open = !self.stats_open,
+            Action::Find => self.open_search(),
+            Action::Link => self.start_link_edit(),
+            Action::Crop => self.start_crop(),
         }
         cx.notify();
     }
@@ -253,7 +314,6 @@ impl ExcalidrawView {
         self.picker = None;
         if d == Dialog::Export {
             self.export.only_selected = !self.selected.is_empty();
-            self.export_preview = None;
         }
         self.dialog = Some(d);
     }
@@ -370,6 +430,68 @@ impl ExcalidrawView {
             self.selected.clear();
         }
         self.commit(cx);
+    }
+
+    /// Opens the hyperlink editor for the single selected element.
+    pub(crate) fn start_link_edit(&mut self) {
+        let list = self.selection_list();
+        if list.len() != 1 || list[0].container_id().is_some() {
+            return;
+        }
+        self.link_edit = Some((list[0].id.clone(), list[0].link().to_string()));
+    }
+
+    /// Applies the hyperlink editor's text (empty removes the link).
+    pub(crate) fn apply_link(&mut self, cx: &mut Context<Self>) {
+        let Some((id, text)) = self.link_edit.take() else {
+            return;
+        };
+        self.set_link(&id, text.trim(), cx);
+    }
+
+    pub(crate) fn set_link(&mut self, id: &str, link: &str, cx: &mut Context<Self>) {
+        let Some(e) = self.scene.get_mut(id) else {
+            return;
+        };
+        if e.link() == link {
+            return;
+        }
+        if link.is_empty() {
+            // Stock stores a removed link as `null`.
+            e.f.link.set_null();
+        } else {
+            e.f.link.set(link.to_string());
+        }
+        self.commit(cx);
+    }
+
+    /// Keyboard for the open hyperlink editor. Returns whether consumed.
+    pub(crate) fn link_key(&mut self, ks: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
+        let Some((_, text)) = self.link_edit.as_mut() else {
+            return false;
+        };
+        let m = &ks.modifiers;
+        if m.platform || m.control {
+            if ks.key == "v"
+                && let Some(t) = cx.read_from_clipboard().and_then(|c| c.text())
+            {
+                text.push_str(t.trim());
+                return true;
+            }
+            return false;
+        }
+        match ks.key.as_str() {
+            "escape" => self.link_edit = None,
+            "enter" => self.apply_link(cx),
+            "backspace" => {
+                text.pop();
+            }
+            _ => match ks.key_char.as_deref() {
+                Some(c) if !c.chars().any(char::is_control) => text.push_str(c),
+                _ => return false,
+            },
+        }
+        true
     }
 
     pub(crate) fn unlock_all(&mut self, cx: &mut Context<Self>) {
@@ -771,6 +893,25 @@ impl ExcalidrawView {
         cx.notify();
     }
 
+    /// Asks before clearing the personal library (stock confirms too).
+    pub(crate) fn reset_library(&mut self, _cx: &mut Context<Self>) {
+        self.dialog = Some(Dialog::ResetLibrary);
+    }
+
+    pub(crate) fn confirm_reset_library(&mut self, cx: &mut Context<Self>) {
+        let ids: Vec<String> = self
+            .library
+            .items
+            .iter()
+            .map(|i| library::item_id(i).to_string())
+            .collect();
+        for id in ids {
+            self.library.remove(&id);
+        }
+        self.dialog = None;
+        cx.notify();
+    }
+
     pub(crate) fn import_library_prompt(&mut self, cx: &mut Context<Self>) {
         let rx = cx.prompt_for_paths(PathPromptOptions {
             files: true,
@@ -834,7 +975,8 @@ impl ExcalidrawView {
     }
 }
 
-/// Excalidraw's colour palette (open-color shades 0/2/4/6/8 per hue).
+/// Excalidraw's colour palette (open-color shades 0/2/4/6/8 per hue), in
+/// the stock picker's grid order (top picks, then `COMMON_ELEMENT_SHADES`).
 pub const PALETTE: [(&str, [&str; 5]); 15] = [
     ("transparent", ["transparent"; 5]),
     ("white", ["#ffffff"; 5]),
@@ -848,36 +990,32 @@ pub const PALETTE: [(&str, [&str; 5]); 15] = [
         ["#f8f1ee", "#eaddd7", "#d2bab0", "#a18072", "#846358"],
     ),
     (
-        "red",
-        ["#fff5f5", "#ffc9c9", "#ff8787", "#fa5252", "#e03131"],
-    ),
-    (
-        "pink",
-        ["#fff0f6", "#fcc2d7", "#f783ac", "#e64980", "#c2255c"],
-    ),
-    (
-        "grape",
-        ["#f8f0fc", "#eebefa", "#da77f2", "#be4bdb", "#9c36b5"],
-    ),
-    (
-        "violet",
-        ["#f3f0ff", "#d0bfff", "#9775fa", "#7950f2", "#6741d9"],
+        "cyan",
+        ["#e3fafc", "#99e9f2", "#3bc9db", "#15aabf", "#0c8599"],
     ),
     (
         "blue",
         ["#e7f5ff", "#a5d8ff", "#4dabf7", "#228be6", "#1971c2"],
     ),
     (
-        "cyan",
-        ["#e3fafc", "#99e9f2", "#3bc9db", "#15aabf", "#0c8599"],
+        "violet",
+        ["#f3f0ff", "#d0bfff", "#9775fa", "#7950f2", "#6741d9"],
     ),
     (
-        "teal",
-        ["#e6fcf5", "#96f2d7", "#38d9a9", "#12b886", "#099268"],
+        "grape",
+        ["#f8f0fc", "#eebefa", "#da77f2", "#be4bdb", "#9c36b5"],
+    ),
+    (
+        "pink",
+        ["#fff0f6", "#fcc2d7", "#f783ac", "#e64980", "#c2255c"],
     ),
     (
         "green",
         ["#ebfbee", "#b2f2bb", "#69db7c", "#40c057", "#2f9e44"],
+    ),
+    (
+        "teal",
+        ["#e6fcf5", "#96f2d7", "#38d9a9", "#12b886", "#099268"],
     ),
     (
         "yellow",
@@ -886,6 +1024,10 @@ pub const PALETTE: [(&str, [&str; 5]); 15] = [
     (
         "orange",
         ["#fff4e6", "#ffd8a8", "#ffa94d", "#fd7e14", "#e8590c"],
+    ),
+    (
+        "red",
+        ["#fff5f5", "#ffc9c9", "#ff8787", "#fa5252", "#e03131"],
     ),
 ];
 
