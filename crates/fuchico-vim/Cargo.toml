@@ -1,0 +1,13 @@
+[package]
+name = "fuchico-vim"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+description = "UI-agnostic Vim modal editing engine (port of @replit/codemirror-vim 6.3.0 as used by Fuchico)"
+
+[dependencies]
+fuchico-helix.workspace = true
+ropey.workspace = true
+regex.workspace = true
+unicode-segmentation.workspace = true
+fancy-regex.workspace = true

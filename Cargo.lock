@@ -2485,6 +2485,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuchico-vim"
+version = "0.1.0"
+dependencies = [
+ "fancy-regex",
+ "fuchico-helix",
+ "regex",
+ "ropey 1.6.1",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "futf"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
