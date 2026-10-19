@@ -36,9 +36,19 @@ fn theme_colours_reach_the_svg() {
 fn errors_carry_line_and_snippet() {
     let t = MermaidTheme::light();
     let e = render_svg("flowchart TD\n  A --> B\n  subgraph X\n  C --> D", &t).unwrap_err();
-    assert!(e.to_string().contains("line 3"), "{e}");
+    // pele's message, verbatim (it reports the end of input here).
+    assert!(e.to_string().starts_with("Parse error on line 5:"), "{e}");
+    assert!(e.to_string().contains("Expecting 'end'"), "{e}");
+    assert_eq!(e.line, Some(5));
+    let e = render_svg("flowchart TD\n  A --> B\n  B --> --> C", &t).unwrap_err();
+    assert_eq!(e.line, Some(3), "{e}");
+    assert!(e.to_string().contains("B --> --> C\n"), "{e}");
     assert!(e.to_string().contains('^'), "{e}");
-    assert!(render_svg("   \n", &t).is_err());
+    let e = render_svg("   \n", &t).unwrap_err();
+    assert_eq!(
+        e.to_string(),
+        "No diagram type detected for the given text."
+    );
     assert!(render_svg("notadiagram foo bar", &t).is_err());
 }
 

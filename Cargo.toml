@@ -36,7 +36,8 @@ base64 = "0.22"
 sha2 = "0.11"
 rand = "0.8"
 indexmap = { version = "2", features = ["serde"] }
-mermaid-rs-renderer = { version = "0.3.1", default-features = false }
+rquickjs = { version = "=0.14.0", default-features = false, features = ["std"] }
+rustybuzz = "0.20"
 png = "0.17"
 dirs = "6"
 objc = "0.2"

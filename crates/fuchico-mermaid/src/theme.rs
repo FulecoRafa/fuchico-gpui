@@ -1,4 +1,4 @@
-//! Theme tokens and their mapping onto the diagram renderer.
+//! Theme tokens and their mapping onto pele's CSS variables.
 //!
 //! The original app paints diagrams from `--pele-*` CSS variables defined in
 //! `globals.css` on `.mermaid-canvas-content`:
@@ -16,12 +16,10 @@
 //! ```
 //!
 //! [`MermaidTheme`] holds the app tokens (any CSS colour string: hex, `rgb()`,
-//! `oklch()`), [`MermaidTheme::pele_vars`] resolves exactly that variable
-//! table, and [`MermaidTheme::to_renderer_theme`] maps it onto
-//! `mermaid-rs-renderer`'s theme.
+//! `oklch()`) and [`MermaidTheme::pele_vars`] resolves exactly that variable
+//! table; [`crate::svgvars`] bakes it into pele's SVG.
 
 use crate::color::{self, Rgba};
-use mermaid_rs_renderer::Theme;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MermaidTheme {
@@ -152,66 +150,6 @@ impl MermaidTheme {
             self.resolve(&self.primary),
         ]
     }
-
-    /// Map the pele variable table onto `mermaid-rs-renderer`'s theme.
-    ///
-    /// bg -> background; fg -> text colours; surface -> node fill;
-    /// surface-alt -> secondary/cluster fill; border -> node/cluster/actor
-    /// strokes; line/muted -> edges and lifelines; accent -> sequence note
-    /// tint; series 1-8 -> pie and git-graph palettes.
-    pub fn to_renderer_theme(&self) -> Theme {
-        let mut t = Theme::modern();
-        let bg = self.resolve(&self.background);
-        let fg = self.resolve(&self.foreground).css();
-        let line = self.resolve(&self.muted_foreground).css();
-        let surface = self.resolve(&self.card).css();
-        let surface_alt = self.resolve(&self.secondary).css();
-        let border = self.resolve(&self.ring).css();
-        let accent_c = self.resolve(&self.syntax_function);
-        let note = accent_c.mix_over(bg, 0.14).css();
-        let series = self.series();
-
-        t.font_family = format!("{}, sans-serif", self.font_sans);
-        t.background = "transparent".to_string();
-        t.text_color = fg.clone();
-        t.primary_text_color = fg.clone();
-        t.primary_color = surface.clone();
-        t.primary_border_color = border.clone();
-        t.line_color = line.clone();
-        t.secondary_color = surface_alt.clone();
-        t.tertiary_color = surface_alt.clone();
-        t.edge_label_background = bg.css();
-        t.cluster_background = surface_alt.clone();
-        t.cluster_border = border.clone();
-        t.sequence_actor_fill = surface.clone();
-        t.sequence_actor_border = border.clone();
-        t.sequence_actor_line = line.clone();
-        t.sequence_note_fill = note;
-        t.sequence_note_border = accent_c.css();
-        t.sequence_activation_fill = surface_alt;
-        t.sequence_activation_border = border.clone();
-
-        for i in 0..12 {
-            t.pie_colors[i] = series[i % 8].css();
-        }
-        t.pie_title_text_color = fg.clone();
-        t.pie_section_text_color = bg.css();
-        t.pie_legend_text_color = fg.clone();
-        t.pie_stroke_color = bg.css();
-        t.pie_outer_stroke_color = border;
-        t.pie_opacity = 1.0;
-        for (i, c) in series.iter().enumerate().take(8) {
-            t.git_colors[i] = c.css();
-            t.git_inv_colors[i] = bg.css();
-            t.git_branch_label_colors[i] = bg.css();
-        }
-        t.git_commit_label_color = fg;
-        t.git_commit_label_background = self.resolve(&self.card).css();
-        t.git_tag_label_color = self.resolve(&self.foreground).css();
-        t.git_tag_label_background = t.primary_color.clone();
-        t.git_tag_label_border = t.primary_border_color.clone();
-        t
-    }
 }
 
 impl Default for MermaidTheme {
@@ -242,33 +180,23 @@ mod tests {
     }
 
     #[test]
-    fn dark_differs_and_maps_to_renderer() {
-        let l = MermaidTheme::light().to_renderer_theme();
-        let d = MermaidTheme::dark().to_renderer_theme();
-        assert_ne!(l.text_color, d.text_color);
+    fn dark_differs_and_custom_tokens_flow_through() {
+        let (l, d) = (
+            MermaidTheme::light().pele_vars(),
+            MermaidTheme::dark().pele_vars(),
+        );
+        assert_ne!(var(&l, "--pele-fg"), var(&d, "--pele-fg"));
         assert_eq!(
-            d.primary_color,
+            var(&d, "--pele-surface"),
             MermaidTheme::dark()
                 .resolve(&MermaidTheme::dark().card)
                 .css()
         );
-        assert_eq!(l.pie_colors[8], l.pie_colors[0]);
-        assert_eq!(
-            l.line_color,
-            MermaidTheme::light()
-                .resolve("oklch(0.56 0.021 213.5)")
-                .css()
-        );
-    }
-
-    #[test]
-    fn custom_tokens_flow_through() {
         let mut t = MermaidTheme::light();
         t.card = "#112233".into();
         t.ring = "#445566".into();
-        let r = t.to_renderer_theme();
-        assert_eq!(r.primary_color, "#112233");
-        assert_eq!(r.primary_border_color, "#445566");
-        assert_eq!(r.cluster_border, "#445566");
+        let v = t.pele_vars();
+        assert_eq!(var(&v, "--pele-surface"), "#112233");
+        assert_eq!(var(&v, "--pele-border"), "#445566");
     }
 }

@@ -6,7 +6,8 @@ license.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true
-mermaid-rs-renderer.workspace = true
+rquickjs.workspace = true
+rustybuzz.workspace = true
 resvg.workspace = true
 image.workspace = true
 anyhow.workspace = true

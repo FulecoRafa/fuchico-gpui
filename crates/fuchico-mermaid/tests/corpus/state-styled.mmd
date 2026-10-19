@@ -1,0 +1,11 @@
+stateDiagram-v2
+    classDef bad fill:#f00,color:white,font-weight:bold
+    [*] --> Draft
+    Draft --> Published : publish
+    Draft --> Rejected : reject
+    Rejected --> [*]
+    class Rejected bad
+    state fork_state <<fork>>
+    Published --> fork_state
+    fork_state --> Archived
+    fork_state --> Shared

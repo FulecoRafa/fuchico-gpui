@@ -23,23 +23,17 @@ pub struct Raster {
     pub scale: f32,
 }
 
-fn fontdb() -> Arc<usvg::fontdb::Database> {
-    static DB: OnceLock<Arc<usvg::fontdb::Database>> = OnceLock::new();
-    DB.get_or_init(|| {
-        let mut db = usvg::fontdb::Database::new();
-        db.load_system_fonts();
-        db.set_sans_serif_family("Helvetica Neue");
-        db.set_serif_family("Times New Roman");
-        db.set_monospace_family("Menlo");
-        Arc::new(db)
-    })
-    .clone()
-}
-
 fn options() -> usvg::Options<'static> {
     usvg::Options {
-        fontdb: fontdb(),
-        font_family: "Helvetica Neue".into(),
+        fontdb: crate::fonts::fontdb(),
+        font_family: crate::fonts::default_sans(),
+        font_resolver: usvg::FontResolver {
+            select_font: usvg::FontResolver::default_font_selector(),
+            select_fallback: Box::new(|c, exclude, db| {
+                let base = db.face(*exclude.first()?)?;
+                crate::measure::fallback_face(db, c, base.weight, base.style, exclude)
+            }),
+        },
         ..Default::default()
     }
 }

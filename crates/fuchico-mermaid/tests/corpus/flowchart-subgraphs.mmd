@@ -1,0 +1,11 @@
+flowchart LR
+    subgraph Frontend
+        direction TB
+        UI[Editor] --> Preview
+    end
+    subgraph Backend [Rust core]
+        Vault[(Vault)] --> Index
+    end
+    Preview -.-> Index
+    Index ==> UI
+    Frontend --> Backend

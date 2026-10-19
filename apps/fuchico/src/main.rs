@@ -67,6 +67,7 @@ fn main() {
     app.run(move |cx| {
         gpui_kit::init(cx);
         assets::register_fonts(cx);
+        fuchico_mermaid::warm_up();
         SettingsStore::init(settings, cx);
         cx.set_global(ui_state);
         cx.set_global(window_states);
