@@ -45,6 +45,12 @@ impl SettingsStore {
         cx.global::<SettingsStore>().settings.clone()
     }
 
+    /// [`Self::get`] when the store is installed (views in tests may run
+    /// without it).
+    pub fn try_get(cx: &App) -> Option<Arc<Settings>> {
+        cx.try_global::<SettingsStore>().map(|s| s.settings.clone())
+    }
+
     /// `set(partial)`: edit, persist the whole object, notify every window.
     /// A no-op edit neither writes nor notifies.
     pub fn update(cx: &mut App, edit: impl FnOnce(&mut Settings)) {

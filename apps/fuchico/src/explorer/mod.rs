@@ -175,7 +175,7 @@ impl Explorer {
         cx.notify();
     }
 
-    fn toggle(&mut self, dir: &str, cx: &mut Context<Self>) {
+    pub(crate) fn toggle(&mut self, dir: &str, cx: &mut Context<Self>) {
         if !self.expanded.remove(dir) {
             self.expanded.insert(dir.to_string());
             self.refetch(dir.to_string(), cx);
@@ -1511,27 +1511,34 @@ fn kind_icon(kind: PendingKind) -> Icon {
     }
 }
 
-/// The row icon: the opt-in Zed icon theme's coloured SVG when one is set
-/// (`crate::dev_marks`), else [`entry_icon`].
+/// The row icon: the selected Zed icon theme's coloured SVG
+/// (`crate::zed_themes::icons`), else [`entry_icon`]. Debug selector
+/// `ex-icon:<name>:<svg stem | lucide>`.
 fn entry_icon_el(entry: &Entry, expanded: bool, muted: gpui_kit::Hsla, cx: &App) -> AnyElement {
-    let themed = crate::dev_marks::icon_theme(cx).and_then(|t| {
-        if entry.is_dir {
-            t.dir_icon(&entry.name, expanded)
-        } else {
-            t.file_icon(&entry.name)
+    use crate::zed_themes::icons::{IconFor, file_icon_el};
+    let what = if entry.is_dir {
+        IconFor::Dir {
+            name: &entry.name,
+            expanded,
         }
-    });
-    match themed {
-        Some(path) => gpui_kit::img(path.to_path_buf())
-            .size(u(14.))
-            .flex_none()
-            .into_any_element(),
-        None => entry_icon(entry)
-            .size(u(14.))
-            .flex_none()
-            .text_color(muted)
-            .into_any_element(),
-    }
+    } else {
+        IconFor::File(&entry.name)
+    };
+    let lucide = entry_icon(entry);
+    file_icon_el(
+        what,
+        14.,
+        format!("ex-icon:{}", entry.name),
+        move || {
+            lucide
+                .clone()
+                .size(u(14.))
+                .flex_none()
+                .text_color(muted)
+                .into_any_element()
+        },
+        cx,
+    )
 }
 
 /// `Folder` / `PenTool` (`.excalidraw`, case-insensitive) / `File`.

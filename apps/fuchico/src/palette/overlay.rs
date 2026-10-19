@@ -109,6 +109,21 @@ pub fn item(
     active: bool,
     cx: &App,
 ) -> Stateful<Div> {
+    let icon = gpui_kit::component::Icon::new(icon)
+        .size(u(13.))
+        .into_any_element();
+    item_with(id, icon, text, indices, active, cx)
+}
+
+/// [`item`] with any leading element (e.g. a themed file icon).
+pub fn item_with(
+    id: impl Into<gpui_kit::ElementId>,
+    icon: gpui_kit::AnyElement,
+    text: &str,
+    indices: &[usize],
+    active: bool,
+    cx: &App,
+) -> Stateful<Div> {
     let th = AppTheme::get(cx);
     let (bg, fg) = if active {
         (Some(th.colors.accent), th.colors.accent_foreground)
@@ -133,7 +148,7 @@ pub fn item(
             div()
                 .flex_none()
                 .text_color(th.colors.muted_foreground)
-                .child(gpui_kit::component::Icon::new(icon).size(u(13.))),
+                .child(icon),
         )
         .child(
             div()

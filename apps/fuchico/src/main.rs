@@ -39,6 +39,7 @@ mod theme;
 mod ui;
 mod windows;
 mod workspace;
+mod zed_themes;
 
 use fuchico_core::open_files::paths_from_args;
 
@@ -73,6 +74,7 @@ fn main() {
         cx.set_global(window_states);
         bus::init(cx);
         caldav::init(cx);
+        zed_themes::init(cx);
         theme::init(cx);
         keymap::bind_global_keys(cx);
         crate::editor::init(cx);

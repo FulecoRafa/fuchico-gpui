@@ -12,3 +12,8 @@
 - Printing (approved by the owner, 2026-10-18): `:print` / export write a Typst PDF and open it in the OS viewer, instead of the original's webview print dialog.
 - Kept supersets (approved by the owner, 2026-10-18): the vault file watcher, Mod-O / Mod-, bindings, macOS menus, Helix `gn`/`gp`/`Space f`/`Space b`/`Space /` doing real work, pending-edit flush on tab close and app quit, and conflict detection on folder events.
 - Known gpui limits: dialogs have no file-type filters (extension checks instead); Cmd+Numpad+ is indistinguishable from Cmd-Shift-= on macOS. See docs/PACKAGING.md.
+- Extra, not in the Tauri app: Zed extensions as a source of colour themes and file icon themes.
+  - Themes are read from Zed's installed extensions, or imported (a folder or a theme `.json`) into `<config>/zed-themes/`.
+  - Selection is through the `palette: "zed"` + `zedTheme` and `iconTheme` settings. Both are omitted when unset, so the original JSON shape is kept.
+  - Icons show in the explorer, the tabs (only while an icon theme is active) and quick open.
+  - This replaces the dev-only `FUCHICO_ICON_THEME` override. Mapping and layout are in docs/ZED_THEMES.md.

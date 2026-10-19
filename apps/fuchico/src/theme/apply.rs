@@ -11,7 +11,7 @@
 use gpui_kit::component::{Theme, ThemeColor, ThemeMode};
 use gpui_kit::{App, Hsla, WindowAppearance, black, px};
 
-use super::{AppTheme, ColorTokens, resolve};
+use super::{AppTheme, ColorTokens, ThemeExtras, resolve_cx};
 use crate::settings::SettingsStore;
 
 /// Whether the OS is in dark mode.
@@ -26,7 +26,7 @@ pub fn os_is_dark(cx: &App) -> bool {
 /// Call after settings change and on OS appearance changes. Cheap no-op when
 /// nothing changed.
 pub fn refresh(cx: &mut App) {
-    let theme = resolve(&SettingsStore::get(cx), os_is_dark(cx));
+    let theme = resolve_cx(&SettingsStore::get(cx), cx);
     if cx.try_global::<AppTheme>() == Some(&theme) {
         return;
     }
@@ -35,8 +35,13 @@ pub fn refresh(cx: &mut App) {
 
 /// Registers the settings observer and applies the initial theme.
 pub fn init(cx: &mut App) {
+    if cx.try_global::<crate::zed_themes::ZedThemes>().is_none() {
+        cx.set_global(crate::zed_themes::ZedThemes::default());
+    }
     refresh(cx);
     cx.observe_global::<SettingsStore>(refresh).detach();
+    cx.observe_global::<crate::zed_themes::ZedThemes>(refresh)
+        .detach();
 }
 
 pub fn apply(theme: AppTheme, cx: &mut App) {
@@ -53,6 +58,7 @@ pub fn apply(theme: AppTheme, cx: &mut App) {
     let t = theme.clone();
     Theme::update(cx, move |gt| {
         map_colors(&t.colors, &mut gt.colors);
+        map_extras(&t.extras, &mut gt.colors);
         gt.font_family = t.ui_font.clone();
         gt.mono_font_family = t.mono_font.clone();
         gt.font_size = px(16. * t.ui_scale);
@@ -63,6 +69,33 @@ pub fn apply(theme: AppTheme, cx: &mut App) {
     });
     cx.set_global(theme);
     cx.refresh_windows();
+}
+
+/// Zed-theme colours that have no token of their own.
+fn map_extras(x: &ThemeExtras, t: &mut ThemeColor) {
+    if let Some(c) = x.cursor {
+        t.caret = c;
+    }
+    if let Some(c) = x.selection {
+        t.selection = c;
+    }
+    if let Some(c) = x.success {
+        t.success = c;
+        t.success_hover = c.opacity(0.85);
+        t.success_active = c;
+        t.green = c;
+    }
+    if let Some(c) = x.warning {
+        t.warning = c;
+        t.warning_hover = c.opacity(0.85);
+        t.warning_active = c;
+        t.yellow = c;
+    }
+    if let Some(c) = x.info {
+        t.info = c;
+        t.info_hover = c.opacity(0.85);
+        t.info_active = c;
+    }
 }
 
 fn map_colors(c: &ColorTokens, t: &mut ThemeColor) {
