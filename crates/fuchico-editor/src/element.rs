@@ -25,6 +25,7 @@ use gpui_kit::{
 use crate::images::{IMAGE_PAD, ImageContext, fit};
 
 use crate::display::{DisplayLine, SpanStyle, WidgetKind};
+use crate::engine::VimCursorShape;
 use crate::style::{EditorStyle, mix};
 use crate::view::{EditorView, EngineKind, InsertCursor, LineNumbers};
 
@@ -1314,8 +1315,17 @@ impl EditorView {
         // ---- cursors -------------------------------------------------------------
         let heads = self.engine.block_cursors();
         // Plain (non-modal) editing keeps CodeMirror's native bar.
-        let block = self.options.engine != EngineKind::Normal
-            && (mode != ModeType::Insert || self.options.insert_cursor == InsertCursor::Block);
+        let vim_shape = self.engine.as_vim().map(|v| v.editor().cursor_shape());
+        let block = match vim_shape {
+            // cm-vim: fat cursor outside insert mode (replace: bottom 20%,
+            // pending operator / count: bottom half), native bar in insert.
+            Some(shape) => shape != VimCursorShape::Bar,
+            None => {
+                self.options.engine != EngineKind::Normal
+                    && (mode != ModeType::Insert
+                        || self.options.insert_cursor == InsertCursor::Block)
+            }
+        };
         let mut cursor_anchor = None;
         if self.table.is_none() {
             for (i, &h) in heads.iter().enumerate() {
@@ -1330,7 +1340,31 @@ impl EditorView {
                 let p = fl.pos(d);
                 let origin = point(fl.x + p.x, fl.top + p.y);
                 let primary = i == main_ix;
-                if block {
+                if let Some(shape) = vim_shape
+                    && block
+                {
+                    let w = fl.advance(d, char_w);
+                    let f = match shape {
+                        VimCursorShape::Half => 0.5,
+                        VimCursorShape::Underline => 0.2,
+                        _ => 1.,
+                    };
+                    let h = fl.row_h * f;
+                    let b = Bounds {
+                        origin: point(origin.x, origin.y + fl.row_h - h),
+                        size: size(w, h),
+                    };
+                    let (bg, outline) = st.fat_cursor(focused);
+                    cursors.push((b, primary, bg));
+                    prims.push(Prim::Quad(quad(
+                        b,
+                        px(2.),
+                        bg,
+                        px(1.),
+                        outline,
+                        BorderStyle::Solid,
+                    )));
+                } else if block {
                     let w = fl.advance(d, char_w);
                     let b = Bounds {
                         origin,

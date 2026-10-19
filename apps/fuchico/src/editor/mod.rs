@@ -38,7 +38,7 @@ use fuchico_core::events::CoreEvent;
 use fuchico_core::fs::file::{ReadResult, fs_read_file, fs_write_file};
 use fuchico_editor::{
     EditorEvent, EditorOptions, EditorStyle, EditorView, EngineKind, LineNumbers, MermaidBlock,
-    ZoomDirection,
+    SharedVimGlobals, VimGlobals, ZoomDirection,
 };
 use gpui_kit::{
     App, AppContext, Context, Entity, EventEmitter, ExternalPaths, FocusHandle, Focusable, Global,
@@ -99,6 +99,26 @@ fn unregister_buffer(path: &str, view: Option<&Entity<EditorView>>, cx: &mut App
     {
         cx.global_mut::<OpenBuffers>().0.remove(path);
     }
+}
+
+/// Vim state (registers, search, marks of `'`, macros, `:map`s) shared by
+/// the editors of one window, like cm-vim's single `vimGlobalState` per
+/// webview. Weak: the editors own it.
+#[derive(Default)]
+struct WindowVimGlobals(HashMap<gpui_kit::WindowId, std::rc::Weak<std::cell::RefCell<VimGlobals>>>);
+impl Global for WindowVimGlobals {}
+
+/// The Vim globals of `window` (created on first use).
+pub fn vim_globals_for(window: &Window, cx: &mut App) -> SharedVimGlobals {
+    let id = window.window_handle().window_id();
+    let map = cx.default_global::<WindowVimGlobals>();
+    map.0.retain(|_, w| w.strong_count() > 0);
+    if let Some(g) = map.0.get(&id).and_then(|w| w.upgrade()) {
+        return g;
+    }
+    let g: SharedVimGlobals = Rc::new(std::cell::RefCell::new(VimGlobals::default()));
+    map.0.insert(id, Rc::downgrade(&g));
+    g
 }
 
 // ---- rebindable shortcuts ---------------------------------------------------
@@ -177,12 +197,10 @@ pub fn sync_editor_shortcuts(cx: &mut App) {
 // ---- settings / theme mapping -------------------------------------------------
 
 /// The engine for a keybinding mode.
-// TODO(vim): `fuchico-vim` (branch wave3/vim) plugs in as `EngineKind::Vim`;
-// until it lands Vim mode drives the modal Helix engine without the Helix
-// extras (mode chip, `:` palette).
 pub fn engine_for(mode: KeybindingMode) -> EngineKind {
     match mode {
-        KeybindingMode::Helix | KeybindingMode::Vim => EngineKind::Helix,
+        KeybindingMode::Helix => EngineKind::Helix,
+        KeybindingMode::Vim => EngineKind::Vim,
         KeybindingMode::Normal => EngineKind::Normal,
     }
 }
@@ -519,8 +537,10 @@ impl EditorPane {
         let had_focus = self.focus.is_focused(window);
         let view = cx.new(|cx| EditorView::new(&content, options, style, window, cx));
         let root = self.pcx.root.clone();
+        let vim = vim_globals_for(window, cx);
         view.update(cx, |v, _| {
-            v.set_note_reader(Some(Rc::new(move |p: &str| read_note(root.as_deref(), p))))
+            v.set_note_reader(Some(Rc::new(move |p: &str| read_note(root.as_deref(), p))));
+            v.set_vim_globals(Some(vim));
         });
         self.disk_text = view.read(cx).text();
         self.stats = compute_doc_stats(&self.disk_text);

@@ -8,6 +8,7 @@ description = "Native GPUI Markdown editor for Fuchico: fuchico-helix modal engi
 [dependencies]
 gpui-kit.workspace = true
 fuchico-helix.workspace = true
+fuchico-vim.workspace = true
 fuchico-markdown.workspace = true
 fuchico-core.workspace = true
 ropey.workspace = true

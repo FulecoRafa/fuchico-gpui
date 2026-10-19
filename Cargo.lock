@@ -2412,6 +2412,7 @@ dependencies = [
  "fuchico-core",
  "fuchico-helix",
  "fuchico-markdown",
+ "fuchico-vim",
  "gpui-kit",
  "gpui-pre",
  "gpui-pre-apple",
