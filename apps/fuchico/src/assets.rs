@@ -55,4 +55,6 @@ pub fn register_fonts(cx: &mut App) {
     if let Err(e) = cx.text_system().add_fonts(fonts) {
         log::warn!("font registration failed: {e}");
     }
+    // Diagrams lay out and paint with the same bundled faces.
+    fuchico_mermaid::add_fonts(FONTS);
 }

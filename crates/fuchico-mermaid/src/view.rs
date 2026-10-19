@@ -245,9 +245,15 @@ impl MermaidView {
         self.svg.as_deref()
     }
 
-    /// Logical size of the diagram, once rendered.
+    /// Logical size of the diagram at zoom 1, once rendered: its natural
+    /// size, shrunk to the canvas width like the original's
+    /// `max-width:100%; height:auto` SVG.
     pub fn content_size(&self) -> Option<(f32, f32)> {
-        self.raster.as_ref().map(|r| (r.width, r.height))
+        let canvas_w = f32::from(self.canvas_bounds.size.width);
+        self.raster.as_ref().map(|r| {
+            let f = shrink_to_fit(r.width, canvas_w);
+            (r.width * f, r.height * f)
+        })
     }
 
     pub fn reset(&mut self, cx: &mut Context<Self>) {
@@ -305,7 +311,12 @@ impl MermaidView {
         let (Some(svg), Some(src)) = (&self.svg, &self.svg_source) else {
             return;
         };
-        let want = dpr * self.pz.scale;
+        let canvas_w = f32::from(self.canvas_bounds.size.width);
+        let fit = self
+            .raster
+            .as_ref()
+            .map_or(1.0, |r| shrink_to_fit(r.width, canvas_w));
+        let want = dpr * self.pz.scale * fit;
         if let Some(r) = &self.raster
             && r.scale >= want * 0.8
             && r.scale <= want * 3.0
@@ -328,6 +339,16 @@ impl MermaidView {
         let img = raster::rasterize_icon(icons::svg(icon), &color.hex(), px, (dpr * 2.0).ceil())?;
         self.icon_cache.insert(key, img.clone());
         Some(img)
+    }
+}
+
+/// The factor the original's `max-width:100%` applies at zoom 1: a diagram
+/// wider than the canvas is scaled down to the canvas width, never up.
+pub fn shrink_to_fit(width: f32, canvas_width: f32) -> f32 {
+    if width > 0.0 && canvas_width > 0.0 && width > canvas_width {
+        canvas_width / width
+    } else {
+        1.0
     }
 }
 
@@ -356,10 +377,8 @@ fn paint_canvas(
     }
     if let Some(r) = raster {
         let origin = bounds.origin + point(px(pz.x), px(pz.y));
-        let image_bounds = Bounds::new(
-            origin,
-            size(px(r.width * pz.scale), px(r.height * pz.scale)),
-        );
+        let k = pz.scale * shrink_to_fit(r.width, w);
+        let image_bounds = Bounds::new(origin, size(px(r.width * k), px(r.height * k)));
         let _ = window.paint_image(bounds, image_bounds, Corners::default(), r.image, 0, false);
     }
     // Pointer capture: keep panning when the cursor leaves the canvas.

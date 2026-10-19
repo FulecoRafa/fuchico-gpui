@@ -358,3 +358,53 @@ fn snapshots() {
         );
     }
 }
+
+/// Offscreen panes for a spread of the parity corpus (wide diagrams shrink
+/// to the canvas width; a syntax error shows pele's message).
+#[test]
+fn corpus_snapshots() {
+    macro_rules! corpus {
+        ($n:literal) => {
+            (
+                $n,
+                include_str!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../crates/fuchico-mermaid/tests/corpus/",
+                    $n,
+                    ".mmd"
+                )),
+            )
+        };
+    }
+    let samples = [
+        corpus!("flowchart-unicode"),
+        corpus!("class-basic"),
+        corpus!("sequence-blocks"),
+        corpus!("mindmap-shapes"),
+        corpus!("error-bad-arrow"),
+    ];
+    for (name, src) in samples {
+        for dark in [false, true] {
+            let snap = format!(
+                "mermaid-corpus-{name}-{}",
+                if dark { "dark" } else { "light" }
+            );
+            crate::snapshot::snapshot(
+                &snap,
+                size(px(380.), px(420.)),
+                SnapTheme::default_mode(dark),
+                |window, cx| {
+                    cx.new(|cx| {
+                        MermaidPane::new(
+                            "snap".into(),
+                            "Diagram".into(),
+                            Some(src.into()),
+                            window,
+                            cx,
+                        )
+                    })
+                },
+            );
+        }
+    }
+}
