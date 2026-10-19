@@ -350,6 +350,7 @@ fn palette_value(p: PaletteId) -> &'static str {
         PaletteId::Dracula => "dracula",
         PaletteId::Catppuccin => "catppuccin",
         PaletteId::Custom => "custom",
+        PaletteId::Zed => "zed",
     }
 }
 

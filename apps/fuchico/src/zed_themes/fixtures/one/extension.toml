@@ -1,0 +1,8 @@
+# Test fixture: a trimmed copy of Zed's bundled "One" theme
+# (assets/themes/one/one.json, MIT, see LICENSE). Only the style keys
+# Fuchico maps are kept.
+id = "one-fixture"
+name = "One (fixture)"
+version = "0.0.1"
+schema_version = 1
+themes = ["themes/one.json"]

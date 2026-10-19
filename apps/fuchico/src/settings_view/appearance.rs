@@ -21,6 +21,7 @@ use crate::settings::{
 };
 use crate::theme::{self, AppTheme, files};
 use crate::ui::u;
+use crate::zed_themes::{self, ZedThemes, import::slug};
 
 type FontSelect = Entity<SelectState<SearchableVec<Opt>>>;
 
@@ -43,6 +44,8 @@ pub(super) struct State {
     draft: String,
     /// Transient import/export result: (text, ok).
     theme_status: Option<(String, bool)>,
+    /// Transient Zed import result: (text, ok).
+    zed_status: Option<(String, bool)>,
 }
 
 fn font_options(families: &[String]) -> SearchableVec<Opt> {
@@ -160,6 +163,7 @@ impl State {
             editing_id: None,
             draft: String::new(),
             theme_status: None,
+            zed_status: None,
         }
     }
 }
@@ -170,6 +174,24 @@ fn editing(s: &Settings) -> Option<&CustomTheme> {
         s.active_custom_theme()
     } else {
         None
+    }
+}
+
+/// The status line after a Zed import.
+fn zed_import_status(res: Result<zed_themes::import::Imported, String>) -> (String, bool) {
+    match res {
+        Ok(r) => (
+            crate::t!(
+                SettingsThemeZedImported,
+                name = r.name,
+                count = r.colors.len() + r.icons.len()
+            ),
+            true,
+        ),
+        Err(message) => (
+            crate::t!(SettingsThemeZedImportFailed, message = message),
+            false,
+        ),
     }
 }
 
@@ -297,6 +319,38 @@ impl SettingsView {
                     Ok(_) => (crate::t!(SettingsThemeImportFailed), false),
                     Err(e) => (e, false),
                 });
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// Imports a Zed extension folder or theme `.json` into
+    /// `<config>/zed-themes/` (on a background thread), then rescans.
+    fn import_zed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let picked = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: true,
+            multiple: false,
+            prompt: Some(crate::t!(SettingsThemeZedImportPrompt).into()),
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            let Ok(Ok(Some(paths))) = picked.await else {
+                return;
+            };
+            let Some(path) = paths.into_iter().next() else {
+                return;
+            };
+            let res = cx
+                .background_spawn(async move {
+                    let dest = zed_themes::imported_dir().ok_or("no config directory")?;
+                    zed_themes::import::import_path(&path, &dest)
+                })
+                .await;
+            this.update(cx, |this, cx| {
+                this.appearance.zed_status = Some(zed_import_status(res));
+                zed_themes::reload(cx);
                 cx.notify();
             })
             .ok();
@@ -478,7 +532,96 @@ impl SettingsView {
         let palette_label = crate::t!(SettingsThemePalette);
         let custom_names = theme_names(s).join(" ");
 
+        // Zed colour themes: clicking one paints exactly it (the mode
+        // follows the theme's appearance when it has a counterpart).
+        let zed = ZedThemes::get(cx).clone();
+        let painted = th.zed_theme.clone();
+        let mut zed_toggles: Vec<Toggle> = zed
+            .colors
+            .iter()
+            .map(|c| {
+                let name = c.theme.name.clone();
+                let appearance = c.theme.appearance;
+                let active = s.palette == PaletteId::Zed
+                    && (painted.as_deref() == Some(name.as_str())
+                        || (painted.is_none() && s.zed_theme.as_deref() == Some(name.as_str())));
+                Toggle::new(
+                    format!("settings-zed-theme-{}", slug(&name)),
+                    name.clone(),
+                    active,
+                    move |_, _, cx| {
+                        let paired = ZedThemes::get(cx).has_counterpart(&name);
+                        let now_dark = AppTheme::get(cx).appearance.is_dark();
+                        let name = name.clone();
+                        SettingsStore::update(cx, move |s| {
+                            s.palette = PaletteId::Zed;
+                            s.zed_theme = Some(name);
+                            if paired && appearance.is_dark() != now_dark {
+                                s.mode = if appearance.is_dark() {
+                                    ModePref::Dark
+                                } else {
+                                    ModePref::Light
+                                };
+                            }
+                        })
+                    },
+                )
+            })
+            .collect();
+        let zed_names: Vec<String> = zed.colors.iter().map(|c| c.theme.name.clone()).collect();
+        let no_zed = zed_toggles.is_empty();
+        zed_toggles.push(
+            Toggle::new(
+                "settings-zed-import",
+                crate::t!(SettingsThemeZedImport),
+                false,
+                cx.listener(|this, _, window, cx| this.import_zed(window, cx)),
+            )
+            .icon(AppIcon::Upload)
+            .tooltip(crate::t!(SettingsThemeZedImportPrompt)),
+        );
+        let zed_label = crate::t!(SettingsThemeZedThemes);
+        let zed_field = field(&zed_label, toggles(zed_toggles, cx), cx)
+            .child(hint_text(
+                if no_zed {
+                    crate::t!(SettingsThemeZedEmpty)
+                } else {
+                    crate::t!(SettingsThemeZedHint)
+                },
+                cx,
+            ))
+            .when_some(self.appearance.zed_status.clone(), |d, (text, ok)| {
+                d.child(status(text, ok, cx))
+            });
+
+        // File icon theme: built-in Lucide or a Zed icon theme.
+        let mut icon_toggles = vec![Toggle::new(
+            "settings-icon-theme-none",
+            crate::t!(SettingsThemeIconThemeNone),
+            s.icon_theme
+                .as_deref()
+                .is_none_or(|n| zed.icon(n).is_none()),
+            |_, _, cx| SettingsStore::update(cx, |s| s.icon_theme = None),
+        )];
+        for ic in &zed.icons {
+            let name = ic.theme.name.clone();
+            icon_toggles.push(Toggle::new(
+                format!("settings-icon-theme-{}", slug(&name)),
+                name.clone(),
+                s.icon_theme.as_deref() == Some(name.as_str()),
+                move |_, _, cx| {
+                    let name = name.clone();
+                    SettingsStore::update(cx, move |s| s.icon_theme = Some(name))
+                },
+            ));
+        }
+        let icon_names: Vec<String> = zed.icons.iter().map(|c| c.theme.name.clone()).collect();
+        let icon_label = crate::t!(SettingsThemeIconTheme);
+        let icon_field = field(&icon_label, toggles(icon_toggles, cx), cx)
+            .child(hint_text(crate::t!(SettingsThemeIconThemeHint), cx));
+
         let dracula = s.palette == PaletteId::Dracula;
+        let fixed_zed = zed_themes::fixed_appearance(s, cx);
         let modes = [
             (
                 ModePref::System,
@@ -499,7 +642,7 @@ impl SettingsView {
                         s.mode == m,
                         move |_, _, cx| SettingsStore::update(cx, |s| s.mode = m),
                     )
-                    .disabled(dracula)
+                    .disabled(dracula || fixed_zed)
                 })
                 .collect(),
             cx,
@@ -515,6 +658,18 @@ impl SettingsView {
             )
             .field(
                 format!(
+                    "{zed_label} Zed {} {}",
+                    zed_names.join(" "),
+                    crate::t!(SettingsThemeZedImport)
+                ),
+                zed_field,
+            )
+            .field(
+                format!("{icon_label} {} Lucide Zed", icon_names.join(" ")),
+                icon_field,
+            )
+            .field(
+                format!(
                     "{mode_label} {}",
                     if dracula {
                         crate::t!(SettingsThemeDraculaHint)
@@ -522,9 +677,13 @@ impl SettingsView {
                         String::new()
                     }
                 ),
-                field(&mode_label, mode_group, cx).when(dracula, |d| {
-                    d.child(hint_text(crate::t!(SettingsThemeDraculaHint), cx))
-                }),
+                field(&mode_label, mode_group, cx)
+                    .when(dracula, |d| {
+                        d.child(hint_text(crate::t!(SettingsThemeDraculaHint), cx))
+                    })
+                    .when(fixed_zed, |d| {
+                        d.child(hint_text(crate::t!(SettingsThemeZedFixedHint), cx))
+                    }),
             );
 
         // Preview theme: the draft applied on top of the current settings.
@@ -550,8 +709,7 @@ impl SettingsView {
             {
                 pt.css = st.draft.clone();
             }
-            let ignored =
-                theme::resolve(&preview_settings, theme::apply::os_is_dark(cx)).ignored_css;
+            let ignored = theme::resolve_cx(&preview_settings, cx).ignored_css;
             let css_label = crate::t!(SettingsThemeCustomCss);
             let editor = div()
                 .debug_selector(|| "settings-theme-css".into())
@@ -654,7 +812,7 @@ impl SettingsView {
         } else if let Some((text, ok)) = self.appearance.theme_status.clone() {
             section = section.other(status(text, ok, cx));
         }
-        let preview_theme = theme::resolve(&preview_settings, theme::apply::os_is_dark(cx));
+        let preview_theme = theme::resolve_cx(&preview_settings, cx);
         section.other(field(
             &crate::t!(CommonPreview),
             preview_card(&preview_theme, None, None),

@@ -37,6 +37,8 @@ pub enum PaletteId {
     Dracula,
     Catppuccin,
     Custom,
+    /// A Zed colour theme (`Settings::zed_theme`; extra, not in the original).
+    Zed,
 }
 
 impl PaletteId {
@@ -50,6 +52,7 @@ impl PaletteId {
             PaletteId::Dracula => "Dracula",
             PaletteId::Catppuccin => "Catppuccin",
             PaletteId::Custom => "Custom",
+            PaletteId::Zed => "Zed",
         }
     }
 }
@@ -115,6 +118,22 @@ pub struct Settings {
     pub daily_notes_folder: String,
     pub templates_folder: String,
     pub external_tool: String,
+    /// Name of the selected Zed colour theme (used when `palette` is
+    /// `zed`). GPUI-only extra; omitted from the JSON when unset.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "lenient_opt_string"
+    )]
+    pub zed_theme: Option<String>,
+    /// Name of the Zed icon theme for file icons; `None` = built-in Lucide.
+    /// GPUI-only extra; omitted from the JSON when unset.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "lenient_opt_string"
+    )]
+    pub icon_theme: Option<String>,
     /// Unknown keys, kept as-is.
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -145,6 +164,8 @@ impl Default for Settings {
             daily_notes_folder: "daily".into(),
             templates_folder: "templates".into(),
             external_tool: String::new(),
+            zed_theme: None,
+            icon_theme: None,
             extra: Map::new(),
         }
     }
@@ -247,6 +268,16 @@ impl Settings {
             })
             .unwrap_or("")
     }
+}
+
+/// A string, else `None` (a wrongly-typed stored value must not reset the
+/// whole settings object: these keys are not in the defaults the lenient
+/// loader probes).
+fn lenient_opt_string<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    Ok(match Value::deserialize(d)? {
+        Value::String(s) if !s.trim().is_empty() => Some(s),
+        _ => None,
+    })
 }
 
 /// `theme-<Date.now() base36>-<5 random base36 chars>`.
@@ -414,6 +445,28 @@ mod tests {
         assert!(parts[1].chars().all(|c| c.is_ascii_alphanumeric()));
         assert_eq!(base36(35), "z");
         assert_eq!(base36(36), "10");
+    }
+
+    #[test]
+    fn zed_extras_round_trip_and_tolerate_bad_types() {
+        let s = Settings::from_json(Some(
+            r#"{"palette":"zed","zedTheme":"One Dark","iconTheme":"Material Icon Theme"}"#,
+        ));
+        assert_eq!(s.palette, PaletteId::Zed);
+        assert_eq!(s.zed_theme.as_deref(), Some("One Dark"));
+        assert_eq!(s.icon_theme.as_deref(), Some("Material Icon Theme"));
+        assert_eq!(Settings::from_json(Some(&s.to_json().to_string())), s);
+        let bad = Settings::from_json(Some(r#"{"tabSize":4,"zedTheme":5,"iconTheme":[1]}"#));
+        assert_eq!(bad.tab_size, 4);
+        assert_eq!(bad.zed_theme, None);
+        assert_eq!(bad.icon_theme, None);
+        assert!(
+            !Settings::default()
+                .to_json()
+                .as_object()
+                .unwrap()
+                .contains_key("iconTheme")
+        );
     }
 
     #[test]

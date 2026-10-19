@@ -34,6 +34,7 @@ impl Workspace {
         let entity = cx.entity().downgrade();
         let count = self.tabs.len();
         let active = self.tabs.active.clone();
+        let themed_icons = crate::zed_themes::icons::active(cx).is_some();
         let tabs: Vec<_> = self
             .tabs
             .tabs
@@ -53,6 +54,23 @@ impl Workspace {
                 let (p_click, p_close, p_menu, p_key) =
                     (path.clone(), path.clone(), path.clone(), path.clone());
                 let focus_tint = th.fg_alpha(0.08);
+                // Extra: with a Zed icon theme selected, tabs show file
+                // icons too (the original's tabs had none).
+                let icon = themed_icons.then(|| {
+                    let muted = th.colors.muted_foreground;
+                    crate::zed_themes::icons::file_icon_el(
+                        crate::zed_themes::icons::IconFor::File(basename(&path)),
+                        14.,
+                        format!("tab-icon-{i}"),
+                        move || {
+                            gpui_kit::component::Icon::new(gpui_kit::component::IconName::File)
+                                .size(u(14.))
+                                .text_color(muted)
+                                .into_any_element()
+                        },
+                        cx,
+                    )
+                });
                 div()
                     .id(("tab", i))
                     .debug_selector(move || format!("tab-{i}"))
@@ -122,6 +140,7 @@ impl Workspace {
                                 .bg(th.colors.syntax_function),
                         )
                     })
+                    .children(icon)
                     .child(
                         div()
                             .flex_1()

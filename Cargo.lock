@@ -2369,6 +2369,7 @@ dependencies = [
  "serde_json",
  "sys-locale",
  "tempfile",
+ "toml 0.8.23",
  "typst",
  "typst-kit",
  "typst-layout",

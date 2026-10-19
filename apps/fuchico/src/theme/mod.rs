@@ -99,7 +99,9 @@ impl ColorTokens {
         use palettes::*;
         let v = match (palette, appearance) {
             (PaletteId::Ayu, Appearance::Light) | (PaletteId::Custom, _) => &AYU_LIGHT,
-            (PaletteId::Ayu, Appearance::Dark) => &AYU_DARK,
+            // Zed themes map over the Ayu variant of their appearance.
+            (PaletteId::Ayu | PaletteId::Zed, Appearance::Dark) => &AYU_DARK,
+            (PaletteId::Zed, Appearance::Light) => &AYU_LIGHT,
             (PaletteId::Dracula, _) => &DRACULA,
             (PaletteId::Catppuccin, Appearance::Light) => &CATPPUCCIN_LATTE,
             (PaletteId::Catppuccin, Appearance::Dark) => &CATPPUCCIN_MOCHA,
@@ -118,6 +120,18 @@ impl Appearance {
     pub fn is_dark(self) -> bool {
         self == Appearance::Dark
     }
+}
+
+/// Colours some themes define beyond the 22 tokens (Zed themes' cursor,
+/// selection and status colours). `None` keeps the token-derived default.
+/// They only reach gpui-component widgets (inputs, notifications).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ThemeExtras {
+    pub cursor: Option<Hsla>,
+    pub selection: Option<Hsla>,
+    pub success: Option<Hsla>,
+    pub warning: Option<Hsla>,
+    pub info: Option<Hsla>,
 }
 
 /// Corner radii in px (`--radius` and the derived `--radius-*`).
@@ -171,6 +185,11 @@ pub struct AppTheme {
     pub ui_scale: f32,
     /// Custom-theme CSS fragments that were not understood.
     pub ignored_css: Vec<String>,
+    /// Extra colours (Zed themes).
+    pub extras: ThemeExtras,
+    /// The Zed theme actually painted (the light/dark counterpart of the
+    /// selected one when the mode asks for it).
+    pub zed_theme: Option<SharedString>,
 }
 
 impl Global for AppTheme {}
@@ -222,10 +241,42 @@ pub fn resolve_appearance(palette: PaletteId, mode: ModePref, os_dark: bool) -> 
     }
 }
 
-/// Pure resolution of the visual theme from settings.
+/// Pure resolution of the visual theme from settings, without any Zed
+/// themes (a `zed` palette then paints the Ayu base).
 pub fn resolve(settings: &Settings, os_dark: bool) -> AppTheme {
-    let appearance = resolve_appearance(settings.palette, settings.mode, os_dark);
+    resolve_with(settings, os_dark, &crate::zed_themes::ZedThemes::default())
+}
+
+/// [`resolve_with`] against the app's Zed theme registry.
+pub fn resolve_cx(settings: &Settings, cx: &App) -> AppTheme {
+    resolve_with(
+        settings,
+        apply::os_is_dark(cx),
+        crate::zed_themes::ZedThemes::get(cx),
+    )
+}
+
+/// Pure resolution of the visual theme from settings and the Zed themes.
+pub fn resolve_with(
+    settings: &Settings,
+    os_dark: bool,
+    zed: &crate::zed_themes::ZedThemes,
+) -> AppTheme {
+    let mut appearance = resolve_appearance(settings.palette, settings.mode, os_dark);
     let mut colors = ColorTokens::built_in(settings.palette, appearance);
+    let mut extras = ThemeExtras::default();
+    let mut zed_theme = None;
+    if settings.palette == PaletteId::Zed
+        && let Some(entry) = settings
+            .zed_theme
+            .as_deref()
+            .and_then(|n| zed.variant(n, appearance))
+    {
+        appearance = entry.theme.appearance;
+        let base = ColorTokens::built_in(PaletteId::Zed, appearance);
+        (colors, extras) = entry.theme.style.tokens(base);
+        zed_theme = Some(SharedString::from(entry.theme.name.clone()));
+    }
     let mut radius = Radii::default();
     let mut ui_font: Option<String> = None;
     let mut mono_font: Option<String> = None;
@@ -272,6 +323,8 @@ pub fn resolve(settings: &Settings, os_dark: bool) -> AppTheme {
         editor_font_size: crate::settings::clamp_editor_font_size(settings.editor_font_size),
         ui_scale: crate::settings::clamp_ui_scale(settings.ui_scale),
         ignored_css: ignored,
+        extras,
+        zed_theme,
     }
 }
 
@@ -476,6 +529,46 @@ mod tests {
             t.colors,
             ColorTokens::built_in(PaletteId::Ayu, Appearance::Light)
         );
+    }
+
+    #[test]
+    fn zed_palette_resolves_the_variant_for_the_mode() {
+        let dir = crate::test_ui::temp_dir("theme-zed");
+        let fx = crate::zed_themes::test_support::fixtures();
+        crate::zed_themes::import::import_path(&fx.join("one"), &dir).unwrap();
+        crate::zed_themes::import::import_path(&fx.join("midnight.json"), &dir).unwrap();
+        let zed = crate::zed_themes::ZedThemes::scan(&[(dir, crate::zed_themes::Source::Imported)]);
+        let mut s = Settings {
+            palette: PaletteId::Zed,
+            zed_theme: Some("One Dark".into()),
+            mode: ModePref::System,
+            ..Settings::default()
+        };
+        let t = resolve_with(&s, true, &zed);
+        assert_eq!(t.appearance, Appearance::Dark);
+        assert_eq!(t.zed_theme.as_deref(), Some("One Dark"));
+        assert_eq!(hex(t.colors.background), "#282c33");
+        assert_eq!(t.extras.cursor.map(hex).as_deref(), Some("#74ade8"));
+        // System light → the family's light theme.
+        let t = resolve_with(&s, false, &zed);
+        assert_eq!(t.appearance, Appearance::Light);
+        assert_eq!(t.zed_theme.as_deref(), Some("One Light"));
+        assert_eq!(hex(t.colors.background), "#fafafa");
+        // Single-appearance theme: fixed dark, like Dracula.
+        s.zed_theme = Some("Midnight".into());
+        s.mode = ModePref::Light;
+        let t = resolve_with(&s, false, &zed);
+        assert_eq!(t.appearance, Appearance::Dark);
+        assert_eq!(hex(t.colors.background), "#0d1326");
+        assert_eq!(t.extras.info, None, "Midnight has no `info` key");
+        // Unknown / uninstalled theme → the Ayu base of the mode.
+        s.zed_theme = Some("Gone".into());
+        let t = resolve_with(&s, false, &zed);
+        assert_eq!(
+            t.colors,
+            ColorTokens::built_in(PaletteId::Ayu, Appearance::Light)
+        );
+        assert_eq!(t.zed_theme, None);
     }
 
     #[test]

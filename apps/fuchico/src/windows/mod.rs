@@ -201,8 +201,9 @@ pub fn register_global_actions(cx: &mut App) {
     cx.on_action(|_: &UiZoomReset, cx| zoom_ui(cx, None));
     cx.on_action(|_: &ToggleTheme, cx| {
         let dark = crate::theme::AppTheme::get(cx).appearance.is_dark();
+        let fixed_zed = crate::zed_themes::fixed_appearance(&SettingsStore::get(cx), cx);
         SettingsStore::update(cx, |s| {
-            if s.palette == PaletteId::Dracula {
+            if s.palette == PaletteId::Dracula || fixed_zed {
                 return;
             }
             s.mode = if dark {

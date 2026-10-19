@@ -14,6 +14,7 @@ use super::OverlayEvent;
 use super::files::{FileRow, rank_files, walk_vault};
 use super::overlay;
 use crate::settings::SettingsStore;
+use crate::ui::u;
 
 /// `useVaultFiles` state.
 #[derive(Clone, Debug, PartialEq)]
@@ -150,9 +151,21 @@ impl Render for QuickSwitcher {
                 .iter()
                 .enumerate()
                 .map(|(i, r)| {
-                    overlay::item(
+                    let name = r.rel.rsplit('/').next().unwrap_or(&r.rel);
+                    let icon = crate::zed_themes::icons::file_icon_el(
+                        crate::zed_themes::icons::IconFor::File(name),
+                        13.,
+                        format!("switcher-icon-{i}"),
+                        || {
+                            gpui_kit::component::Icon::new(IconName::FileText)
+                                .size(u(13.))
+                                .into_any_element()
+                        },
+                        cx,
+                    );
+                    overlay::item_with(
                         ("switcher-file", i),
-                        IconName::FileText,
+                        icon,
                         &r.rel,
                         &r.indices,
                         i == self.active,
