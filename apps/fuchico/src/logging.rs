@@ -192,9 +192,9 @@ mod tests {
     fn log_dir_follows_tauri() {
         let d = log_dir().unwrap();
         if cfg!(target_os = "macos") {
-            assert!(d.ends_with("Library/Logs/dev.fuleco.fuchico"));
+            assert!(d.ends_with("Library/Logs/dev.fuleco.fuchico-gpui"));
         } else {
-            assert!(d.ends_with("dev.fuleco.fuchico/logs"));
+            assert!(d.ends_with("dev.fuleco.fuchico-gpui/logs"));
         }
         assert!(log_file(&d).ends_with("Fuchico.log"));
     }

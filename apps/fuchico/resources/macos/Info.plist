@@ -5,15 +5,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleDisplayName</key>
-	<string>Fuchico</string>
+	<string>Fuchico GPUI</string>
 	<key>CFBundleExecutable</key>
 	<string>fuchico</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.fuleco.fuchico</string>
+	<string>dev.fuleco.fuchico-gpui</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Fuchico</string>
+	<string>Fuchico GPUI</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

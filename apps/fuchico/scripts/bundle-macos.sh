@@ -1,6 +1,6 @@
 #!/bin/sh
-# Builds dist/Fuchico.app (unsigned), like `pnpm tauri build` did for the
-# original: identifier dev.fuleco.fuchico, icon, Productivity category and
+# Builds dist/Fuchico GPUI.app (unsigned), like `pnpm tauri build` did for the
+# original, under its own identifier dev.fuleco.fuchico-gpui: icon, Productivity category and
 # the .md/.markdown "Editor" document types (resources/macos/Info.plist).
 #
 #   apps/fuchico/scripts/bundle-macos.sh              # release build + bundle
@@ -25,7 +25,7 @@ bin="$root/target/${TARGET:+$TARGET/}$profile/fuchico"
 [ -x "$bin" ] || { echo "missing binary: $bin" >&2; exit 1; }
 
 out=${OUT_DIR:-$root/dist}
-app="$out/Fuchico.app"
+app="$out/Fuchico GPUI.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/fuchico"

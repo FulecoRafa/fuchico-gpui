@@ -50,8 +50,8 @@ gpui-pre-apple = { version = "=0.3.9", features = ["font-kit"] }
 # `scripts/bundle-macos.sh` assembles the .app without extra tools (it uses
 # resources/macos/Info.plist); `cargo bundle --release` reads this table.
 [package.metadata.bundle]
-name = "Fuchico"
-identifier = "dev.fuleco.fuchico"
+name = "Fuchico GPUI"
+identifier = "dev.fuleco.fuchico-gpui"
 icon = [
     "resources/icons/32x32.png",
     "resources/icons/128x128.png",

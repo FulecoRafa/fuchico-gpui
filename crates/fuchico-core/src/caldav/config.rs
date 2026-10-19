@@ -13,7 +13,7 @@ use crate::fs::file::write_atomic;
 /// under which every account's app-specific password is stored, keyed by
 /// that account's `id`.
 #[cfg_attr(test, allow(dead_code))]
-const KEYRING_SERVICE: &str = "dev.fuleco.fuchico";
+const KEYRING_SERVICE: &str = crate::paths::BUNDLE_IDENTIFIER;
 
 /// A saved CalDAV account. Never carries a password -- that lives in the OS
 /// keyring, looked up by `id` via [`load_password`].

@@ -55,7 +55,7 @@ You need a recent stable Rust toolchain (edition 2024).
 ```sh
 cargo run -p fuchico -- [vault-or-file ...]
 cargo test --workspace
-apps/fuchico/scripts/bundle-macos.sh      # builds dist/Fuchico.app
+apps/fuchico/scripts/bundle-macos.sh      # builds "dist/Fuchico GPUI.app"
 ```
 
 More options are in [docs/PACKAGING.md](docs/PACKAGING.md).
@@ -151,7 +151,7 @@ Você precisa de uma versão estável e recente do Rust (edição 2024).
 ```sh
 cargo run -p fuchico -- [cofre-ou-arquivo ...]
 cargo test --workspace
-apps/fuchico/scripts/bundle-macos.sh      # gera dist/Fuchico.app
+apps/fuchico/scripts/bundle-macos.sh      # gera "dist/Fuchico GPUI.app"
 ```
 
 Mais opções em [docs/PACKAGING.md](docs/PACKAGING.md).

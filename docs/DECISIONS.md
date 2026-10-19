@@ -17,3 +17,12 @@
   - Selection is through the `palette: "zed"` + `zedTheme` and `iconTheme` settings. Both are omitted when unset, so the original JSON shape is kept.
   - Icons show in the explorer, the tabs (only while an icon theme is active) and quick open.
   - This replaces the dev-only `FUCHICO_ICON_THEME` override. Mapping and layout are in docs/ZED_THEMES.md.
+
+## App identity: "Fuchico GPUI", `dev.fuleco.fuchico-gpui` (2026-10-19)
+
+Approved by the user before the first public release. The GPUI build is a
+separate app from the Tauri one: bundle name "Fuchico GPUI", identifier
+`dev.fuleco.fuchico-gpui`. Its config, data, logs, single-instance socket,
+CalDAV keyring service and Excalidraw library live under that identifier, so
+both apps install side by side and never share or overwrite each other's
+settings. Settings from the Tauri app are not imported automatically.

@@ -1,13 +1,14 @@
-//! Locations shared with the Tauri build of Fuchico (bundle identifier from
-//! `src-tauri/tauri.conf.json`).
+//! Per-app locations, laid out like Tauri's path resolver. The identifier
+//! differs from the Tauri build's (`dev.fuleco.fuchico`) so both apps can be
+//! installed side by side with their own data (see docs/DECISIONS.md).
 
 use std::path::PathBuf;
 
-pub const BUNDLE_IDENTIFIER: &str = "dev.fuleco.fuchico";
+pub const BUNDLE_IDENTIFIER: &str = "dev.fuleco.fuchico-gpui";
 
 /// Tauri's `app_data_dir()`: `<data_dir>/<identifier>`
-/// (macOS `~/Library/Application Support/dev.fuleco.fuchico`,
-/// Linux `~/.local/share/dev.fuleco.fuchico`, Windows `%APPDATA%\dev.fuleco.fuchico`).
+/// (macOS `~/Library/Application Support/dev.fuleco.fuchico-gpui`,
+/// Linux `~/.local/share/dev.fuleco.fuchico-gpui`, Windows `%APPDATA%\dev.fuleco.fuchico-gpui`).
 pub fn app_data_dir() -> Option<PathBuf> {
     dirs::data_dir().map(|d| d.join(BUNDLE_IDENTIFIER))
 }
@@ -40,10 +41,10 @@ mod tests {
     #[test]
     fn dirs_end_with_identifier() {
         if let Some(d) = app_data_dir() {
-            assert!(d.ends_with("dev.fuleco.fuchico"));
+            assert!(d.ends_with("dev.fuleco.fuchico-gpui"));
         }
         if let Some(d) = app_config_dir() {
-            assert!(d.ends_with("dev.fuleco.fuchico"));
+            assert!(d.ends_with("dev.fuleco.fuchico-gpui"));
         }
     }
 }

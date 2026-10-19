@@ -19,13 +19,13 @@ pub struct Library {
 }
 
 /// `$FUCHICO_EXCALIDRAW_LIBRARY`, else
-/// `<data dir>/fuchico/excalidraw/library.excalidrawlib`.
+/// `<data dir>/fuchico-gpui/excalidraw/library.excalidrawlib`.
 pub fn default_path() -> Option<PathBuf> {
     if let Some(p) = std::env::var_os(LIBRARY_ENV) {
         return Some(PathBuf::from(p));
     }
     dirs::data_dir().map(|d| {
-        d.join("fuchico")
+        d.join("fuchico-gpui")
             .join("excalidraw")
             .join("library.excalidrawlib")
     })
